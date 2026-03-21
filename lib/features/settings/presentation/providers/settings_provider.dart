@@ -65,17 +65,17 @@ final upgradeCheckProvider = FutureProvider<UpgradeCheck>((ref) async {
 // ============================================================================
 
 /// 主题模式 Notifier
-class ThemeModeNotifier extends StateNotifier<ThemeMode> {
-  final Ref _ref;
-
-  ThemeModeNotifier(this._ref) : super(ThemeMode.system) {
+class ThemeModeNotifier extends Notifier<ThemeMode> {
+  @override
+  ThemeMode build() {
     _loadThemeMode();
+    return ThemeMode.system;
   }
 
   /// 从 AppPreferences 加载主题模式
   Future<void> _loadThemeMode() async {
     try {
-      final prefs = await _ref.read(appPreferencesProvider.future);
+      final prefs = await ref.read(appPreferencesProvider.future);
       state = prefs.getThemeMode();
     } catch (e) {
       // 加载失败使用默认值
@@ -87,7 +87,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   Future<void> setThemeMode(ThemeMode mode) async {
     state = mode;
     try {
-      final prefs = await _ref.read(appPreferencesProvider.future);
+      final prefs = await ref.read(appPreferencesProvider.future);
       await prefs.setThemeMode(mode);
     } catch (e) {
       // 保存失败忽略
@@ -96,21 +96,27 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 }
 
 /// 主题模式 Provider
-final themeModeProvider =
-    StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
-  return ThemeModeNotifier(ref);
-});
+final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
+  ThemeModeNotifier.new,
+);
 
 // ============================================================================
 // Scan Progress Provider
 // ============================================================================
 
 /// 扫描进度 Notifier
-class ScanProgressNotifier extends StateNotifier<ScanProgress> {
-  final ScanApi _scanApi;
+class ScanProgressNotifier extends Notifier<ScanProgress> {
+  late ScanApi _scanApi;
   Timer? _pollTimer;
 
-  ScanProgressNotifier(this._scanApi) : super(ScanProgress.idle);
+  @override
+  ScanProgress build() {
+    _scanApi = ref.watch(scanApiProvider);
+    ref.onDispose(() {
+      _stopPolling();
+    });
+    return ScanProgress.idle;
+  }
 
   /// 开始扫描
   Future<void> startScan({bool reimport = false}) async {
@@ -121,12 +127,11 @@ class ScanProgressNotifier extends StateNotifier<ScanProgress> {
     } catch (e) {
       state = ScanProgress(
         status: 'error',
-        progress: 0,
         totalFiles: 0,
-        processed: 0,
-        added: 0,
-        updated: 0,
-        failed: 0,
+        scannedFiles: 0,
+        importedFiles: 0,
+        skippedFiles: 0,
+        failedFiles: 0,
       );
       rethrow;
     }
@@ -139,12 +144,11 @@ class ScanProgressNotifier extends StateNotifier<ScanProgress> {
       _stopPolling();
       state = ScanProgress(
         status: 'cancelled',
-        progress: state.progress,
         totalFiles: state.totalFiles,
-        processed: state.processed,
-        added: state.added,
-        updated: state.updated,
-        failed: state.failed,
+        scannedFiles: state.scannedFiles,
+        importedFiles: state.importedFiles,
+        skippedFiles: state.skippedFiles,
+        failedFiles: state.failedFiles,
       );
     } catch (e) {
       rethrow;
@@ -187,31 +191,31 @@ class ScanProgressNotifier extends StateNotifier<ScanProgress> {
     _pollTimer?.cancel();
     _pollTimer = null;
   }
-
-  @override
-  void dispose() {
-    _stopPolling();
-    super.dispose();
-  }
 }
 
 /// 扫描进度 Provider
 final scanProgressProvider =
-    StateNotifierProvider<ScanProgressNotifier, ScanProgress>((ref) {
-  final scanApi = ref.watch(scanApiProvider);
-  return ScanProgressNotifier(scanApi);
-});
+    NotifierProvider<ScanProgressNotifier, ScanProgress>(
+      ScanProgressNotifier.new,
+    );
 
 // ============================================================================
 // Upgrade Progress Provider
 // ============================================================================
 
 /// 升级进度 Notifier
-class UpgradeProgressNotifier extends StateNotifier<UpgradeProgress> {
-  final UpgradeApi _upgradeApi;
+class UpgradeProgressNotifier extends Notifier<UpgradeProgress> {
+  late UpgradeApi _upgradeApi;
   Timer? _pollTimer;
 
-  UpgradeProgressNotifier(this._upgradeApi) : super(UpgradeProgress.idle);
+  @override
+  UpgradeProgress build() {
+    _upgradeApi = ref.watch(upgradeApiProvider);
+    ref.onDispose(() {
+      _stopPolling();
+    });
+    return UpgradeProgress.idle;
+  }
 
   /// 开始升级
   Future<void> startUpgrade() async {
@@ -259,17 +263,10 @@ class UpgradeProgressNotifier extends StateNotifier<UpgradeProgress> {
     _pollTimer?.cancel();
     _pollTimer = null;
   }
-
-  @override
-  void dispose() {
-    _stopPolling();
-    super.dispose();
-  }
 }
 
 /// 升级进度 Provider
 final upgradeProgressProvider =
-    StateNotifierProvider<UpgradeProgressNotifier, UpgradeProgress>((ref) {
-  final upgradeApi = ref.watch(upgradeApiProvider);
-  return UpgradeProgressNotifier(upgradeApi);
-});
+    NotifierProvider<UpgradeProgressNotifier, UpgradeProgress>(
+      UpgradeProgressNotifier.new,
+    );

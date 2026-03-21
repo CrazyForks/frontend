@@ -3,21 +3,21 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../config/app_config.dart';
 import '../../../../core/theme/responsive.dart';
+import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../../settings/data/plugin_api.dart';
 
 /// 插件入口网格组件
 class PluginGrid extends StatelessWidget {
   final List<Plugin> plugins;
 
-  const PluginGrid({
-    super.key,
-    required this.plugins,
-  });
+  const PluginGrid({super.key, required this.plugins});
 
   /// 获取活跃且有入口路径的插件
   List<Plugin> get _activePlugins {
     return plugins
-        .where((p) => p.isActive && p.entryPath != null && p.entryPath!.isNotEmpty)
+        .where(
+          (p) => p.isActive && p.entryPath != null && p.entryPath!.isNotEmpty,
+        )
         .toList();
   }
 
@@ -143,21 +143,15 @@ class _PluginCard extends StatelessWidget {
     }
 
     // 构建完整 URL: baseUrl + /api/v1/plugin + entryPath
-    final url = Uri.parse('${AppConfig.baseUrl}${AppConfig.apiPrefix}/plugin${plugin.entryPath}');
+    final url = Uri.parse(
+      '${AppConfig.baseUrl}${AppConfig.apiPrefix}/plugin${plugin.entryPath}',
+    );
 
     try {
-      await launchUrl(
-        url,
-        mode: LaunchMode.externalApplication,
-      );
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('无法打开插件: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ResponsiveSnackBar.showError(context, message: '无法打开插件: $e');
       }
     }
   }

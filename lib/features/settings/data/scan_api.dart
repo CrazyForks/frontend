@@ -5,58 +5,59 @@ import '../../../core/network/api_exceptions.dart';
 
 /// 扫描进度模型
 class ScanProgress {
-  final String status; // 'idle', 'scanning', 'completed', 'cancelled', 'error'
-  final int progress; // 0-100
+  final String
+  status; // 'idle', 'scanning', 'importing', 'completed', 'failed', 'cancelling', 'cancelled'
   final String? currentFile;
   final int totalFiles;
-  final int processed;
-  final int added;
-  final int updated;
-  final int failed;
+  final int scannedFiles;
+  final int importedFiles;
+  final int skippedFiles;
+  final int failedFiles;
 
   ScanProgress({
     required this.status,
-    required this.progress,
     this.currentFile,
     required this.totalFiles,
-    required this.processed,
-    required this.added,
-    required this.updated,
-    required this.failed,
+    required this.scannedFiles,
+    required this.importedFiles,
+    required this.skippedFiles,
+    required this.failedFiles,
   });
 
   factory ScanProgress.fromJson(Map<String, dynamic> json) {
     return ScanProgress(
       status: json['status'] as String? ?? 'idle',
-      progress: json['progress'] as int? ?? 0,
       currentFile: json['current_file'] as String?,
       totalFiles: json['total_files'] as int? ?? 0,
-      processed: json['processed'] as int? ?? 0,
-      added: json['added'] as int? ?? 0,
-      updated: json['updated'] as int? ?? 0,
-      failed: json['failed'] as int? ?? 0,
+      scannedFiles: json['scanned_files'] as int? ?? 0,
+      importedFiles: json['imported_files'] as int? ?? 0,
+      skippedFiles: json['skipped_files'] as int? ?? 0,
+      failedFiles: json['failed_files'] as int? ?? 0,
     );
   }
 
   /// 默认空闲状态
   static ScanProgress get idle => ScanProgress(
-        status: 'idle',
-        progress: 0,
-        totalFiles: 0,
-        processed: 0,
-        added: 0,
-        updated: 0,
-        failed: 0,
-      );
+    status: 'idle',
+    totalFiles: 0,
+    scannedFiles: 0,
+    importedFiles: 0,
+    skippedFiles: 0,
+    failedFiles: 0,
+  );
 
-  /// 是否正在扫描
-  bool get isScanning => status == 'scanning';
+  /// 计算进度百分比 0-100
+  int get progress => totalFiles > 0 ? (scannedFiles * 100 ~/ totalFiles) : 0;
+
+  /// 是否正在扫描（包括 scanning 和 importing 阶段）
+  bool get isScanning =>
+      status == 'scanning' || status == 'importing' || status == 'cancelling';
 
   /// 是否完成
   bool get isCompleted => status == 'completed';
 
   /// 是否出错
-  bool get isError => status == 'error';
+  bool get isError => status == 'failed';
 
   /// 是否已取消
   bool get isCancelled => status == 'cancelled';
@@ -66,7 +67,7 @@ class ScanProgress {
 
   @override
   String toString() =>
-      'ScanProgress(status: $status, progress: $progress%, processed: $processed/$totalFiles)';
+      'ScanProgress(status: $status, progress: $progress%, scanned: $scannedFiles/$totalFiles)';
 }
 
 /// 扫描 API 服务
@@ -79,7 +80,10 @@ class ScanApi {
   /// POST /api/v1/scan
   Future<void> startScan({bool reimport = false}) async {
     try {
-      await dio.post('${AppConfig.apiPrefix}/scan', data: {'reimport': reimport});
+      await dio.post(
+        '${AppConfig.apiPrefix}/scan',
+        data: {'reimport': reimport},
+      );
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }

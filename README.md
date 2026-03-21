@@ -13,12 +13,17 @@ MiMusic 跨平台音乐播放器，基于 Flutter 构建，支持 6 个目标平
 | 🌐 **Web (standalone)** | [mimusic-web-standalone.tar.gz](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-web-standalone.tar.gz) | 独立部署版，支持配置后端地址 |
 | 🌐 **Web (embedded)** | [mimusic-web-embedded.tar.gz](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-web-embedded.tar.gz) | 嵌入 Go 后端同域部署 |
 | 🐧 **Linux** | [mimusic-linux-x64.tar.gz](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-linux-x64.tar.gz) | x64 桌面版 |
-| 🪟 **Windows** | [mimusic-windows-x64.zip](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-windows-x64.zip) | x64 桌面版 |
-| 🍎 **macOS** | [mimusic-macos.zip](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-macos.zip) | Universal 桌面版 |
+| | [mimusic-linux-amd64.deb](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-linux-amd64.deb) | Debian/Ubuntu x64 |
+| | [mimusic-linux-x86_64.rpm](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-linux-x86_64.rpm) | Fedora/RHEL/CentOS x64 |
+| 🪟 **Windows** | [mimusic-windows-x64.zip](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-windows-x64.zip) | x64 便携版 |
+| | [mimusic-windows-x64.msi](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-windows-x64.msi) | x64 安装版 |
+| 🍎 **macOS** | [mimusic-macos.dmg](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-macos.dmg) | Universal DMG (Intel/Apple Silicon) |
+| | [mimusic-macos.pkg](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-macos.pkg) | Universal PKG 安装包 |
+| | [mimusic-macos.zip](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-macos.zip) | Universal App 压缩包 |
 | 🤖 **Android** | [mimusic-arm64-v8a.apk](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-arm64-v8a.apk) | ARM64 设备（推荐） |
 | | [mimusic-armeabi-v7a.apk](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-armeabi-v7a.apk) | ARMv7 设备 |
 | | [mimusic-x86_64.apk](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-x86_64.apk) | x86_64 模拟器/设备 |
-| 📱 **iOS** | [mimusic-ios-nosign.tar.gz](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-ios-nosign.tar.gz) | 未签名，需自行签名安装 |
+| 📱 **iOS** | [mimusic-ios-nosign.ipa](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-ios-nosign.ipa) | 未签名 IPA，可通过 AltStore/Sideloadly 安装 |
 
 > 开发版可在 [main 分支 Release](https://github.com/mimusic-org/frontend/releases/tag/main) 获取。
 
@@ -109,6 +114,7 @@ lib/
 ├── main.dart        # 应用入口
 scripts/
 ├── build-frontend.sh         # 多平台构建脚本
+├── release-frontend.sh       # 版本发布脚本（语义化版本控制）
 └── docker-build-frontend.sh  # Docker 构建便捷脚本
 ```
 
@@ -132,8 +138,35 @@ scripts/
 
 默认构建（不传 `--dart-define`）等同于 standalone 模式。
 
+## 版本发布
+
+使用 `release-frontend.sh` 脚本进行版本发布（遵循语义化版本控制）：
+
+```bash
+# 补丁版本升级（1.0.0 -> 1.0.1）
+./scripts/release-frontend.sh patch
+
+# 次版本号升级（1.0.0 -> 1.1.0）
+./scripts/release-frontend.sh minor
+
+# 主版本号升级（1.0.0 -> 2.0.0）
+./scripts/release-frontend.sh major
+```
+
+脚本会自动：
+- 读取并升级 `pubspec.yaml` 中的版本号
+- 创建 Git 标签（格式：`v{version}`）
+- 推送 Git 标签到远程仓库
+- 提供交互式确认和进度反馈
+
 ## 后端
 
-需要配合 [MiMusic 后端](https://github.com/mimusic-org/mimusic) 服务运行。默认连接 `http://localhost:58091`，可在登录页高级设置中修改 API 地址。
+需要配合 [MiMusic 后端](https://github.com/mimusic-org/mimusic) 服务运行。默认连接 `http://localhost:58091`，可在登录页中修改 API 地址。
 
 默认账号：admin / admin
+
+🔗 **服务端 GitHub**: [https://github.com/mimusic-org/mimusic](https://github.com/mimusic-org/mimusic)
+
+## 许可证
+
+[MIT License](LICENSE)

@@ -1,0 +1,12 @@
+display_name: MiMusic
+icon: assets/icons/app_icon.png
+keywords:
+  - Music
+  - Player
+  - Self-hosted
+generic_name: Music Player
+categories:
+  - Audio
+  - Music
+  - Player
+startup_notify: true

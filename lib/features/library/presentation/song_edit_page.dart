@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/constants.dart';
 import '../../../shared/models/song.dart';
+import '../../../shared/utils/responsive_snackbar.dart';
 import 'providers/songs_provider.dart';
 
 /// 编辑/添加网络歌曲或电台的页面
@@ -10,11 +11,7 @@ class SongEditPage extends ConsumerStatefulWidget {
   final Song? song;
   final String songType; // 'remote' 或 'radio'
 
-  const SongEditPage({
-    super.key,
-    this.song,
-    required this.songType,
-  });
+  const SongEditPage({super.key, this.song, required this.songType});
 
   @override
   ConsumerState<SongEditPage> createState() => _SongEditPageState();
@@ -41,7 +38,9 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
     _artistController = TextEditingController(text: widget.song?.artist ?? '');
     _albumController = TextEditingController(text: widget.song?.album ?? '');
     _urlController = TextEditingController(text: widget.song?.url ?? '');
-    _coverUrlController = TextEditingController(text: widget.song?.coverUrl ?? '');
+    _coverUrlController = TextEditingController(
+      text: widget.song?.coverUrl ?? '',
+    );
     _durationController = TextEditingController(
       text: widget.song?.duration.toStringAsFixed(0) ?? '',
     );
@@ -63,19 +62,22 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditMode
-            ? (isRadio ? '编辑电台' : '编辑网络歌曲')
-            : (isRadio ? '添加电台' : '添加网络歌曲')),
+        title: Text(
+          isEditMode
+              ? (isRadio ? '编辑电台' : '编辑网络歌曲')
+              : (isRadio ? '添加电台' : '添加网络歌曲'),
+        ),
         actions: [
           TextButton(
             onPressed: _isSubmitting ? null : _onSubmit,
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('保存'),
+            child:
+                _isSubmitting
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('保存'),
           ),
         ],
       ),
@@ -208,12 +210,13 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
                       width: 150,
                       height: 150,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 150,
-                        height: 150,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.broken_image, size: 48),
-                      ),
+                      errorBuilder:
+                          (_, _, _) => Container(
+                            width: 150,
+                            height: 150,
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.broken_image, size: 48),
+                          ),
                     ),
                   ),
                 ),
@@ -240,65 +243,68 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
         await repository.updateSong(
           widget.song!.id,
           title: _titleController.text.trim(),
-          artist: _artistController.text.trim().isEmpty
-              ? null
-              : _artistController.text.trim(),
-          album: isRadio
-              ? null
-              : (_albumController.text.trim().isEmpty
+          artist:
+              _artistController.text.trim().isEmpty
                   ? null
-                  : _albumController.text.trim()),
+                  : _artistController.text.trim(),
+          album:
+              isRadio
+                  ? null
+                  : (_albumController.text.trim().isEmpty
+                      ? null
+                      : _albumController.text.trim()),
           url: _urlController.text.trim(),
-          coverUrl: _coverUrlController.text.trim().isEmpty
-              ? null
-              : _coverUrlController.text.trim(),
-          duration: isRadio
-              ? null
-              : (double.tryParse(_durationController.text)),
+          coverUrl:
+              _coverUrlController.text.trim().isEmpty
+                  ? null
+                  : _coverUrlController.text.trim(),
+          duration:
+              isRadio ? null : (double.tryParse(_durationController.text)),
           isLive: isRadio ? _isLive : null,
         );
       } else if (isRadio) {
         // 创建电台
         await repository.createRadioSong(
           title: _titleController.text.trim(),
-          artist: _artistController.text.trim().isEmpty
-              ? null
-              : _artistController.text.trim(),
+          artist:
+              _artistController.text.trim().isEmpty
+                  ? null
+                  : _artistController.text.trim(),
           url: _urlController.text.trim(),
-          coverUrl: _coverUrlController.text.trim().isEmpty
-              ? null
-              : _coverUrlController.text.trim(),
+          coverUrl:
+              _coverUrlController.text.trim().isEmpty
+                  ? null
+                  : _coverUrlController.text.trim(),
           isLive: _isLive,
         );
       } else {
         // 创建网络歌曲
         await repository.createRemoteSong(
           title: _titleController.text.trim(),
-          artist: _artistController.text.trim().isEmpty
-              ? null
-              : _artistController.text.trim(),
-          album: _albumController.text.trim().isEmpty
-              ? null
-              : _albumController.text.trim(),
+          artist:
+              _artistController.text.trim().isEmpty
+                  ? null
+                  : _artistController.text.trim(),
+          album:
+              _albumController.text.trim().isEmpty
+                  ? null
+                  : _albumController.text.trim(),
           url: _urlController.text.trim(),
-          coverUrl: _coverUrlController.text.trim().isEmpty
-              ? null
-              : _coverUrlController.text.trim(),
+          coverUrl:
+              _coverUrlController.text.trim().isEmpty
+                  ? null
+                  : _coverUrlController.text.trim(),
           duration: double.tryParse(_durationController.text),
         );
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEditMode ? '保存成功' : '添加成功')),
-        );
+        ResponsiveSnackBar.show(context, message: isEditMode ? '保存成功' : '添加成功');
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
-        );
+        ResponsiveSnackBar.showError(context, message: '操作失败: $e');
       }
     } finally {
       if (mounted) {

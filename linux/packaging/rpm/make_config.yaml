@@ -1,0 +1,19 @@
+display_name: MiMusic
+icon: assets/icons/app_icon.png
+summary: Self-hosted music server with cross-platform client
+group: Applications/Multimedia
+vendor: MiMusic
+packager: MiMusic Team
+packagerEmail: dev@mimusic.org
+license: MIT
+url: https://github.com/mimusic-org/mimusic
+keywords:
+  - Music
+  - Player
+  - Self-hosted
+generic_name: Music Player
+categories:
+  - Audio
+  - Music
+  - Player
+startup_notify: true

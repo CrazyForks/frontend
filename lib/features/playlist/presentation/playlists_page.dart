@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/constants.dart';
 import '../../../core/theme/responsive.dart';
+import '../../../shared/utils/responsive_snackbar.dart';
 import '../../player/presentation/providers/player_provider.dart';
 import '../domain/playlist.dart';
 import 'providers/playlist_provider.dart';
@@ -82,16 +83,19 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
 
             // 歌单列表
             playlistsAsync.when(
-              data: (response) => _buildPlaylistGrid(context, response.playlists),
-              loading: () => const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(64),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              ),
-              error: (error, stack) => SliverToBoxAdapter(
-                child: _buildErrorContent(error.toString()),
-              ),
+              data:
+                  (response) => _buildPlaylistGrid(context, response.playlists),
+              loading:
+                  () => const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(64),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+              error:
+                  (error, stack) => SliverToBoxAdapter(
+                    child: _buildErrorContent(error.toString()),
+                  ),
             ),
 
             // 底部安全区域
@@ -108,9 +112,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
 
   Widget _buildPlaylistGrid(BuildContext context, List<Playlist> playlists) {
     if (playlists.isEmpty) {
-      return SliverToBoxAdapter(
-        child: _buildEmptyContent(),
-      );
+      return SliverToBoxAdapter(child: _buildEmptyContent());
     }
 
     final crossAxisCount = context.responsive<int>(
@@ -129,20 +131,18 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
           crossAxisSpacing: 16,
           childAspectRatio: 0.7, // 卡片高度比宽度略高，预留文字区域
         ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final playlist = playlists[index];
-            return PlaylistCard(
-              playlist: playlist,
-              // 使用 push 保持导航栈，便于返回
-              onTap: () => context.push('/playlists/${playlist.id}'),
-              onEdit: () => _showEditDialog(playlist),
-              onDelete: playlist.isBuiltIn ? null : () => _confirmDelete(playlist),
-              onPlayAll: () => _playAll(playlist),
-            );
-          },
-          childCount: playlists.length,
-        ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final playlist = playlists[index];
+          return PlaylistCard(
+            playlist: playlist,
+            // 使用 push 保持导航栈，便于返回
+            onTap: () => context.push('/playlists/${playlist.id}'),
+            onEdit: () => _showEditDialog(playlist),
+            onDelete:
+                playlist.isBuiltIn ? null : () => _confirmDelete(playlist),
+            onPlayAll: () => _playAll(playlist),
+          );
+        }, childCount: playlists.length),
       ),
     );
   }
@@ -192,16 +192,9 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: colorScheme.error,
-            ),
+            Icon(Icons.error_outline, size: 64, color: colorScheme.error),
             const SizedBox(height: 16),
-            Text(
-              '加载失败',
-              style: textTheme.titleMedium,
-            ),
+            Text('加载失败', style: textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
               error,
@@ -212,7 +205,8 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: () => ref.invalidate(playlistListProvider(_selectedType)),
+              onPressed:
+                  () => ref.invalidate(playlistListProvider(_selectedType)),
               icon: const Icon(Icons.refresh),
               label: const Text('重试'),
             ),
@@ -226,9 +220,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
   Future<void> _showCreateDialog() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => const _PlaylistFormDialog(
-        title: '创建歌单',
-      ),
+      builder: (context) => const _PlaylistFormDialog(title: '创建歌单'),
     );
 
     if (result != null && mounted) {
@@ -240,9 +232,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       );
 
       if (playlist != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('歌单创建成功')),
-        );
+        ResponsiveSnackBar.showSuccess(context, message: '歌单创建成功');
       }
     }
   }
@@ -251,13 +241,14 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
   Future<void> _showEditDialog(Playlist playlist) async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _PlaylistFormDialog(
-        title: '编辑歌单',
-        initialName: playlist.name,
-        initialDescription: playlist.description,
-        initialType: playlist.type,
-        isEdit: true,
-      ),
+      builder:
+          (context) => _PlaylistFormDialog(
+            title: '编辑歌单',
+            initialName: playlist.name,
+            initialDescription: playlist.description,
+            initialType: playlist.type,
+            isEdit: true,
+          ),
     );
 
     if (result != null && mounted) {
@@ -269,9 +260,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       );
 
       if (updated != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('歌单更新成功')),
-        );
+        ResponsiveSnackBar.showSuccess(context, message: '歌单更新成功');
       }
     }
   }
@@ -280,23 +269,24 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
   Future<void> _confirmDelete(Playlist playlist) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除歌单「${playlist.name}」吗？此操作不可恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('确认删除'),
+            content: Text('确定要删除歌单「${playlist.name}」吗？此操作不可恢复。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true && mounted) {
@@ -304,9 +294,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       final success = await notifier.deletePlaylist(playlist.id);
 
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('歌单已删除')),
-        );
+        ResponsiveSnackBar.showSuccess(context, message: '歌单已删除');
       }
     }
   }
@@ -315,20 +303,21 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
   Future<void> _autoCreatePlaylists() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('自动创建歌单'),
-        content: const Text('根据音乐文件的目录结构自动创建歌单，是否继续？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('自动创建歌单'),
+            content: const Text('根据音乐文件的目录结构自动创建歌单，是否继续？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('确定'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true && mounted) {
@@ -336,46 +325,27 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       final success = await notifier.autoCreatePlaylists();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? '歌单创建完成' : '创建失败'),
-          ),
-        );
+        if (success) {
+          ResponsiveSnackBar.showSuccess(context, message: '歌单创建完成');
+        } else {
+          ResponsiveSnackBar.showError(context, message: '创建失败');
+        }
       }
     }
   }
 
-  /// 播放歌单全部歌曲
+  /// 播放歌单全部歌曲（委托给 PlayerNotifier.playPlaylistById）
   Future<void> _playAll(Playlist playlist) async {
-    try {
-      // 获取歌单歌曲
-      final playlistApi = ref.read(playlistApiProvider);
-      final response = await playlistApi.getPlaylistSongs(playlist.id, limit: 9999, offset: 0);
-      final songs = response.songs;
-
-      if (songs.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('歌单为空')),
-          );
-        }
-        return;
-      }
-
-      // 调用播放器播放
-      ref.read(playerStateProvider.notifier).playPlaylist(songs);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('播放全部 ${songs.length} 首歌曲')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('播放失败: $e')),
-        );
-      }
+    final total = await ref
+        .read(playerStateProvider.notifier)
+        .playPlaylistById(playlist.id);
+    if (!mounted) return;
+    if (total < 0) {
+      ResponsiveSnackBar.showError(context, message: '播放失败');
+    } else if (total == 0) {
+      ResponsiveSnackBar.show(context, message: '歌单为空');
+    } else {
+      ResponsiveSnackBar.show(context, message: '播放全部 $total 首歌曲');
     }
   }
 }
@@ -410,7 +380,9 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
-    _descriptionController = TextEditingController(text: widget.initialDescription);
+    _descriptionController = TextEditingController(
+      text: widget.initialDescription,
+    );
     _type = widget.initialType ?? AppConstants.playlistTypeNormal;
   }
 
@@ -492,10 +464,7 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('确定'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('确定')),
       ],
     );
   }
@@ -504,9 +473,10 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
     if (_formKey.currentState?.validate() == true) {
       Navigator.of(context).pop({
         'name': _nameController.text.trim(),
-        'description': _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
+        'description':
+            _descriptionController.text.trim().isEmpty
+                ? null
+                : _descriptionController.text.trim(),
         'type': _type,
       });
     }

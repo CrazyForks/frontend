@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_dimensions.dart';
+
 /// 空状态组件
 /// 用于显示列表为空、无数据等状态
+///
+/// 推荐使用 [FilledButton.tonal] 作为 action 按钮，以获得更好的视觉效果。
 class EmptyState extends StatelessWidget {
   /// 显示的图标
   final IconData icon;
@@ -13,10 +17,8 @@ class EmptyState extends StatelessWidget {
   final String? subtitle;
 
   /// 操作按钮（可选）
+  /// 推荐使用 [FilledButton.tonal]
   final Widget? action;
-
-  /// 图标大小
-  final double iconSize;
 
   const EmptyState({
     super.key,
@@ -24,7 +26,6 @@ class EmptyState extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.action,
-    this.iconSize = 64,
   });
 
   @override
@@ -37,12 +38,28 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: iconSize,
-              color: theme.colorScheme.onSurfaceVariant.withAlpha(128),
+            // 渐变背景圆形容器包裹图标
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.colorScheme.primary.withValues(alpha: 0.12),
+                    theme.colorScheme.primary.withValues(alpha: 0.04),
+                  ],
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: 48,
+                color: theme.colorScheme.primary.withValues(alpha: 0.6),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               title,
               style: theme.textTheme.titleMedium?.copyWith(
@@ -51,7 +68,7 @@ class EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             if (subtitle != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 subtitle!,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -61,7 +78,7 @@ class EmptyState extends StatelessWidget {
               ),
             ],
             if (action != null) ...[
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.lg),
               action!,
             ],
           ],

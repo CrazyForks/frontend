@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_exceptions.dart';
+import '../../../../core/theme/responsive.dart';
 import '../../data/upgrade_api.dart';
 import '../providers/settings_provider.dart';
 
@@ -81,16 +82,12 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     final upgradeProgress = ref.watch(upgradeProgressProvider);
 
     return AlertDialog(
-      title: Row(
-        children: [
-          const Icon(Icons.system_update),
-          const SizedBox(width: 8),
-          const Text('检查更新'),
-        ],
+      title: const Row(
+        children: [Icon(Icons.system_update), SizedBox(width: 8), Text('检查更新')],
       ),
       content: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 300,
+          maxWidth: context.responsiveDialogMaxWidth,
           maxHeight: MediaQuery.of(context).size.height * 0.6,
         ),
         child: SingleChildScrollView(
@@ -98,59 +95,68 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            // 错误信息
-            if (_error != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.error_outline, color: colorScheme.error, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _error!,
-                        style: TextStyle(color: colorScheme.onErrorContainer),
+              // 错误信息
+              if (_error != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: colorScheme.error,
+                        size: 20,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(color: colorScheme.onErrorContainer),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-            // 正在检查
-            if (_isChecking)
-              const Center(
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('正在检查更新...'),
-                  ],
+              // 正在检查
+              if (_isChecking)
+                const Center(
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('正在检查更新...'),
+                    ],
+                  ),
+                )
+              // 正在升级
+              else if (upgradeProgress.isUpgrading)
+                _buildUpgradeProgress(upgradeProgress)
+              // 升级完成
+              else if (upgradeProgress.isCompleted)
+                _buildUpgradeCompleted()
+              // 升级出错
+              else if (upgradeProgress.isError)
+                _buildUpgradeError(upgradeProgress)
+              // 本地捕获的错误（如 API 返回 403）- 错误信息已在顶部显示
+              else if (_error != null)
+                const SizedBox.shrink()
+              // 显示检查结果
+              else
+                upgradeCheckAsync.when(
+                  data: (check) => _buildCheckResult(check),
+                  loading:
+                      () => const Center(child: CircularProgressIndicator()),
+                  error:
+                      (e, _) => Text(
+                        e is ApiException ? e.message : '检查失败',
+                        style: TextStyle(color: colorScheme.error),
+                      ),
                 ),
-              )
-            // 正在升级
-            else if (upgradeProgress.isUpgrading)
-              _buildUpgradeProgress(upgradeProgress)
-            // 升级完成
-            else if (upgradeProgress.isCompleted)
-              _buildUpgradeCompleted()
-            // 升级出错
-            else if (upgradeProgress.isError)
-              _buildUpgradeError(upgradeProgress)
-            // 显示检查结果
-            else
-              upgradeCheckAsync.when(
-                data: (check) => _buildCheckResult(check),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text(
-                  e is ApiException ? e.message : '检查失败',
-                  style: TextStyle(color: colorScheme.error),
-                ),
-              ),
             ],
           ),
         ),
@@ -167,7 +173,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
       return Center(
         child: Column(
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 48),
+            const Icon(Icons.check_circle, color: Colors.green, size: 48),
             const SizedBox(height: 16),
             const Text('已是最新版本'),
             const SizedBox(height: 8),
@@ -243,10 +249,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
         Text(progress.statusText),
         if (progress.message != null) ...[
           const SizedBox(height: 8),
-          Text(
-            progress.message!,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text(progress.message!, style: Theme.of(context).textTheme.bodySmall),
         ],
       ],
     );
@@ -260,10 +263,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           const SizedBox(height: 16),
           const Text('升级完成'),
           const SizedBox(height: 8),
-          Text(
-            '应用即将重启',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text('应用即将重启', style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );
@@ -289,7 +289,10 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     );
   }
 
-  List<Widget> _buildActions(AsyncValue<UpgradeCheck> upgradeCheckAsync, UpgradeProgress upgradeProgress) {
+  List<Widget> _buildActions(
+    AsyncValue<UpgradeCheck> upgradeCheckAsync,
+    UpgradeProgress upgradeProgress,
+  ) {
     // 正在升级时不显示按钮
     if (upgradeProgress.isUpgrading) {
       return [];
@@ -300,6 +303,9 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
       return [
         FilledButton(
           onPressed: () => Navigator.pop(context),
+          style: FilledButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
           child: const Text('关闭'),
         ),
       ];
@@ -310,6 +316,9 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
       return [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
           child: const Text('关闭'),
         ),
         FilledButton(
@@ -317,6 +326,9 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
             ref.read(upgradeProgressProvider.notifier).reset();
             _checkUpgrade();
           },
+          style: FilledButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
           child: const Text('重试'),
         ),
       ];
@@ -327,7 +339,30 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
       return [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
           child: const Text('取消'),
+        ),
+      ];
+    }
+
+    // 检查时发生错误（已捕获）
+    if (_error != null) {
+      return [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('关闭'),
+        ),
+        FilledButton(
+          onPressed: _checkUpgrade,
+          style: FilledButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('重试'),
         ),
       ];
     }
@@ -339,38 +374,55 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           return [
             TextButton(
               onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                minimumSize: context.responsiveButtonMinSize,
+              ),
               child: const Text('稍后'),
             ),
             FilledButton(
               onPressed: _isStarting ? null : _startUpgrade,
-              child: _isStarting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('立即升级'),
+              style: FilledButton.styleFrom(
+                minimumSize: context.responsiveButtonMinSize,
+              ),
+              child:
+                  _isStarting
+                      ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : const Text('立即升级'),
             ),
           ];
         }
         return [
           FilledButton(
             onPressed: () => Navigator.pop(context),
+            style: FilledButton.styleFrom(
+              minimumSize: context.responsiveButtonMinSize,
+            ),
             child: const Text('关闭'),
           ),
         ];
       },
       loading: () => [],
-      error: (_, __) => [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('关闭'),
-        ),
-        FilledButton(
-          onPressed: _checkUpgrade,
-          child: const Text('重试'),
-        ),
-      ],
+      error:
+          (_, _) => [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                minimumSize: context.responsiveButtonMinSize,
+              ),
+              child: const Text('关闭'),
+            ),
+            FilledButton(
+              onPressed: _checkUpgrade,
+              style: FilledButton.styleFrom(
+                minimumSize: context.responsiveButtonMinSize,
+              ),
+              child: const Text('重试'),
+            ),
+          ],
     );
   }
 }

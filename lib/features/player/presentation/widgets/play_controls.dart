@@ -37,14 +37,12 @@ class PlayControls extends StatelessWidget {
         // 上一首
         IconButton(
           onPressed: hasPrev ? onPrev : null,
-          icon: Icon(
-            Icons.skip_previous_rounded,
-            size: iconSize,
-          ),
+          icon: Icon(Icons.skip_previous_rounded, size: iconSize),
           style: IconButton.styleFrom(
             foregroundColor: theme.colorScheme.onSurface,
-            disabledForegroundColor:
-                theme.colorScheme.onSurface.withValues(alpha: 0.38),
+            disabledForegroundColor: theme.colorScheme.onSurface.withValues(
+              alpha: 0.38,
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -54,14 +52,12 @@ class PlayControls extends StatelessWidget {
         // 下一首
         IconButton(
           onPressed: hasNext ? onNext : null,
-          icon: Icon(
-            Icons.skip_next_rounded,
-            size: iconSize,
-          ),
+          icon: Icon(Icons.skip_next_rounded, size: iconSize),
           style: IconButton.styleFrom(
             foregroundColor: theme.colorScheme.onSurface,
-            disabledForegroundColor:
-                theme.colorScheme.onSurface.withValues(alpha: 0.38),
+            disabledForegroundColor: theme.colorScheme.onSurface.withValues(
+              alpha: 0.38,
+            ),
           ),
         ),
       ],
@@ -72,41 +68,37 @@ class PlayControls extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (isBuffering) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
+      return ClipOval(
+        child: Container(
+          width: size,
+          height: size,
           color: theme.colorScheme.primary,
-          shape: BoxShape.circle,
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(size * 0.25),
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              theme.colorScheme.onPrimary,
+          child: Padding(
+            padding: EdgeInsets.all(size * 0.25),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                theme.colorScheme.onPrimary,
+              ),
             ),
           ),
         ),
       );
     }
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary,
-        shape: BoxShape.circle,
-      ),
+    return ClipOval(
       child: Material(
-        color: Colors.transparent,
+        color: theme.colorScheme.primary,
         child: InkWell(
           onTap: isPlaying ? onPause : onPlay,
-          customBorder: const CircleBorder(),
-          child: Icon(
-            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            size: iconSize,
-            color: theme.colorScheme.onPrimary,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Icon(
+              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              size: iconSize,
+              color: theme.colorScheme.onPrimary,
+            ),
           ),
         ),
       ),
@@ -157,9 +149,7 @@ class CompactPlayButton extends StatelessWidget {
         isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
         size: size * 0.6,
       ),
-      style: IconButton.styleFrom(
-        foregroundColor: theme.colorScheme.primary,
-      ),
+      style: IconButton.styleFrom(foregroundColor: theme.colorScheme.primary),
     );
   }
 }

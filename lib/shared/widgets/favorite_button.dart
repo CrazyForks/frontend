@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/library/presentation/providers/favorite_provider.dart';
+import '../utils/responsive_snackbar.dart';
 
 /// 收藏按钮组件
 /// 点击切换收藏状态，带有缩放动画效果
@@ -41,13 +42,17 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton>
     );
     _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.3)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 1.3,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 50,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.3, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween<double>(
+          begin: 1.3,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 50,
       ),
     ]).animate(_animationController);
@@ -75,20 +80,17 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton>
       widget.onToggle?.call(newState);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(newState ? '已添加到收藏' : '已取消收藏'),
-            duration: const Duration(seconds: 1),
-          ),
+        ResponsiveSnackBar.show(
+          context,
+          message: newState ? '已添加到收藏' : '已取消收藏',
+          duration: const Duration(seconds: 1),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isFavorited ? '取消收藏失败' : '收藏失败'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+        ResponsiveSnackBar.showError(
+          context,
+          message: isFavorited ? '取消收藏失败' : '收藏失败',
         );
       }
     } finally {
@@ -114,9 +116,10 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton>
         ),
         icon: Icon(
           isFavorited ? Icons.favorite : Icons.favorite_border,
-          color: isFavorited
-              ? Colors.red
-              : Theme.of(context).colorScheme.onSurfaceVariant,
+          color:
+              isFavorited
+                  ? Colors.red
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         tooltip: isFavorited ? '取消收藏' : '收藏',
       ),

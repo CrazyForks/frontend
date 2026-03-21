@@ -1,0 +1,18 @@
+display_name: MiMusic
+package_name: mimusic
+maintainer:
+  name: MiMusic Team
+  email: dev@mimusic.org
+priority: optional
+section: sound
+icon: assets/icons/app_icon.png
+keywords:
+  - Music
+  - Player
+  - Self-hosted
+generic_name: Music Player
+categories:
+  - Audio
+  - Music
+  - Player
+startup_notify: true

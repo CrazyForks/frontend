@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/cover_url.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/song.dart';
+import '../../../shared/utils/responsive_snackbar.dart';
+import '../domain/player_state.dart';
 import 'providers/player_provider.dart';
 
 /// 播放队列底部弹窗
@@ -30,6 +32,17 @@ class QueueBottomSheet extends ConsumerWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    // 播放列表变空时（逐个删除到最后一首），自动关闭队列弹窗
+    ref.listen<PlayerState>(playerStateProvider, (previous, next) {
+      if (previous != null &&
+          previous.playlist.isNotEmpty &&
+          next.playlist.isEmpty) {
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+      }
+    });
+
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.4,
@@ -49,10 +62,16 @@ class QueueBottomSheet extends ConsumerWidget {
               const Divider(height: 1),
               // 歌曲列表
               Expanded(
-                child: state.playlist.isEmpty
-                    ? _buildEmptyState(context, colorScheme, theme)
-                    : _buildQueueList(
-                        context, ref, state, notifier, scrollController),
+                child:
+                    state.playlist.isEmpty
+                        ? _buildEmptyState(context, colorScheme, theme)
+                        : _buildQueueList(
+                          context,
+                          ref,
+                          state,
+                          notifier,
+                          scrollController,
+                        ),
               ),
             ],
           ),
@@ -163,12 +182,6 @@ class QueueBottomSheet extends ConsumerWidget {
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             ),
           ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.library_music_rounded),
-            label: const Text('去选择歌曲'),
-          ),
         ],
       ),
     );
@@ -216,16 +229,15 @@ class QueueBottomSheet extends ConsumerWidget {
     Song song,
   ) {
     notifier.removeFromPlaylist(index);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('已移除「${song.title}」'),
-        action: SnackBarAction(
-          label: '撤销',
-          onPressed: () {
-            // TODO: 实现撤销功能
-          },
-        ),
-        duration: const Duration(seconds: 2),
+    ResponsiveSnackBar.show(
+      context,
+      message: '已移除「${song.title}」',
+      duration: const Duration(seconds: 2),
+      action: SnackBarAction(
+        label: '撤销',
+        onPressed: () {
+          notifier.insertToPlaylist(index, song);
+        },
       ),
     );
   }
@@ -234,23 +246,24 @@ class QueueBottomSheet extends ConsumerWidget {
   void _showClearConfirmation(BuildContext context, PlayerNotifier notifier) {
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('清空播放队列'),
-        content: const Text('确定要清空播放队列吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('清空播放队列'),
+            content: const Text('确定要清空播放队列吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  notifier.clearPlaylist();
+                  Navigator.pop(dialogContext); // 关闭确认对话框，队列弹窗由 ref.listen 自动关闭
+                },
+                child: const Text('清空'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () {
-              notifier.clearPlaylist();
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('清空'),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -293,15 +306,13 @@ class _QueueSongItem extends StatelessWidget {
         color: colorScheme.errorContainer,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        child: Icon(
-          Icons.delete_rounded,
-          color: colorScheme.onErrorContainer,
-        ),
+        child: Icon(Icons.delete_rounded, color: colorScheme.onErrorContainer),
       ),
       child: Material(
-        color: isCurrentSong
-            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
-            : Colors.transparent,
+        color:
+            isCurrentSong
+                ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                : Colors.transparent,
         child: InkWell(
           onTap: onTap,
           child: Padding(
@@ -337,10 +348,10 @@ class _QueueSongItem extends StatelessWidget {
                           fit: BoxFit.cover,
                           width: 48,
                           height: 48,
-                          placeholder: (_, __) =>
-                              _buildCoverPlaceholder(colorScheme),
-                          errorWidget: (_, __, ___) =>
-                              _buildCoverPlaceholder(colorScheme),
+                          placeholder:
+                              (_, _) => _buildCoverPlaceholder(colorScheme),
+                          errorWidget:
+                              (_, _, _) => _buildCoverPlaceholder(colorScheme),
                         )
                       else
                         _buildCoverPlaceholder(colorScheme),
@@ -370,10 +381,13 @@ class _QueueSongItem extends StatelessWidget {
                         song.title,
                         style: textTheme.bodyMedium?.copyWith(
                           fontWeight:
-                              isCurrentSong ? FontWeight.w600 : FontWeight.normal,
-                          color: isCurrentSong
-                              ? colorScheme.primary
-                              : colorScheme.onSurface,
+                              isCurrentSong
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                          color:
+                              isCurrentSong
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

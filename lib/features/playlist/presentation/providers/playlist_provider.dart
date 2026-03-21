@@ -19,35 +19,66 @@ final playlistRepositoryProvider = Provider<PlaylistRepository>((ref) {
 });
 
 /// 获取歌单列表 Provider（带类型筛选）
-final playlistListProvider = FutureProvider.family<PlaylistListResponse, String?>(
-  (ref, type) async {
-    final repository = ref.watch(playlistRepositoryProvider);
-    return repository.getPlaylists(type: type, limit: 100);
-  },
-);
+final playlistListProvider =
+    FutureProvider.family<PlaylistListResponse, String?>((ref, type) async {
+      final repository = ref.watch(playlistRepositoryProvider);
+      return repository.getPlaylists(type: type, limit: 100);
+    });
 
 /// 获取歌单详情 Provider
-final playlistDetailProvider = FutureProvider.family<Playlist, int>(
-  (ref, id) async {
-    final repository = ref.watch(playlistRepositoryProvider);
-    return repository.getPlaylist(id);
-  },
-);
+final playlistDetailProvider = FutureProvider.family<Playlist, int>((
+  ref,
+  id,
+) async {
+  final repository = ref.watch(playlistRepositoryProvider);
+  return repository.getPlaylist(id);
+});
 
-/// 获取歌单歌曲 Provider
-final playlistSongsProvider = FutureProvider.family<SongListResponse, int>(
-  (ref, id) async {
-    final repository = ref.watch(playlistRepositoryProvider);
-    return repository.getPlaylistSongs(id, limit: 1000);
-  },
-);
+/// 获取歌单歌曲 Provider（自动分页，确保加载全部歌曲）
+final playlistSongsProvider = FutureProvider.family<SongListResponse, int>((
+  ref,
+  id,
+) async {
+  final repository = ref.watch(playlistRepositoryProvider);
+  const pageLimit = 500;
+
+  // 第一页
+  final firstPage = await repository.getPlaylistSongs(
+    id,
+    limit: pageLimit,
+    offset: 0,
+  );
+  final total = firstPage.total;
+
+  // 第一页已包含全部歌曲，直接返回
+  if (firstPage.songs.length >= total) return firstPage;
+
+  // 继续加载剩余页
+  final allSongs = List<Song>.from(firstPage.songs);
+  int offset = firstPage.songs.length;
+  while (offset < total) {
+    final page = await repository.getPlaylistSongs(
+      id,
+      limit: pageLimit,
+      offset: offset,
+    );
+    if (page.songs.isEmpty) break;
+    allSongs.addAll(page.songs);
+    offset += page.songs.length;
+  }
+
+  return SongListResponse(songs: allSongs, total: total);
+});
 
 /// 歌单操作 Notifier
-class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
-  final PlaylistRepository _repository;
-  final Ref _ref;
+class PlaylistNotifier extends Notifier<AsyncValue<void>> {
+  late PlaylistRepository _repository;
 
-  PlaylistNotifier(this._repository, this._ref) : super(const AsyncValue.data(null));
+  @override
+  AsyncValue<void> build() {
+    _repository = ref.watch(playlistRepositoryProvider);
+    return const AsyncValue.data(null);
+  }
 
   /// 创建歌单
   Future<Playlist?> createPlaylist({
@@ -66,7 +97,7 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
       );
       state = const AsyncValue.data(null);
       // 刷新歌单列表
-      _ref.invalidate(playlistListProvider);
+      ref.invalidate(playlistListProvider);
       return playlist;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -91,8 +122,8 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
       );
       state = const AsyncValue.data(null);
       // 刷新歌单详情和列表
-      _ref.invalidate(playlistDetailProvider(id));
-      _ref.invalidate(playlistListProvider);
+      ref.invalidate(playlistDetailProvider(id));
+      ref.invalidate(playlistListProvider);
       return playlist;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -107,7 +138,7 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
       await _repository.deletePlaylist(id);
       state = const AsyncValue.data(null);
       // 刷新歌单列表
-      _ref.invalidate(playlistListProvider);
+      ref.invalidate(playlistListProvider);
       return true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -122,7 +153,7 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
       await _repository.autoCreatePlaylists();
       state = const AsyncValue.data(null);
       // 刷新歌单列表
-      _ref.invalidate(playlistListProvider);
+      ref.invalidate(playlistListProvider);
       return true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -137,7 +168,7 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
       await _repository.addSongsToPlaylist(playlistId, songIds);
       state = const AsyncValue.data(null);
       // 刷新歌单歌曲列表
-      _ref.invalidate(playlistSongsProvider(playlistId));
+      ref.invalidate(playlistSongsProvider(playlistId));
       return true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -152,7 +183,7 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
       await _repository.removeSongFromPlaylist(playlistId, songId);
       state = const AsyncValue.data(null);
       // 刷新歌单歌曲列表
-      _ref.invalidate(playlistSongsProvider(playlistId));
+      ref.invalidate(playlistSongsProvider(playlistId));
       return true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -167,7 +198,7 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
       await _repository.reorderPlaylistSongs(playlistId, songIds);
       state = const AsyncValue.data(null);
       // 刷新歌单歌曲列表
-      _ref.invalidate(playlistSongsProvider(playlistId));
+      ref.invalidate(playlistSongsProvider(playlistId));
       return true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -184,7 +215,7 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
       }
       state = const AsyncValue.data(null);
       // 刷新歌单歌曲列表
-      _ref.invalidate(playlistSongsProvider(playlistId));
+      ref.invalidate(playlistSongsProvider(playlistId));
       return true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -204,7 +235,4 @@ class PlaylistNotifier extends StateNotifier<AsyncValue<void>> {
 
 /// 歌单操作 Provider
 final playlistNotifierProvider =
-    StateNotifierProvider<PlaylistNotifier, AsyncValue<void>>((ref) {
-  final repository = ref.watch(playlistRepositoryProvider);
-  return PlaylistNotifier(repository, ref);
-});
+    NotifierProvider<PlaylistNotifier, AsyncValue<void>>(PlaylistNotifier.new);

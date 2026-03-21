@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/constants.dart';
 import '../../../core/theme/responsive.dart';
+import '../../../shared/models/song.dart';
+import '../../../shared/utils/responsive_snackbar.dart';
 import '../../../shared/widgets/add_to_playlist_modal.dart';
+import '../../player/presentation/providers/player_provider.dart';
 import 'providers/songs_provider.dart';
 import 'song_edit_page.dart';
 import 'widgets/song_filter_bar.dart';
@@ -91,7 +94,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: colorScheme.onErrorContainer),
+                    icon: Icon(
+                      Icons.close,
+                      color: colorScheme.onErrorContainer,
+                    ),
                     onPressed: () {
                       ref.read(songsListProvider.notifier).clearError();
                     },
@@ -100,9 +106,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               ),
             ),
           // 歌曲列表
-          Expanded(
-            child: _buildSongList(context, state),
-          ),
+          Expanded(child: _buildSongList(context, state)),
         ],
       ),
     );
@@ -122,9 +126,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           TextButton.icon(
             icon: const Icon(Icons.playlist_add),
             label: const Text('添加到歌单'),
-            onPressed: state.selectedSongIds.isEmpty
-                ? null
-                : () => _showAddToPlaylistDialog(context, state.selectedSongIds.toList()),
+            onPressed:
+                state.selectedSongIds.isEmpty
+                    ? null
+                    : () => _showAddToPlaylistDialog(
+                      context,
+                      state.selectedSongIds.toList(),
+                    ),
           ),
           TextButton(
             onPressed: () {
@@ -158,24 +166,25 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               _navigateToAddSong(context, AppConstants.songTypeRadio);
             }
           },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'remote',
-              child: ListTile(
-                leading: Icon(Icons.cloud),
-                title: Text('添加网络歌曲'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'radio',
-              child: ListTile(
-                leading: Icon(Icons.radio),
-                title: Text('添加电台'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
+          itemBuilder:
+              (context) => [
+                const PopupMenuItem(
+                  value: 'remote',
+                  child: ListTile(
+                    leading: Icon(Icons.cloud),
+                    title: Text('添加网络歌曲'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'radio',
+                  child: ListTile(
+                    leading: Icon(Icons.radio),
+                    title: Text('添加电台'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
         ),
         // 清理按钮
         IconButton(
@@ -195,18 +204,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         decoration: InputDecoration(
           hintText: '搜索歌曲...',
           prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    ref.read(songsListProvider.notifier).search('');
-                  },
-                )
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          suffixIcon:
+              _searchController.text.isNotEmpty
+                  ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchController.clear();
+                      ref.read(songsListProvider.notifier).search('');
+                    },
+                  )
+                  : null,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
         onChanged: _onSearchChanged,
@@ -225,9 +233,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
     return RefreshIndicator(
       onRefresh: () => ref.read(songsListProvider.notifier).refresh(),
-      child: context.isMobile
-          ? _buildMobileList(context, state)
-          : _buildDesktopList(context, state),
+      child:
+          context.isMobile
+              ? _buildMobileList(context, state)
+              : _buildDesktopList(context, state),
     );
   }
 
@@ -257,9 +266,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             ref.read(songsListProvider.notifier).toggleSongSelection(song.id);
           },
           onDelete: () => _showDeleteConfirmDialog(context, song.id),
-          onEdit: song.type != AppConstants.songTypeLocal
-              ? () => _navigateToEditSong(context, song)
-              : null,
+          onEdit:
+              song.type != AppConstants.songTypeLocal
+                  ? () => _navigateToEditSong(context, song)
+                  : null,
           onAddToPlaylist: () => _showAddToPlaylistDialog(context, [song.id]),
         );
       },
@@ -375,13 +385,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 isSelectionMode: state.isSelectionMode,
                 onTap: () => _onSongTap(song),
                 onSelect: () {
-                  ref.read(songsListProvider.notifier).toggleSongSelection(song.id);
+                  ref
+                      .read(songsListProvider.notifier)
+                      .toggleSongSelection(song.id);
                 },
                 onDelete: () => _showDeleteConfirmDialog(context, song.id),
-                onEdit: song.type != AppConstants.songTypeLocal
-                    ? () => _navigateToEditSong(context, song)
-                    : null,
-                onAddToPlaylist: () => _showAddToPlaylistDialog(context, [song.id]),
+                onEdit:
+                    song.type != AppConstants.songTypeLocal
+                        ? () => _navigateToEditSong(context, song)
+                        : null,
+                onAddToPlaylist:
+                    () => _showAddToPlaylistDialog(context, [song.id]),
               );
             },
           ),
@@ -407,34 +421,29 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           Text(
             state.keyword.isNotEmpty ? '未找到匹配的歌曲' : '歌曲库为空',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             state.keyword.isNotEmpty ? '尝试其他关键词' : '添加一些歌曲开始吧',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _onSongTap(dynamic song) {
-    // TODO: 实现播放功能
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('播放: ${song.title}')),
-    );
+  void _onSongTap(Song song) {
+    ref.read(playerStateProvider.notifier).playSong(song);
   }
 
   void _navigateToAddSong(BuildContext context, String songType) async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
-        builder: (context) => SongEditPage(songType: songType),
-      ),
+      MaterialPageRoute(builder: (context) => SongEditPage(songType: songType)),
     );
     if (result == true) {
       ref.read(songsListProvider.notifier).refresh();
@@ -456,51 +465,55 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   void _showDeleteConfirmDialog(BuildContext context, int songId) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这首歌曲吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('确认删除'),
+            content: const Text('确定要删除这首歌曲吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ref.read(songsListProvider.notifier).deleteSong(songId);
+                },
+                child: const Text('删除'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ref.read(songsListProvider.notifier).deleteSong(songId);
-            },
-            child: const Text('删除'),
-          ),
-        ],
-      ),
     );
   }
 
   void _showCleanConfirmDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('清理歌曲'),
-        content: const Text('将清理无效的歌曲记录（如文件已删除的本地歌曲）。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('清理歌曲'),
+            content: const Text('将清理无效的歌曲记录（如文件已删除的本地歌曲）。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  final cleaned =
+                      await ref.read(songsListProvider.notifier).cleanSongs();
+                  if (context.mounted) {
+                    ResponsiveSnackBar.show(
+                      context,
+                      message: '已清理 $cleaned 首无效歌曲',
+                    );
+                  }
+                },
+                child: const Text('清理'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final cleaned = await ref.read(songsListProvider.notifier).cleanSongs();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('已清理 $cleaned 首无效歌曲')),
-                );
-              }
-            },
-            child: const Text('清理'),
-          ),
-        ],
-      ),
     );
   }
 

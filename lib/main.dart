@@ -1,20 +1,37 @@
+import 'dart:io' show Platform;
+import 'dart:ui';
+
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 import 'config/app_config.dart';
+import 'core/audio/audio_service.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/responsive.dart';
 import 'core/router/app_router.dart';
 import 'features/settings/presentation/providers/settings_provider.dart';
+
+/// 全局 AudioHandler Provider
+final audioHandlerProvider = Provider<MiMusicAudioHandler>((ref) {
+  throw UnimplementedError('audioHandlerProvider must be overridden');
+});
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Web 平台禁用 Google Fonts 运行时加载，避免从 Google CDN 拉取字体资源
-  if (kIsWeb) {
-    GoogleFonts.config.allowRuntimeFetching = false;
-  }
+  // 全局异常处理，防止未捕获异常导致白屏
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('[FlutterError] ${details.exceptionAsString()}');
+    FlutterError.presentError(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[PlatformError] $error\n$stack');
+    return true;
+  };
 
   if (AppConfig.isEmbedded) {
     // 嵌入模式：Flutter Web 嵌入 Go 后端，直接使用当前页面的 origin 作为后端 API 地址
@@ -29,15 +46,77 @@ void main() async {
     }
   }
 
+  // Android 13+ 需要运行时请求通知权限
+  if (!kIsWeb && Platform.isAndroid) {
+    final status = await Permission.notification.status;
+    debugPrint('[Main] 📱 Android 平台检测');
+    debugPrint('[Main] 通知权限状态: $status');
+    if (status.isDenied) {
+      debugPrint('[Main] 请求通知权限...');
+      final result = await Permission.notification.request();
+      debugPrint('[Main] 通知权限请求结果: $result');
+    }
+    // 检查权限是否永久拒绝
+    if (status.isPermanentlyDenied) {
+      debugPrint('[Main] ⚠️ 通知权限被永久拒绝，需要在系统设置中手动开启');
+    }
+  }
+
+  // 初始化 audio_service（带降级保护）
+  MiMusicAudioHandler audioHandler;
+  try {
+    debugPrint('[Main] 🚀 开始初始化 AudioService...');
+    debugPrint('[Main] AudioServiceConfig:');
+    debugPrint('[Main]   - channelId: com.mimusic.playback');
+    debugPrint('[Main]   - channelName: MiMusic 播放控制');
+
+    audioHandler = await AudioService.init<MiMusicAudioHandler>(
+      builder: () {
+        debugPrint('[Main] 调用 MiMusicAudioHandler builder...');
+        return MiMusicAudioHandler();
+      },
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.mimusic.playback',
+        androidNotificationChannelName: 'MiMusic 播放控制',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+      ),
+    );
+    // 等待 handler 内部初始化完成（AudioSession + stream listeners）
+    debugPrint('[Main] 等待 handler 初始化完成...');
+    await audioHandler.ensureInitialized();
+    debugPrint(
+      '[Main] ✅ AudioService 初始化成功, handler type: ${audioHandler.runtimeType}',
+    );
+  } catch (e, stackTrace) {
+    debugPrint('[Main] ❌ AudioService.init 失败: $e');
+    debugPrint('[Main] Stack trace: $stackTrace');
+    debugPrint('[Main] ⚠️ 使用降级 handler (通知栏功能将不可用)');
+    audioHandler = MiMusicAudioHandler();
+    await audioHandler.ensureInitialized();
+  }
+
   runApp(
-    const ProviderScope(
-      child: MiMusicApp(),
+    ProviderScope(
+      overrides: [
+        // 将 audioHandler 注入到 Riverpod 中
+        audioHandlerProvider.overrideWithValue(audioHandler),
+      ],
+      child: const MiMusicApp(),
     ),
   );
 }
 
 class MiMusicApp extends ConsumerWidget {
   const MiMusicApp({super.key});
+
+  /// 根据屏幕宽度获取 ScreenType
+  ScreenType _getScreenType(double width) {
+    if (width >= ResponsiveBreakpoints.tv) return ScreenType.tv;
+    if (width >= ResponsiveBreakpoints.desktop) return ScreenType.desktop;
+    if (width >= ResponsiveBreakpoints.tablet) return ScreenType.tablet;
+    return ScreenType.mobile;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,10 +125,22 @@ class MiMusicApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'MiMusic',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme(),
+      darkTheme: AppTheme.darkTheme(),
       themeMode: themeMode,
       routerConfig: router,
+      builder: (context, child) {
+        // 在 builder 中获取 MediaQuery 来应用响应式主题
+        final width = MediaQuery.of(context).size.width;
+        final screenType = _getScreenType(width);
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Theme(
+          data: isDark
+              ? AppTheme.darkTheme(screenType: screenType)
+              : AppTheme.lightTheme(screenType: screenType),
+          child: child!,
+        );
+      },
     );
   }
 }

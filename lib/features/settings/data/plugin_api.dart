@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../../config/app_config.dart';
@@ -64,6 +66,63 @@ class Plugin {
   String toString() => 'Plugin(id: $id, name: $displayName, status: $status)';
 }
 
+/// 单个插件上传结果
+class PluginUploadResult {
+  final String fileName;
+  final Plugin? plugin;
+  final String? error;
+  final bool success;
+
+  PluginUploadResult({
+    required this.fileName,
+    this.plugin,
+    this.error,
+    required this.success,
+  });
+
+  factory PluginUploadResult.fromJson(Map<String, dynamic> json) {
+    return PluginUploadResult(
+      fileName: json['file_name'] as String? ?? '',
+      plugin: json['plugin'] != null
+          ? Plugin.fromJson(json['plugin'] as Map<String, dynamic>)
+          : null,
+      error: json['error'] as String?,
+      success: json['success'] as bool? ?? false,
+    );
+  }
+}
+
+/// 批量插件上传响应
+class PluginUploadResponse {
+  final int total;
+  final int success;
+  final int failed;
+  final List<PluginUploadResult> results;
+  final String message;
+
+  PluginUploadResponse({
+    required this.total,
+    required this.success,
+    required this.failed,
+    required this.results,
+    required this.message,
+  });
+
+  factory PluginUploadResponse.fromJson(Map<String, dynamic> json) {
+    return PluginUploadResponse(
+      total: json['total'] as int? ?? 0,
+      success: json['success'] as int? ?? 0,
+      failed: json['failed'] as int? ?? 0,
+      results: (json['results'] as List<dynamic>?)
+              ?.map((e) =>
+                  PluginUploadResult.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      message: json['message'] as String? ?? '',
+    );
+  }
+}
+
 /// 插件 API 服务
 class PluginApi {
   final Dio dio;
@@ -84,9 +143,9 @@ class PluginApi {
     }
   }
 
-  /// 上传插件
+  /// 上传插件（从文件路径，适用于原生平台）
   /// POST /api/v1/plugins (multipart)
-  Future<Plugin> uploadPlugin(String filePath, String fileName) async {
+  Future<PluginUploadResponse> uploadPlugin(String filePath, String fileName) async {
     try {
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(filePath, filename: fileName),
@@ -95,7 +154,24 @@ class PluginApi {
         '${AppConfig.apiPrefix}/plugins',
         data: formData,
       );
-      return Plugin.fromJson(response.data as Map<String, dynamic>);
+      return PluginUploadResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 上传插件（从字节数据，适用于 Web 平台）
+  /// POST /api/v1/plugins (multipart)
+  Future<PluginUploadResponse> uploadPluginBytes(Uint8List bytes, String fileName) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      });
+      final response = await dio.post(
+        '${AppConfig.apiPrefix}/plugins',
+        data: formData,
+      );
+      return PluginUploadResponse.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }

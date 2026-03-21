@@ -172,7 +172,7 @@ class SongListTile extends ConsumerWidget {
               width: size,
               height: size,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildDefaultCover(size),
+              errorBuilder: (_, _, _) => _buildDefaultCover(size),
             )
           : _buildDefaultCover(size),
     );

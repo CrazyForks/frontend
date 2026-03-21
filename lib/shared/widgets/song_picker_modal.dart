@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/song.dart';
+import '../utils/responsive_snackbar.dart';
 import '../../features/library/presentation/providers/songs_provider.dart';
 import 'cover_image.dart';
 
@@ -11,26 +12,43 @@ class SongPickerModal extends ConsumerStatefulWidget {
   /// 要排除的歌曲 ID（已在歌单中的歌曲）
   final Set<int> excludeIds;
 
+  /// 按歌曲类型过滤（如 'radio', 'local', 'remote'），只显示此类型
+  final String? songType;
+
+  /// 要排除的歌曲类型（如 'radio'），排除此类型的歌曲
+  final String? excludeType;
+
   const SongPickerModal({
     super.key,
     this.excludeIds = const {},
+    this.songType,
+    this.excludeType,
   });
 
   /// 显示歌曲选择器弹窗
-  /// 
+  ///
   /// [context] 上下文
   /// [excludeIds] 要排除的歌曲 ID
-  /// 
+  /// [songType] 按歌曲类型过滤（如 'radio' 只显示电台歌曲）
+  /// [excludeType] 要排除的歌曲类型（如 'radio' 排除电台歌曲）
+  ///
   /// 返回选中的歌曲 ID 列表，取消返回 null
   static Future<List<int>?> show(
     BuildContext context, {
     Set<int> excludeIds = const {},
+    String? songType,
+    String? excludeType,
   }) {
     return showModalBottomSheet<List<int>>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => SongPickerModal(excludeIds: excludeIds),
+      builder:
+          (context) => SongPickerModal(
+            excludeIds: excludeIds,
+            songType: songType,
+            excludeType: excludeType,
+          ),
     );
   }
 
@@ -118,10 +136,21 @@ class _SongPickerModalState extends ConsumerState<SongPickerModal> {
         offset: _currentPage * _pageSize,
       );
 
-      // 过滤掉 excludeIds 中的歌曲
-      final filteredSongs = response.songs
-          .where((song) => !widget.excludeIds.contains(song.id))
-          .toList();
+      // 过滤歌曲：排除已有的 + 按类型过滤
+      final filteredSongs =
+          response.songs.where((song) {
+            // 排除已在歌单中的歌曲
+            if (widget.excludeIds.contains(song.id)) return false;
+            // 按类型过滤（只显示指定类型）
+            if (widget.songType != null && song.type != widget.songType) {
+              return false;
+            }
+            // 排除指定类型
+            if (widget.excludeType != null && song.type == widget.excludeType) {
+              return false;
+            }
+            return true;
+          }).toList();
 
       setState(() {
         if (reset) {
@@ -137,9 +166,7 @@ class _SongPickerModalState extends ConsumerState<SongPickerModal> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
+        ResponsiveSnackBar.showError(context, message: '加载失败: $e');
       }
     }
   }
@@ -235,10 +262,7 @@ class _SongPickerModalState extends ConsumerState<SongPickerModal> {
               children: [
                 const Text(
                   '选择歌曲',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 FilledButton(
@@ -258,12 +282,13 @@ class _SongPickerModalState extends ConsumerState<SongPickerModal> {
               decoration: InputDecoration(
                 hintText: '搜索歌曲、艺术家或专辑',
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: _clearSearch,
-                      )
-                    : null,
+                suffixIcon:
+                    _searchController.text.isNotEmpty
+                        ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: _clearSearch,
+                        )
+                        : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -299,99 +324,99 @@ class _SongPickerModalState extends ConsumerState<SongPickerModal> {
 
           // 歌曲列表
           Expanded(
-            child: _isLoading && _songs.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : _songs.isEmpty
+            child:
+                _isLoading && _songs.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : _songs.isEmpty
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.music_note,
-                              size: 64,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.music_note,
+                            size: 64,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _searchController.text.isEmpty
+                                ? '暂无歌曲'
+                                : '未找到匹配的歌曲',
+                            style: TextStyle(
                               color: colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchController.text.isEmpty
-                                  ? '暂无歌曲'
-                                  : '未找到匹配的歌曲',
-                              style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
+                          ),
+                        ],
+                      ),
+                    )
                     : ListView.builder(
-                        controller: _scrollController,
-                        itemCount: _songs.length + (_isLoadingMore ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == _songs.length) {
-                            return const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            );
-                          }
+                      controller: _scrollController,
+                      itemCount: _songs.length + (_isLoadingMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == _songs.length) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
 
-                          final song = _songs[index];
-                          final isSelected = _selectedIds.contains(song.id);
+                        final song = _songs[index];
+                        final isSelected = _selectedIds.contains(song.id);
 
-                          return InkWell(
-                            onTap: () => _toggleSongSelection(song.id),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: Row(
-                                children: [
-                                  Checkbox(
-                                    value: isSelected,
-                                    onChanged: (_) => _toggleSongSelection(song.id),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  CoverImage(
-                                    coverUrl: song.coverUrl,
-                                    coverPath: song.coverPath,
-                                    size: 48,
-                                    borderRadius: 8,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
+                        return InkWell(
+                          onTap: () => _toggleSongSelection(song.id),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: isSelected,
+                                  onChanged:
+                                      (_) => _toggleSongSelection(song.id),
+                                ),
+                                const SizedBox(width: 8),
+                                CoverImage(
+                                  coverUrl: song.coverUrl,
+                                  coverPath: song.coverPath,
+                                  size: 48,
+                                  borderRadius: 8,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        song.title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (song.artist != null)
                                         Text(
-                                          song.title,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
+                                          song.artist!,
+                                          style: TextStyle(
+                                            color: colorScheme.onSurfaceVariant,
+                                            fontSize: 12,
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        if (song.artist != null)
-                                          Text(
-                                            song.artist!,
-                                            style: TextStyle(
-                                              color: colorScheme.onSurfaceVariant,
-                                              fontSize: 12,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                      ],
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),

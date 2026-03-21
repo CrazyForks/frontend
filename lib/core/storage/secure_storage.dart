@@ -3,7 +3,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Token 安全存储服务
-/// 优先使用 FlutterSecureStorage，在不支持的平台（如 macOS 沙箱未签名）自动回退到 SharedPreferences
+///
+/// - 原生平台：优先使用 FlutterSecureStorage（Keychain / EncryptedSharedPreferences），
+///   在不支持的平台（如 macOS 沙箱未签名）自动回退到 SharedPreferences。
+/// - Web 平台：直接使用 SharedPreferences（底层为 localStorage，刷新页面后数据仍在）。
+///   FlutterSecureStorage 在 Web 上使用 sessionStorage，刷新即丢失，不适合持久化 Token。
 class SecureStorageService {
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
@@ -20,13 +24,17 @@ class SecureStorageService {
   SecureStorageService({FlutterSecureStorage? storage})
       : _storage = storage ??
             const FlutterSecureStorage(
-              aOptions: AndroidOptions(
-                encryptedSharedPreferences: true,
-              ),
+              aOptions: AndroidOptions(),
               iOptions: IOSOptions(
                 accessibility: KeychainAccessibility.first_unlock,
               ),
-            );
+            ) {
+    // Web 平台直接使用 SharedPreferences（localStorage），
+    // 因为 FlutterSecureStorage 在 Web 上基于 sessionStorage，刷新页面后数据丢失
+    if (kIsWeb) {
+      _useFallback = true;
+    }
+  }
 
   Future<void> _write(String key, String value) async {
     if (_useFallback) {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/app_config.dart';
+import '../../../core/theme/app_dimensions.dart';
+import '../../../shared/utils/responsive_snackbar.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
 import 'providers/settings_provider.dart';
 import 'widgets/config_manager.dart';
@@ -52,25 +55,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-      ),
+      appBar: AppBar(title: const Text('设置')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           // 分组1: 外观设置
           _buildSectionCard(
             title: '外观设置',
             icon: Icons.palette_outlined,
             children: [
-              ListTile(
-                leading: const Icon(Icons.brightness_6),
-                title: const Text('主题模式'),
-                subtitle: const Text('选择应用的主题外观'),
+              const ListTile(
+                leading: Icon(Icons.brightness_6),
+                title: Text('主题模式'),
+                subtitle: Text('选择应用的主题外观'),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: const ThemeSelector(),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                ),
+                child: ThemeSelector(),
               ),
             ],
           ),
@@ -82,10 +88,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: '音乐库管理',
             icon: Icons.library_music_outlined,
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: const ScanManager(),
-              ),
+              const Padding(padding: EdgeInsets.all(16), child: ScanManager()),
             ],
           ),
 
@@ -113,9 +116,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildSectionCard(
             title: '安全',
             icon: Icons.security_outlined,
-            children: [
-              const TokenManager(),
-            ],
+            children: [const TokenManager()],
           ),
 
           const SizedBox(height: 16),
@@ -156,10 +157,58 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ],
           ),
 
+          // 分组7: 账户
+          _buildSectionCard(
+            title: '账户',
+            icon: Icons.account_circle_outlined,
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.logout,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                title: Text(
+                  '退出登录',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _showLogoutDialog,
+              ),
+            ],
+          ),
+
           const SizedBox(height: 32),
         ],
       ),
     );
+  }
+
+  Future<void> _showLogoutDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('确认退出'),
+            content: const Text('确定要退出当前账户吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('确认退出'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      await ref.read(authStateProvider.notifier).logout();
+    }
   }
 
   Widget _buildSectionCard({
@@ -174,7 +223,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: [
           // 标题栏
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
             child: Row(
               children: [
                 Icon(
@@ -186,8 +240,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -208,7 +262,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return Text(url ?? '使用默认地址');
       },
       loading: () => const Text('加载中...'),
-      error: (_, __) => const Text('使用默认地址'),
+      error: (_, _) => const Text('使用默认地址'),
     );
   }
 
@@ -226,88 +280,103 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('API 地址'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('设置服务器 API 地址，留空使用默认地址。'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _apiUrlController,
-              decoration: const InputDecoration(
-                labelText: 'API 地址',
-                hintText: 'http://example.com:8080',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.url,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('API 地址'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('设置服务器 API 地址。'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _apiUrlController,
+                  decoration: const InputDecoration(
+                    labelText: 'API 地址',
+                    hintText: 'http://example.com:8080',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.url,
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                final prefs = await ref.read(appPreferencesProvider.future);
-                await prefs.clearApiBaseUrl();
-                _apiUrlController.clear();
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已重置为默认地址')),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('重置失败: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('重置'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final url = _apiUrlController.text.trim();
-              if (url.isNotEmpty && !Uri.tryParse(url)!.hasScheme) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请输入有效的 URL（包含 http:// 或 https://）')),
-                );
-                return;
-              }
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final dialogContext = context;
+                  try {
+                    final prefs = await ref.read(appPreferencesProvider.future);
+                    await prefs.clearApiBaseUrl();
+                    _apiUrlController.clear();
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                      ResponsiveSnackBar.show(
+                        dialogContext,
+                        message: '已重置为默认地址',
+                      );
+                    }
+                  } catch (e) {
+                    if (dialogContext.mounted) {
+                      ResponsiveSnackBar.showError(
+                        dialogContext,
+                        message: '重置失败: $e',
+                      );
+                    }
+                  }
+                },
+                child: const Text('重置'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final dialogContext = context;
+                  final url = _apiUrlController.text.trim();
+                  if (url.isNotEmpty && !Uri.tryParse(url)!.hasScheme) {
+                    ResponsiveSnackBar.show(
+                      dialogContext,
+                      message: '请输入有效的 URL（包含 http:// 或 https://）',
+                    );
+                    return;
+                  }
 
-              try {
-                final prefs = await ref.read(appPreferencesProvider.future);
-                if (url.isEmpty) {
-                  await prefs.clearApiBaseUrl();
-                } else {
-                  await prefs.setApiBaseUrl(url);
-                }
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('API 地址已更新，重启应用后生效')),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('保存失败: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('保存'),
+                  try {
+                    final prefs = await ref.read(appPreferencesProvider.future);
+                    if (url.isEmpty) {
+                      await prefs.clearApiBaseUrl();
+                    } else {
+                      await prefs.setApiBaseUrl(url);
+                    }
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                      ResponsiveSnackBar.show(
+                        dialogContext,
+                        message: 'API 地址已更新，重启应用后生效',
+                      );
+                    }
+                  } catch (e) {
+                    if (dialogContext.mounted) {
+                      ResponsiveSnackBar.showError(
+                        dialogContext,
+                        message: '保存失败: $e',
+                      );
+                    }
+                  }
+                },
+                child: const Text('保存'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Future<void> _showAboutDialog() async {
@@ -336,8 +405,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       applicationName: 'MiMusic',
       applicationVersion: version,
-      applicationIcon: const FlutterLogo(size: 48),
-      applicationLegalese: '© 2024 MiMusic. All rights reserved.',
+      applicationIcon: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF06B6D4), Color(0xFF8B5CF6)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(
+          Icons.music_note_rounded,
+          size: 28,
+          color: Colors.white,
+        ),
+      ),
+      applicationLegalese: '© 2024-2026 MiMusic. All rights reserved.',
       children: [
         const SizedBox(height: 16),
         const Text('MiMusic 是一个开源的个人音乐服务器应用。'),
@@ -350,6 +435,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
+        const SizedBox(height: 16),
+        InkWell(
+          onTap: () => _launchUrl('https://github.com/mimusic-org/mimusic'),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.open_in_new,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'GitHub: mimusic-org/mimusic',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

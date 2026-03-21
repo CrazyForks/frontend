@@ -23,6 +23,7 @@ class AdaptiveScaffold extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onDestinationSelected;
   final Widget? bottomPlayer;
+  final Widget? playlistDrawer;
 
   const AdaptiveScaffold({
     super.key,
@@ -30,6 +31,7 @@ class AdaptiveScaffold extends StatelessWidget {
     required this.currentIndex,
     required this.onDestinationSelected,
     this.bottomPlayer,
+    this.playlistDrawer,
   });
 
   /// 导航项定义
@@ -83,13 +85,14 @@ class AdaptiveScaffold extends StatelessWidget {
           NavigationBar(
             selectedIndex: currentIndex,
             onDestinationSelected: onDestinationSelected,
-            destinations: destinations.map((dest) {
-              return NavigationDestination(
-                icon: Icon(dest.icon),
-                selectedIcon: Icon(dest.selectedIcon),
-                label: dest.label,
-              );
-            }).toList(),
+            destinations:
+                destinations.map((dest) {
+                  return NavigationDestination(
+                    icon: Icon(dest.icon),
+                    selectedIcon: Icon(dest.selectedIcon),
+                    label: dest.label,
+                  );
+                }).toList(),
           ),
         ],
       ),
@@ -105,19 +108,27 @@ class AdaptiveScaffold extends StatelessWidget {
             selectedIndex: currentIndex,
             onDestinationSelected: onDestinationSelected,
             labelType: NavigationRailLabelType.all,
-            destinations: destinations.map((dest) {
-              return NavigationRailDestination(
-                icon: Icon(dest.icon),
-                selectedIcon: Icon(dest.selectedIcon),
-                label: Text(dest.label),
-              );
-            }).toList(),
+            destinations:
+                destinations.map((dest) {
+                  return NavigationRailDestination(
+                    icon: Icon(dest.icon),
+                    selectedIcon: Icon(dest.selectedIcon),
+                    label: Text(dest.label),
+                  );
+                }).toList(),
           ),
           const VerticalDivider(thickness: 1, width: 1),
           Expanded(
             child: Column(
               children: [
-                Expanded(child: body),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(child: body),
+                      if (playlistDrawer != null) playlistDrawer!,
+                    ],
+                  ),
+                ),
                 if (bottomPlayer != null) bottomPlayer!,
               ],
             ),
@@ -179,24 +190,27 @@ class AdaptiveScaffold extends StatelessWidget {
                         child: ListTile(
                           leading: Icon(
                             isSelected ? dest.selectedIcon : dest.icon,
-                            color: isSelected
-                                ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
+                            color:
+                                isSelected
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
                           ),
                           title: Text(
                             dest.label,
                             style: TextStyle(
-                              color: isSelected
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurface,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
+                              color:
+                                  isSelected
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurface,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
                             ),
                           ),
                           selected: isSelected,
-                          selectedTileColor:
-                              colorScheme.primaryContainer.withValues(alpha: 0.3),
+                          selectedTileColor: colorScheme.primaryContainer
+                              .withValues(alpha: 0.3),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -213,7 +227,14 @@ class AdaptiveScaffold extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
-                Expanded(child: body),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(child: body),
+                      if (playlistDrawer != null) playlistDrawer!,
+                    ],
+                  ),
+                ),
                 if (bottomPlayer != null) bottomPlayer!,
               ],
             ),
@@ -241,20 +262,13 @@ class AdaptiveScaffold extends StatelessWidget {
             decoration: BoxDecoration(
               color: colorScheme.surface,
               border: Border(
-                bottom: BorderSide(
-                  color: colorScheme.outlineVariant,
-                  width: 1,
-                ),
+                bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
               ),
             ),
             child: Row(
               children: [
                 // Logo 和标题
-                Icon(
-                  Icons.music_note,
-                  size: 40,
-                  color: colorScheme.primary,
-                ),
+                Icon(Icons.music_note, size: 40, color: colorScheme.primary),
                 const SizedBox(width: 16),
                 Text(
                   'MiMusic',
@@ -268,21 +282,25 @@ class AdaptiveScaffold extends StatelessWidget {
                 Expanded(
                   child: FocusTraversalGroup(
                     child: Row(
-                      children: destinations.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final dest = entry.value;
-                        final isSelected = index == currentIndex;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: TvTheme.spacingMedium),
-                          child: _TvNavButton(
-                            icon: isSelected ? dest.selectedIcon : dest.icon,
-                            label: dest.label,
-                            isSelected: isSelected,
-                            onPressed: () => onDestinationSelected(index),
-                            autofocus: index == 0,
-                          ),
-                        );
-                      }).toList(),
+                      children:
+                          destinations.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final dest = entry.value;
+                            final isSelected = index == currentIndex;
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                right: TvTheme.spacingMedium,
+                              ),
+                              child: _TvNavButton(
+                                icon:
+                                    isSelected ? dest.selectedIcon : dest.icon,
+                                label: dest.label,
+                                isSelected: isSelected,
+                                onPressed: () => onDestinationSelected(index),
+                                autofocus: index == 0,
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
                 ),
@@ -290,7 +308,14 @@ class AdaptiveScaffold extends StatelessWidget {
             ),
           ),
           // 主内容区域
-          Expanded(child: body),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: body),
+                if (playlistDrawer != null) playlistDrawer!,
+              ],
+            ),
+          ),
           // 底部播放器
           if (bottomPlayer != null) bottomPlayer!,
         ],
@@ -300,7 +325,7 @@ class AdaptiveScaffold extends StatelessWidget {
 }
 
 /// TV 导航按钮组件
-/// 
+///
 /// 支持 D-Pad 焦点导航的大尺寸导航按钮
 class _TvNavButton extends StatefulWidget {
   final IconData icon;
@@ -370,16 +395,20 @@ class _TvNavButtonState extends State<_TvNavButton> {
               vertical: TvTheme.spacingMedium,
             ),
             decoration: BoxDecoration(
-              color: widget.isSelected
-                  ? colorScheme.primaryContainer.withValues(alpha: 0.3)
-                  : (_hasFocus ? colorScheme.surfaceContainerHighest : null),
+              color:
+                  widget.isSelected
+                      ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                      : (_hasFocus
+                          ? colorScheme.surfaceContainerHighest
+                          : null),
               borderRadius: BorderRadius.circular(12),
-              border: _hasFocus
-                  ? Border.all(
-                      color: colorScheme.primary,
-                      width: TvTheme.focusBorderWidth,
-                    )
-                  : null,
+              border:
+                  _hasFocus
+                      ? Border.all(
+                        color: colorScheme.primary,
+                        width: TvTheme.focusBorderWidth,
+                      )
+                      : null,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -387,21 +416,22 @@ class _TvNavButtonState extends State<_TvNavButton> {
                 Icon(
                   widget.icon,
                   size: 28,
-                  color: widget.isSelected || _hasFocus
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+                  color:
+                      widget.isSelected || _hasFocus
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: TvTheme.spacingSmall),
                 Text(
                   widget.label,
                   style: TextStyle(
                     fontSize: TvTheme.fontSizeButton,
-                    color: widget.isSelected || _hasFocus
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                    fontWeight: widget.isSelected
-                        ? FontWeight.w600
-                        : FontWeight.normal,
+                    color:
+                        widget.isSelected || _hasFocus
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                    fontWeight:
+                        widget.isSelected ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
               ],

@@ -174,7 +174,7 @@ class TvListView extends StatelessWidget {
         shrinkWrap: shrinkWrap,
         physics: physics,
         itemCount: itemCount,
-        separatorBuilder: (_, __) => SizedBox(height: itemSpacing),
+        separatorBuilder: (_, _) => SizedBox(height: itemSpacing),
         itemBuilder: itemBuilder,
       ),
     );
@@ -261,7 +261,7 @@ class TvHorizontalListView extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: padding,
           itemCount: itemCount,
-          separatorBuilder: (_, __) => SizedBox(width: itemSpacing),
+          separatorBuilder: (_, _) => SizedBox(width: itemSpacing),
           itemBuilder: itemBuilder,
         ),
       ),

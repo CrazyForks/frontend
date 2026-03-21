@@ -1,11 +1,15 @@
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/responsive.dart';
 import '../../features/library/presentation/providers/favorite_provider.dart';
+import '../../features/player/presentation/providers/player_provider.dart';
 import '../../features/player/presentation/widgets/desktop_player.dart';
 import '../../features/player/presentation/widgets/mini_player.dart';
+import '../../features/player/presentation/widgets/playlist_drawer.dart';
 import '../../features/player/presentation/widgets/tv_player.dart';
 import 'adaptive_scaffold.dart';
 
@@ -14,10 +18,7 @@ import 'adaptive_scaffold.dart';
 class ShellLayout extends ConsumerWidget {
   final Widget child;
 
-  const ShellLayout({
-    super.key,
-    required this.child,
-  });
+  const ShellLayout({super.key, required this.child});
 
   /// 路由路径到导航索引的映射
   static const Map<String, int> _routeToIndex = {
@@ -57,14 +58,13 @@ class ShellLayout extends ConsumerWidget {
     final location = GoRouterState.of(context).uri.path;
     final currentIndex = _getCurrentIndex(location);
 
-    // 初始化收藏系统（幂等操作，多次调用不会重复初始化）
-    final favoriteState = ref.watch(favoriteProvider);
-    if (!favoriteState.initialized && !favoriteState.isLoading) {
-      // 在下一帧中初始化，避免在 build 中直接调用异步方法
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(favoriteProvider.notifier).initialize();
-      });
-    }
+    // 确保收藏系统被初始化（FavoriteNotifier.build 中自动调度）
+    ref.watch(favoriteProvider);
+
+    // 监听播放队列侧边栏状态（仅桌面/平板端有效）
+    final showPlaylistDrawer = ref.watch(
+      playerStateProvider.select((s) => s.showPlaylistDrawer),
+    );
 
     return AdaptiveScaffold(
       body: child,
@@ -76,6 +76,7 @@ class ShellLayout extends ConsumerWidget {
         }
       },
       bottomPlayer: _buildBottomPlayer(context),
+      playlistDrawer: showPlaylistDrawer ? const PlaylistDrawer() : null,
     );
   }
 
@@ -89,7 +90,12 @@ class ShellLayout extends ConsumerWidget {
       case ScreenType.desktop:
         return const DesktopPlayer();
       case ScreenType.tv:
-        return const TvMiniPlayer();
+        // 仅在 Android TV 等真正的 TV 平台使用 TvMiniPlayer
+        // 桌面/Web 大屏使用 DesktopPlayer 以保留完整工具栏
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          return const TvMiniPlayer();
+        }
+        return const DesktopPlayer();
     }
   }
 }

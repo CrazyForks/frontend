@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/playlist/domain/playlist.dart';
 import '../../features/playlist/presentation/providers/playlist_provider.dart';
+import '../utils/responsive_snackbar.dart';
 import 'cover_image.dart';
 import 'loading_indicator.dart';
 
@@ -11,10 +12,7 @@ class AddToPlaylistModal extends ConsumerStatefulWidget {
   /// 要添加的歌曲 ID 列表
   final List<int> songIds;
 
-  const AddToPlaylistModal({
-    super.key,
-    required this.songIds,
-  });
+  const AddToPlaylistModal({super.key, required this.songIds});
 
   /// 显示添加到歌单模态框
   static Future<void> show(BuildContext context, {required List<int> songIds}) {
@@ -39,31 +37,23 @@ class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
 
     try {
       final notifier = ref.read(playlistNotifierProvider.notifier);
-      final success = await notifier.addSongsToPlaylist(playlist.id, widget.songIds);
+      final success = await notifier.addSongsToPlaylist(
+        playlist.id,
+        widget.songIds,
+      );
 
       if (success && mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('已添加 ${widget.songIds.length} 首歌曲到「${playlist.name}」'),
-          ),
+        ResponsiveSnackBar.show(
+          context,
+          message: '已添加 ${widget.songIds.length} 首歌曲到「${playlist.name}」',
         );
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('添加失败'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        ResponsiveSnackBar.showError(context, message: '添加失败');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('添加失败: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        ResponsiveSnackBar.showError(context, message: '添加失败: $e');
       }
     } finally {
       if (mounted) {
@@ -78,38 +68,39 @@ class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
 
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('新建歌单'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: '歌单名称',
-            border: OutlineInputBorder(),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('新建歌单'),
+            content: TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: '歌单名称',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+              onSubmitted: (value) {
+                final trimmed = value.trim();
+                if (trimmed.isNotEmpty) {
+                  Navigator.of(context).pop(trimmed);
+                }
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final trimmed = nameController.text.trim();
+                  if (trimmed.isNotEmpty) {
+                    Navigator.of(context).pop(trimmed);
+                  }
+                },
+                child: const Text('创建'),
+              ),
+            ],
           ),
-          autofocus: true,
-          onSubmitted: (value) {
-            final trimmed = value.trim();
-            if (trimmed.isNotEmpty) {
-              Navigator.of(context).pop(trimmed);
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final trimmed = nameController.text.trim();
-              if (trimmed.isNotEmpty) {
-                Navigator.of(context).pop(trimmed);
-              }
-            },
-            child: const Text('创建'),
-          ),
-        ],
-      ),
     );
 
     if (name == null || name.isEmpty || !mounted) return;
@@ -131,28 +122,17 @@ class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
 
         if (success && mounted) {
           Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('已创建歌单「$name」并添加 ${widget.songIds.length} 首歌曲'),
-            ),
+          ResponsiveSnackBar.show(
+            context,
+            message: '已创建歌单「$name」并添加 ${widget.songIds.length} 首歌曲',
           );
         }
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('创建歌单失败'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        ResponsiveSnackBar.showError(context, message: '创建歌单失败');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('创建歌单失败: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        ResponsiveSnackBar.showError(context, message: '创建歌单失败: $e');
       }
     } finally {
       if (mounted) {
@@ -188,13 +168,13 @@ class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
               ),
               // 标题
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
-                    Text(
-                      '添加到歌单',
-                      style: theme.textTheme.titleLarge,
-                    ),
+                    Text('添加到歌单', style: theme.textTheme.titleLarge),
                     const Spacer(),
                     Text(
                       '${widget.songIds.length} 首歌曲',
@@ -215,10 +195,7 @@ class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
                     color: theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
-                    Icons.add,
-                    color: theme.colorScheme.primary,
-                  ),
+                  child: Icon(Icons.add, color: theme.colorScheme.primary),
                 ),
                 title: const Text('新建歌单'),
                 onTap: _isAdding ? null : _showCreatePlaylistDialog,
@@ -255,37 +232,41 @@ class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
                           subtitle: Text(
                             playlist.type == 'radio' ? '电台' : '歌单',
                           ),
-                          onTap: _isAdding ? null : () => _addToPlaylist(playlist),
+                          onTap:
+                              _isAdding ? null : () => _addToPlaylist(playlist),
                         );
                       },
                     );
                   },
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  error: (error, stack) => Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 48,
-                          color: theme.colorScheme.error,
+                  loading:
+                      () => const Center(child: CircularProgressIndicator()),
+                  error:
+                      (error, stack) => Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: theme.colorScheme.error,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '加载失败',
+                              style: TextStyle(color: theme.colorScheme.error),
+                            ),
+                            const SizedBox(height: 8),
+                            FilledButton.icon(
+                              onPressed:
+                                  () => ref.invalidate(
+                                    playlistListProvider(null),
+                                  ),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('重试'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '加载失败',
-                          style: TextStyle(color: theme.colorScheme.error),
-                        ),
-                        const SizedBox(height: 8),
-                        FilledButton.icon(
-                          onPressed: () => ref.invalidate(playlistListProvider(null)),
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('重试'),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
                 ),
               ),
             ],

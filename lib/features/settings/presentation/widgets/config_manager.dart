@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_exceptions.dart';
+import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../data/config_api.dart';
 import '../providers/settings_provider.dart';
 
@@ -42,26 +43,30 @@ class ConfigManager extends ConsumerWidget {
         // 配置列表
         configsAsync.when(
           data: (configs) => _buildConfigList(context, ref, configs),
-          loading: () => const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (error, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  error is ApiException ? error.message : '加载失败',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+          loading:
+              () => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+          error:
+              (error, _) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text(
+                      error is ApiException ? error.message : '加载失败',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => ref.invalidate(configsProvider),
+                      child: const Text('重试'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => ref.invalidate(configsProvider),
-                  child: const Text('重试'),
-                ),
-              ],
-            ),
-          ),
+              ),
         ),
       ],
     );
@@ -96,7 +101,7 @@ class ConfigManager extends ConsumerWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: configs.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final config = configs[index];
         return _ConfigItem(config: config);
@@ -111,61 +116,62 @@ class ConfigManager extends ConsumerWidget {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('添加配置'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: keyController,
-                decoration: const InputDecoration(
-                  labelText: '配置键',
-                  hintText: '例如: app.setting.name',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '请输入配置键';
-                  }
-                  return null;
-                },
+      builder:
+          (context) => AlertDialog(
+            title: const Text('添加配置'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: keyController,
+                    decoration: const InputDecoration(
+                      labelText: '配置键',
+                      hintText: '例如: app.setting.name',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '请输入配置键';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: valueController,
+                    decoration: const InputDecoration(
+                      labelText: '配置值',
+                      hintText: '配置值（支持多行）',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '请输入配置值';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: valueController,
-                decoration: const InputDecoration(
-                  labelText: '配置值',
-                  hintText: '配置值（支持多行）',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '请输入配置值';
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.pop(context, true);
                   }
-                  return null;
                 },
+                child: const Text('添加'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text('添加'),
-          ),
-        ],
-      ),
     );
 
     if (result != true) return;
@@ -178,21 +184,15 @@ class ConfigManager extends ConsumerWidget {
       );
       ref.invalidate(configsProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('配置已添加')),
-        );
+        ResponsiveSnackBar.showSuccess(context, message: '配置已添加');
       }
     } on ApiException catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: ${e.message}')),
-        );
+        ResponsiveSnackBar.showError(context, message: '添加失败: ${e.message}');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: $e')),
-        );
+        ResponsiveSnackBar.showError(context, message: '添加失败: $e');
       }
     }
   }
@@ -215,40 +215,41 @@ class _ConfigItemState extends ConsumerState<_ConfigItem> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('编辑配置: ${widget.config.key}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '配置键: ${widget.config.key}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
+      builder:
+          (context) => AlertDialog(
+            title: Text('编辑配置: ${widget.config.key}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '配置键: ${widget.config.key}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: valueController,
+                  decoration: const InputDecoration(
+                    labelText: '配置值',
+                    border: OutlineInputBorder(),
                   ),
+                  maxLines: 5,
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: valueController,
-              decoration: const InputDecoration(
-                labelText: '配置值',
-                border: OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
               ),
-              maxLines: 5,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('保存'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
     );
 
     if (result != true) return;
@@ -261,21 +262,15 @@ class _ConfigItemState extends ConsumerState<_ConfigItem> {
       );
       ref.invalidate(configsProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('配置已更新')),
-        );
+        ResponsiveSnackBar.showSuccess(context, message: '配置已更新');
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: ${e.message}')),
-        );
+        ResponsiveSnackBar.showError(context, message: '更新失败: ${e.message}');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
-        );
+        ResponsiveSnackBar.showError(context, message: '更新失败: $e');
       }
     }
   }
@@ -283,23 +278,24 @@ class _ConfigItemState extends ConsumerState<_ConfigItem> {
   Future<void> _deleteConfig() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除配置 "${widget.config.key}" 吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('确认删除'),
+            content: Text('确定要删除配置 "${widget.config.key}" 吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
     );
 
     if (confirm != true) return;
@@ -311,21 +307,15 @@ class _ConfigItemState extends ConsumerState<_ConfigItem> {
       await configApi.deleteConfig(widget.config.key);
       ref.invalidate(configsProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('配置已删除')),
-        );
+        ResponsiveSnackBar.showSuccess(context, message: '配置已删除');
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: ${e.message}')),
-        );
+        ResponsiveSnackBar.showError(context, message: '删除失败: ${e.message}');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e')),
-        );
+        ResponsiveSnackBar.showError(context, message: '删除失败: $e');
       }
     } finally {
       if (mounted) {
@@ -356,11 +346,7 @@ class _ConfigItemState extends ConsumerState<_ConfigItem> {
       ),
       subtitle: Tooltip(
         message: config.value,
-        child: Text(
-          config.value,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
+        child: Text(config.value, maxLines: 2, overflow: TextOverflow.ellipsis),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -373,13 +359,14 @@ class _ConfigItemState extends ConsumerState<_ConfigItem> {
           ),
           // 删除按钮
           IconButton(
-            icon: _isDeleting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.delete_outline),
+            icon:
+                _isDeleting
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Icon(Icons.delete_outline),
             onPressed: _isDeleting ? null : _deleteConfig,
             tooltip: '删除',
           ),

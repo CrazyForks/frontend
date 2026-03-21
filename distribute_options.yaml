@@ -1,0 +1,47 @@
+output: dist/
+
+releases:
+  - name: stable
+    jobs:
+      - name: build-linux-deb
+        package:
+          platform: linux
+          target: deb
+      - name: build-linux-rpm
+        package:
+          platform: linux
+          target: rpm
+      - name: build-linux-appimage
+        package:
+          platform: linux
+          target: appimage
+      - name: build-macos-dmg
+        package:
+          platform: macos
+          target: dmg
+      - name: build-macos-pkg
+        package:
+          platform: macos
+          target: pkg
+      - name: build-windows-exe
+        package:
+          platform: windows
+          target: exe
+      - name: build-windows-msix
+        package:
+          platform: windows
+          target: msix
+      - name: build-android-apk
+        package:
+          platform: android
+          target: apk
+          build_args:
+            target-platform: android-arm,android-arm64
+      - name: build-android-aab
+        package:
+          platform: android
+          target: aab
+      - name: build-ios-ipa
+        package:
+          platform: ios
+          target: ipa

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_exceptions.dart';
+import '../../../../shared/utils/responsive_snackbar.dart';
+import '../../data/scan_api.dart';
 import '../providers/settings_provider.dart';
 
 /// 扫描管理组件
@@ -33,9 +35,9 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
     });
 
     try {
-      await ref.read(scanProgressProvider.notifier).startScan(
-        reimport: _scanMode == 'reimport',
-      );
+      await ref
+          .read(scanProgressProvider.notifier)
+          .startScan(reimport: _scanMode == 'reimport');
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
@@ -50,15 +52,11 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
       await ref.read(scanProgressProvider.notifier).cancelScan();
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('取消失败: ${e.message}')),
-        );
+        ResponsiveSnackBar.showError(context, message: '取消失败: ${e.message}');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('取消失败: $e')),
-        );
+        ResponsiveSnackBar.showError(context, message: '取消失败: $e');
       }
     }
   }
@@ -134,21 +132,22 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
         const SizedBox(height: 12),
         // 扫描按钮
         FilledButton.icon(
-      onPressed: _isLoading ? null : _startScan,
-      icon: _isLoading
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.search),
-      label: Text(_isLoading ? '正在启动...' : '扫描本地音乐'),
+          onPressed: _isLoading ? null : _startScan,
+          icon:
+              _isLoading
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Icon(Icons.search),
+          label: Text(_isLoading ? '正在启动...' : '扫描本地音乐'),
         ),
       ],
     );
   }
 
-  Widget _buildScanningState(progress) {
+  Widget _buildScanningState(ScanProgress progress) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -172,7 +171,7 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
 
         // 统计信息
         Text(
-          '已处理: ${progress.processed}/${progress.totalFiles}, 新增: ${progress.added}, 更新: ${progress.updated}',
+          '已处理: ${progress.scannedFiles}/${progress.totalFiles}, 导入: ${progress.importedFiles}, 跳过: ${progress.skippedFiles}, 失败: ${progress.failedFiles}',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
@@ -187,7 +186,7 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
     );
   }
 
-  Widget _buildCompletedState(progress) {
+  Widget _buildCompletedState(ScanProgress progress) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
@@ -209,7 +208,7 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
                   children: [
                     const Text('扫描完成'),
                     Text(
-                      '新增 ${progress.added} 首, 更新 ${progress.updated} 首, 失败 ${progress.failed} 个',
+                      '导入 ${progress.importedFiles} 首, 跳过 ${progress.skippedFiles} 首, 失败 ${progress.failedFiles} 个',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -228,12 +227,12 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
     );
   }
 
-  Widget _buildCancelledState(progress) {
+  Widget _buildCancelledState(ScanProgress progress) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '扫描已取消 (已处理 ${progress.processed} 个文件)',
+          '扫描已取消 (已处理 ${progress.scannedFiles} 个文件)',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
@@ -246,7 +245,7 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
     );
   }
 
-  Widget _buildErrorState(progress) {
+  Widget _buildErrorState(ScanProgress progress) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
@@ -262,9 +261,7 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
             children: [
               Icon(Icons.error, color: colorScheme.error),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text('扫描出错'),
-              ),
+              const Expanded(child: Text('扫描出错')),
             ],
           ),
         ),

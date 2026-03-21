@@ -78,13 +78,15 @@ class SongsListState {
 }
 
 /// 歌曲列表状态管理器
-class SongsListNotifier extends StateNotifier<SongsListState> {
-  final SongsRepository _repository;
-  final int _pageSize;
+class SongsListNotifier extends Notifier<SongsListState> {
+  late SongsRepository _repository;
+  final int _pageSize = AppConstants.defaultPageSize;
 
-  SongsListNotifier(this._repository, {int pageSize = AppConstants.defaultPageSize})
-      : _pageSize = pageSize,
-        super(const SongsListState());
+  @override
+  SongsListState build() {
+    _repository = ref.watch(songsRepositoryProvider);
+    return const SongsListState();
+  }
 
   /// 加载歌曲列表
   Future<void> loadSongs({
@@ -260,12 +262,8 @@ class SongsListNotifier extends StateNotifier<SongsListState> {
   }
 }
 
-/// 歌曲列表 StateNotifierProvider
-final songsListProvider =
-    StateNotifierProvider<SongsListNotifier, SongsListState>((ref) {
-  final repository = ref.watch(songsRepositoryProvider);
-  return SongsListNotifier(repository);
-});
+/// 歌曲列表 NotifierProvider
+final songsListProvider = NotifierProvider<SongsListNotifier, SongsListState>(SongsListNotifier.new);
 
 /// 单首歌曲 Provider
 final songDetailProvider =

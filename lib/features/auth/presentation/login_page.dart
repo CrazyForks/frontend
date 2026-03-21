@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../config/app_config.dart';
+import '../../../core/router/app_router.dart';
+import '../../../shared/utils/responsive_snackbar.dart';
 import '../domain/auth_state.dart';
 import 'providers/auth_provider.dart';
 
@@ -20,7 +23,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _apiUrlController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _showAdvanced = false;
 
   @override
   void initState() {
@@ -36,9 +38,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final savedUrl = prefs.getApiBaseUrl();
     if (savedUrl != null && savedUrl.isNotEmpty) {
       _apiUrlController.text = savedUrl;
-      setState(() {
-        _showAdvanced = true;
-      });
     }
   }
 
@@ -59,9 +58,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       username: _usernameController.text.trim(),
       password: _passwordController.text,
       // 嵌入模式不传 apiBaseUrl，baseUrl 已在 main() 中通过 Uri.base.origin 设定
-      apiBaseUrl: (!AppConfig.isEmbedded && _apiUrlController.text.trim().isNotEmpty)
-          ? _apiUrlController.text.trim()
-          : null,
+      apiBaseUrl:
+          (!AppConfig.isEmbedded && _apiUrlController.text.trim().isNotEmpty)
+              ? _apiUrlController.text.trim()
+              : null,
     );
   }
 
@@ -74,25 +74,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     // 监听认证状态变化，显示错误信息
     ref.listen<AuthState>(authStateProvider, (previous, next) {
       if (next.error != null && next.error!.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.error!),
-            backgroundColor: colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ResponsiveSnackBar.showError(context, message: next.error!);
       }
 
-      // 登录成功后跳转
+      // 登录成功后跳转到首页
       if (next.status == AuthStatus.authenticated) {
-        // TODO: 使用 go_router 导航到首页
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('登录成功'),
-            backgroundColor: colorScheme.primary,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        context.go(AppRoutes.home);
       }
     });
 
@@ -130,8 +117,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             _buildPasswordField(colorScheme),
                             const SizedBox(height: 16),
 
-                            // 高级设置（API 地址）— 嵌入模式下隐藏，独立部署时显示
-                            if (!AppConfig.isEmbedded) _buildAdvancedSettings(colorScheme),
+                            // API 地址输入框 — 嵌入模式下隐藏，独立部署时显示
+                            if (!AppConfig.isEmbedded)
+                              _buildApiUrlField(colorScheme),
                             const SizedBox(height: 24),
 
                             // 登录按钮
@@ -241,95 +229,43 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  Widget _buildAdvancedSettings(ColorScheme colorScheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 展开/收起按钮
-        InkWell(
-          onTap: () {
-            setState(() {
-              _showAdvanced = !_showAdvanced;
-            });
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Icon(
-                  _showAdvanced
-                      ? Icons.expand_less
-                      : Icons.expand_more,
-                  size: 20,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '高级设置',
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // API 地址输入框
-        AnimatedCrossFade(
-          firstChild: const SizedBox.shrink(),
-          secondChild: Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: TextFormField(
-              controller: _apiUrlController,
-              decoration: InputDecoration(
-                labelText: 'API 地址',
-                hintText: AppConfig.baseUrl,
-                prefixIcon: const Icon(Icons.cloud_outlined),
-                helperText: '独立部署模式使用，留空则使用默认地址',
-                helperMaxLines: 2,
-              ),
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.done,
-              validator: (value) {
-                if (value != null && value.isNotEmpty) {
-                  // 简单的 URL 格式验证
-                  if (!value.startsWith('http://') &&
-                      !value.startsWith('https://')) {
-                    return '请输入有效的 URL（以 http:// 或 https:// 开头）';
-                  }
-                }
-                return null;
-              },
-            ),
-          ),
-          crossFadeState: _showAdvanced
-              ? CrossFadeState.showSecond
-              : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 200),
-        ),
-      ],
+  Widget _buildApiUrlField(ColorScheme colorScheme) {
+    return TextFormField(
+      controller: _apiUrlController,
+      decoration: InputDecoration(
+        labelText: 'API 地址',
+        hintText: AppConfig.baseUrl,
+        prefixIcon: const Icon(Icons.cloud_outlined),
+      ),
+      keyboardType: TextInputType.url,
+      textInputAction: TextInputAction.done,
+      validator: (value) {
+        if (value != null && value.isNotEmpty) {
+          // 简单的 URL 格式验证
+          if (!value.startsWith('http://') && !value.startsWith('https://')) {
+            return '请输入有效的 URL（以 http:// 或 https:// 开头）';
+          }
+        }
+        return null;
+      },
     );
   }
 
   Widget _buildLoginButton(AuthState authState, ColorScheme colorScheme) {
     return FilledButton(
       onPressed: authState.isLoading ? null : _handleLogin,
-      style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-      ),
-      child: authState.isLoading
-          ? SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: colorScheme.onPrimary,
-              ),
-            )
-          : const Text('登录'),
+      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+      child:
+          authState.isLoading
+              ? SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.onPrimary,
+                ),
+              )
+              : const Text('登录'),
     );
   }
 

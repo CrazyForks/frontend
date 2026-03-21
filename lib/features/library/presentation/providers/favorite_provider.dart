@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../auth/domain/auth_state.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../playlist/data/playlist_api.dart';
 import '../../../playlist/domain/playlist.dart';
 
@@ -53,10 +56,27 @@ class FavoriteState {
 }
 
 /// 收藏状态管理器
-class FavoriteNotifier extends StateNotifier<FavoriteState> {
-  final PlaylistApi _playlistApi;
+class FavoriteNotifier extends Notifier<FavoriteState> {
+  late PlaylistApi _playlistApi;
+  bool _disposed = false;
 
-  FavoriteNotifier(this._playlistApi) : super(const FavoriteState());
+  @override
+  FavoriteState build() {
+    _playlistApi = ref.watch(favoritePlaylistApiProvider);
+    _disposed = false;
+
+    ref.onDispose(() {
+      _disposed = true;
+    });
+
+    // 仅在已认证时自动调度初始化，避免在 auth unknown 阶段发起无效 API 请求
+    final authStatus = ref.watch(authStateProvider.select((s) => s.status));
+    if (authStatus == AuthStatus.authenticated) {
+      Future.microtask(() => initialize());
+    }
+
+    return const FavoriteState();
+  }
 
   /// 初始化：查找或创建内置收藏歌单
   /// 幂等操作，多次调用不会重复创建歌单
@@ -69,6 +89,7 @@ class FavoriteNotifier extends StateNotifier<FavoriteState> {
     try {
       // 1. 获取所有歌单
       final response = await _playlistApi.getPlaylists(limit: 1000);
+      if (_disposed) return;
       final playlists = response.playlists;
 
       // 2. 查找歌曲收藏歌单（优先查找内置的）
@@ -86,22 +107,30 @@ class FavoriteNotifier extends StateNotifier<FavoriteState> {
       );
 
       // 4. 如果歌曲收藏歌单不存在，创建它
-      songFavorite ??= await _playlistApi.createPlaylist(
-        type: 'normal',
-        name: _favoriteSongPlaylistName,
-        description: '我喜欢的歌曲',
-      );
+      if (songFavorite == null) {
+        songFavorite = await _playlistApi.createPlaylist(
+          type: 'normal',
+          name: _favoriteSongPlaylistName,
+          description: '我喜欢的歌曲',
+        );
+        if (_disposed) return;
+      }
 
       // 5. 如果电台收藏歌单不存在，创建它
-      radioFavorite ??= await _playlistApi.createPlaylist(
-        type: 'radio',
-        name: _favoriteRadioPlaylistName,
-        description: '我喜欢的电台',
-      );
+      if (radioFavorite == null) {
+        radioFavorite = await _playlistApi.createPlaylist(
+          type: 'radio',
+          name: _favoriteRadioPlaylistName,
+          description: '我喜欢的电台',
+        );
+        if (_disposed) return;
+      }
 
       // 6. 加载收藏歌单中的歌曲 ID
       final songIds = await _loadPlaylistSongIds(songFavorite.id);
+      if (_disposed) return;
       final radioIds = await _loadPlaylistSongIds(radioFavorite.id);
+      if (_disposed) return;
 
       state = state.copyWith(
         favoriteSongPlaylistId: songFavorite.id,
@@ -112,10 +141,9 @@ class FavoriteNotifier extends StateNotifier<FavoriteState> {
         isLoading: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      if (_disposed) return;
+      debugPrint('[Favorite] initialize error: $e');
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -136,18 +164,27 @@ class FavoriteNotifier extends StateNotifier<FavoriteState> {
     return null;
   }
 
-  /// 加载歌单中的所有歌曲 ID
+  /// 加载歌单中的所有歌曲 ID（分页加载，确保大歌单也能完整加载）
   Future<Set<int>> _loadPlaylistSongIds(int playlistId) async {
+    const pageLimit = 500;
+    final allIds = <int>{};
+    int offset = 0;
     try {
-      final response = await _playlistApi.getPlaylistSongs(
-        playlistId,
-        limit: 9999,
-        offset: 0,
-      );
-      return response.songs.map((s) => s.id).toSet();
+      while (true) {
+        final response = await _playlistApi.getPlaylistSongs(
+          playlistId,
+          limit: pageLimit,
+          offset: offset,
+        );
+        if (response.songs.isEmpty) break;
+        allIds.addAll(response.songs.map((s) => s.id));
+        offset += response.songs.length;
+        if (offset >= response.total) break;
+      }
     } catch (e) {
-      return {};
+      // 返回已加载的部分
     }
+    return allIds;
   }
 
   /// 切换歌曲收藏状态
@@ -173,10 +210,9 @@ class FavoriteNotifier extends StateNotifier<FavoriteState> {
         );
         return false;
       } else {
-        await _playlistApi.addSongsToPlaylist(
-          state.favoriteSongPlaylistId!,
-          [songId],
-        );
+        await _playlistApi.addSongsToPlaylist(state.favoriteSongPlaylistId!, [
+          songId,
+        ]);
         state = state.copyWith(
           favoriteSongIds: Set<int>.from(state.favoriteSongIds)..add(songId),
         );
@@ -207,14 +243,14 @@ class FavoriteNotifier extends StateNotifier<FavoriteState> {
           radioId,
         );
         state = state.copyWith(
-          favoriteRadioIds: Set<int>.from(state.favoriteRadioIds)..remove(radioId),
+          favoriteRadioIds: Set<int>.from(state.favoriteRadioIds)
+            ..remove(radioId),
         );
         return false;
       } else {
-        await _playlistApi.addSongsToPlaylist(
-          state.favoriteRadioPlaylistId!,
-          [radioId],
-        );
+        await _playlistApi.addSongsToPlaylist(state.favoriteRadioPlaylistId!, [
+          radioId,
+        ]);
         state = state.copyWith(
           favoriteRadioIds: Set<int>.from(state.favoriteRadioIds)..add(radioId),
         );
@@ -244,12 +280,10 @@ final favoritePlaylistApiProvider = Provider<PlaylistApi>((ref) {
   return PlaylistApi(dio);
 });
 
-/// Favorite StateNotifier Provider
-final favoriteProvider =
-    StateNotifierProvider<FavoriteNotifier, FavoriteState>((ref) {
-  final playlistApi = ref.watch(favoritePlaylistApiProvider);
-  return FavoriteNotifier(playlistApi);
-});
+/// Favorite NotifierProvider
+final favoriteProvider = NotifierProvider<FavoriteNotifier, FavoriteState>(
+  FavoriteNotifier.new,
+);
 
 /// 便捷 Provider：检查歌曲是否已收藏
 final isSongFavoritedProvider = Provider.family<bool, int>((ref, songId) {

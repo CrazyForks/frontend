@@ -3,13 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
+import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/responsive.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../playlist/domain/playlist.dart';
 import '../../playlist/presentation/providers/playlist_provider.dart';
 import '../../settings/data/plugin_api.dart';
 import '../../settings/presentation/providers/settings_provider.dart';
 import 'widgets/playlist_carousel.dart';
 import 'widgets/plugin_grid.dart';
+import '../../../shared/widgets/loading_indicator.dart';
 
 /// 首页
 class HomePage extends ConsumerWidget {
@@ -30,9 +33,9 @@ class HomePage extends ConsumerWidget {
             // 顶部 AppBar
             SliverAppBar(
               expandedHeight: context.responsive<double>(
-                mobile: 120,
-                tablet: 140,
-                desktop: 160,
+                mobile: 100,
+                tablet: 120,
+                desktop: 140,
               ),
               floating: false,
               pinned: true,
@@ -41,11 +44,11 @@ class HomePage extends ConsumerWidget {
                   _getGreeting(),
                   style: TextStyle(
                     fontSize: context.responsive<double>(
-                      mobile: 20,
-                      tablet: 24,
-                      desktop: 28,
+                      mobile: 17,
+                      tablet: 20,
+                      desktop: 22,
                     ),
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 titlePadding: EdgeInsets.only(
@@ -58,17 +61,19 @@ class HomePage extends ConsumerWidget {
             // 主体内容
             SliverToBoxAdapter(
               child: playlistsAsync.when(
-                data: (response) => _buildContent(
-                  context,
-                  ref,
-                  response.playlists,
-                  pluginsAsync.valueOrNull ?? [],
-                ),
+                data:
+                    (response) => _buildContent(
+                      context,
+                      ref,
+                      response.playlists,
+                      pluginsAsync.value ?? [],
+                    ),
                 loading: () => const _LoadingContent(),
-                error: (error, stack) => _ErrorContent(
-                  error: error.toString(),
-                  onRetry: () => ref.invalidate(playlistListProvider(null)),
-                ),
+                error:
+                    (error, stack) => _ErrorContent(
+                      error: error.toString(),
+                      onRetry: () => ref.invalidate(playlistListProvider(null)),
+                    ),
               ),
             ),
           ],
@@ -91,9 +96,13 @@ class HomePage extends ConsumerWidget {
     final radioPlaylists = playlists.where((p) => p.type == 'radio').toList();
 
     // 筛选活跃且有入口路径的插件
-    final activePlugins = plugins
-        .where((p) => p.isActive && p.entryPath != null && p.entryPath!.isNotEmpty)
-        .toList();
+    final activePlugins =
+        plugins
+            .where(
+              (p) =>
+                  p.isActive && p.entryPath != null && p.entryPath!.isNotEmpty,
+            )
+            .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,7 +112,7 @@ class HomePage extends ConsumerWidget {
         // 我的歌单区域
         if (normalPlaylists.isNotEmpty) ...[
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -134,7 +143,7 @@ class HomePage extends ConsumerWidget {
         // 电台歌单区域
         if (radioPlaylists.isNotEmpty) ...[
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Text(
               '我的电台',
               style: textTheme.titleLarge?.copyWith(
@@ -156,7 +165,7 @@ class HomePage extends ConsumerWidget {
         // 插件入口区域
         if (activePlugins.isNotEmpty) ...[
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -180,10 +189,10 @@ class HomePage extends ConsumerWidget {
 
         // 统计信息
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -214,29 +223,13 @@ class HomePage extends ConsumerWidget {
 
         // 空状态
         if (playlists.isEmpty)
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.library_music_outlined,
-                  size: 64,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '暂无歌单',
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () => context.go(AppRoutes.playlists),
-                  icon: const Icon(Icons.add),
-                  label: const Text('创建歌单'),
-                ),
-              ],
+          EmptyState(
+            icon: Icons.library_music_outlined,
+            title: '暂无歌单',
+            subtitle: '创建你的第一个歌单开始收藏音乐',
+            action: FilledButton.tonal(
+              onPressed: () => context.go(AppRoutes.playlists),
+              child: const Text('创建歌单'),
             ),
           ),
 
@@ -310,10 +303,43 @@ class _LoadingContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.all(64),
-      child: Center(
-        child: CircularProgressIndicator(),
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题骨架
+          SkeletonLoader(height: 20, width: 100, borderRadius: AppRadius.smAll),
+          const SizedBox(height: AppSpacing.md),
+          // 歌单卡片骨架行
+          SizedBox(
+            height: 180,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: 4,
+              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+              itemBuilder:
+                  (_, _) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonLoader.card(size: 140),
+                      const SizedBox(height: AppSpacing.sm),
+                      SkeletonLoader(
+                        height: 12,
+                        width: 100,
+                        borderRadius: AppRadius.smAll,
+                      ),
+                    ],
+                  ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          // 第二组骨架
+          SkeletonLoader(height: 20, width: 80, borderRadius: AppRadius.smAll),
+          const SizedBox(height: AppSpacing.md),
+          // 列表骨架
+          for (int i = 0; i < 3; i++) SkeletonLoader.listTile(),
+        ],
       ),
     );
   }
@@ -324,10 +350,7 @@ class _ErrorContent extends StatelessWidget {
   final String error;
   final VoidCallback onRetry;
 
-  const _ErrorContent({
-    required this.error,
-    required this.onRetry,
-  });
+  const _ErrorContent({required this.error, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -335,21 +358,14 @@ class _ErrorContent extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: colorScheme.error,
-            ),
+            Icon(Icons.error_outline, size: 64, color: colorScheme.error),
             const SizedBox(height: 16),
-            Text(
-              '加载失败',
-              style: textTheme.titleMedium,
-            ),
+            Text('加载失败', style: textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
               error,

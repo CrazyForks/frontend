@@ -36,11 +36,11 @@ show_help() {
     echo "平台参数："
     echo "  web            构建 Web 独立部署版（standalone）"
     echo "  web-embedded   构建 Web 嵌入版（embedded，用于 Go 后端嵌入）"
-    echo "  linux          构建 Linux 桌面版"
-    echo "  windows        构建 Windows 桌面版"
-    echo "  macos          构建 macOS 桌面版"
+    echo "  linux          构建 Linux 版（bundle + deb/rpm/appimage，需要 fastforge）"
+    echo "  windows        构建 Windows 版（bundle + exe/msix/zip，需要 fastforge）"
+    echo "  macos          构建 macOS 版（.app + dmg，需要 fastforge，仅 macOS 可用）"
     echo "  android        构建 Android 版（APK + AAB）"
-    echo "  ios            构建 iOS 版（仅 macOS 可用）"
+    echo "  ios            构建 iOS 版（.app + ipa，仅 macOS 可用）"
     echo "  all            构建当前系统支持的所有平台"
     echo ""
     echo "可选参数："
@@ -65,6 +65,15 @@ LOG_DIR="$OUTPUT_DIR/.build_logs"
 check_flutter() {
     if ! command -v flutter &>/dev/null; then
         echo -e "${RED}错误：未检测到 Flutter，请先安装 Flutter SDK${NC}"
+        exit 1
+    fi
+}
+
+# 检查 fastforge 是否安装（仅用于提示）
+check_fastforge() {
+    if ! command -v fastforge &>/dev/null; then
+        echo -e "${RED}错误：未检测到 fastforge，请先安装：${NC}"
+        echo -e "  dart pub global activate fastforge"
         exit 1
     fi
 }
@@ -105,7 +114,34 @@ build_web() {
 
     echo -e "${BLUE}[Web]${NC} 开始构建 Web ${mode} 版..."
     cd "$FRONTEND_DIR"
-    flutter build web --no-web-resources-cdn --dart-define=DEPLOY_MODE=${mode} --output="$output" 2>&1 | tee -a "$log_file"
+
+    # 检查并下载本地字体文件（用于 CanvasKit 字体 fallback）
+    # 检查 Roboto 字体文件是否存在
+    local need_download=false
+    if [ ! -d "$FRONTEND_DIR/web/fonts/roboto/v32" ] || [ -z "$(ls -A "$FRONTEND_DIR/web/fonts/roboto/v32" 2>/dev/null)" ]; then
+        need_download=true
+    fi
+
+    if [ "$need_download" = true ]; then
+        echo -e "${BLUE}[Web]${NC} 下载本地字体文件..."
+        if [ -f "$SCRIPT_DIR/download-fonts.sh" ]; then
+            bash "$SCRIPT_DIR/download-fonts.sh"
+        else
+            echo -e "${YELLOW}⚠ [Web]${NC} 字体下载脚本不存在，跳过字体下载"
+        fi
+    else
+        echo -e "${GREEN}✓ [Web]${NC} 本地字体文件已存在"
+    fi
+
+    flutter build web --release --no-web-resources-cdn --no-wasm-dry-run --dart-define=DEPLOY_MODE=${mode} --output="$output" 2>&1 | tee -a "$log_file"
+
+    # 清理 canvaskit 目录中未使用的渲染器变体（skwasm、wimp、symbols），仅保留 canvaskit 本体
+    if [ -d "$output/canvaskit" ]; then
+        rm -f "$output/canvaskit"/skwasm* "$output/canvaskit"/wimp* "$output/canvaskit"/*.symbols
+        rm -rf "$output/canvaskit/chromium"
+        echo -e "${GREEN}✓ [Web]${NC} 已清理未使用的渲染器变体"
+    fi
+
     echo -e "${GREEN}✓ [Web]${NC} Web ${mode} 构建完成 → $output"
 }
 
@@ -115,8 +151,73 @@ build_linux() {
 
     echo -e "${BLUE}[Linux]${NC} 开始构建 Linux 版本..."
     cd "$FRONTEND_DIR"
+    mkdir -p "$output"
+
+    # 1. 构建 Flutter Linux bundle
     flutter build linux --release 2>&1 | tee -a "$log_file"
-    cp -r build/linux/x64/release/bundle "$output"
+    cp -r build/linux/x64/release/bundle "$output/"
+    echo -e "${GREEN}✓ [Linux]${NC} Linux bundle 构建完成"
+
+    # 2. 使用 fastforge 生成发行版包（deb/rpm/appimage）
+    if command -v fastforge &>/dev/null; then
+        echo -e "${BLUE}[Linux]${NC} 使用 fastforge 生成发行版包..."
+
+        # DEB 包
+        echo -e "${BLUE}[Linux]${NC} 构建 DEB 包..."
+        if fastforge package --platform linux --targets deb 2>&1 | tee -a "$log_file"; then
+            local deb_file
+            deb_file=$(find dist -maxdepth 2 -name "*.deb" -print -quit 2>/dev/null)
+            if [ -n "$deb_file" ]; then
+                cp "$deb_file" "$output/"
+                echo -e "${GREEN}✓ [Linux]${NC} DEB 包构建完成"
+            else
+                echo -e "${YELLOW}⚠ [Linux]${NC} 未找到 DEB 产物"
+            fi
+        else
+            echo -e "${YELLOW}⚠ [Linux]${NC} DEB 包构建失败，跳过"
+        fi
+
+        # RPM 包
+        if command -v rpmbuild &>/dev/null; then
+            echo -e "${BLUE}[Linux]${NC} 构建 RPM 包..."
+            if fastforge package --platform linux --targets rpm 2>&1 | tee -a "$log_file"; then
+                local rpm_file
+                rpm_file=$(find dist -maxdepth 2 -name "*.rpm" -print -quit 2>/dev/null)
+                if [ -n "$rpm_file" ]; then
+                    cp "$rpm_file" "$output/"
+                    echo -e "${GREEN}✓ [Linux]${NC} RPM 包构建完成"
+                else
+                    echo -e "${YELLOW}⚠ [Linux]${NC} 未找到 RPM 产物"
+                fi
+            else
+                echo -e "${YELLOW}⚠ [Linux]${NC} RPM 包构建失败，跳过"
+            fi
+        else
+            echo -e "${YELLOW}⚠ [Linux]${NC} 未安装 rpmbuild，跳过 RPM 构建。安装命令：sudo apt install rpm (Debian/Ubuntu) 或 sudo dnf install rpm-build (Fedora)"
+        fi
+
+        # AppImage
+        if command -v appimagetool &>/dev/null; then
+            echo -e "${BLUE}[Linux]${NC} 构建 AppImage..."
+            if fastforge package --platform linux --targets appimage 2>&1 | tee -a "$log_file"; then
+                local appimage_file
+                appimage_file=$(find dist -maxdepth 2 -name "*.AppImage" -print -quit 2>/dev/null)
+                if [ -n "$appimage_file" ]; then
+                    cp "$appimage_file" "$output/"
+                    echo -e "${GREEN}✓ [Linux]${NC} AppImage 构建完成"
+                else
+                    echo -e "${YELLOW}⚠ [Linux]${NC} 未找到 AppImage 产物"
+                fi
+            else
+                echo -e "${YELLOW}⚠ [Linux]${NC} AppImage 构建失败，跳过"
+            fi
+        else
+            echo -e "${YELLOW}⚠ [Linux]${NC} 未安装 appimagetool，跳过 AppImage 构建。安装方法：从 https://github.com/AppImage/AppImageKit/releases 下载 appimagetool 并添加到 PATH"
+        fi
+    else
+        echo -e "${YELLOW}⚠ [Linux]${NC} 未安装 fastforge，跳过发行版包构建。安装命令：dart pub global activate fastforge"
+    fi
+
     echo -e "${GREEN}✓ [Linux]${NC} Linux 构建完成 → $output"
 }
 
@@ -126,8 +227,66 @@ build_windows() {
 
     echo -e "${BLUE}[Windows]${NC} 开始构建 Windows 版本..."
     cd "$FRONTEND_DIR"
+    mkdir -p "$output"
+
+    # 1. 构建 Flutter Windows bundle
     flutter build windows --release 2>&1 | tee -a "$log_file"
-    cp -r build/windows/x64/runner/Release "$output"
+    cp -r build/windows/x64/runner/Release "$output/bundle"
+    echo -e "${GREEN}✓ [Windows]${NC} Windows bundle 构建完成"
+
+    # 2. 打包绿色便携 ZIP
+    echo -e "${BLUE}[Windows]${NC} 构建绿色便携 ZIP 包..."
+    if [ -d "build/windows/x64/runner/Release" ]; then
+        cd build/windows/x64/runner/Release
+        if zip -r "$output/mimusic-windows-portable.zip" . 2>&1 | tee -a "$log_file"; then
+            echo -e "${GREEN}✓ [Windows]${NC} 绿色便携 ZIP 包构建完成"
+        else
+            echo -e "${YELLOW}⚠ [Windows]${NC} ZIP 包构建失败，跳过"
+        fi
+        cd "$FRONTEND_DIR"
+    fi
+
+    # 3. 使用 fastforge 生成安装包（exe/msix）
+    if command -v fastforge &>/dev/null; then
+        echo -e "${BLUE}[Windows]${NC} 使用 fastforge 生成安装包..."
+
+        # EXE 安装程序
+        if command -v iscc &>/dev/null; then
+            echo -e "${BLUE}[Windows]${NC} 构建 EXE 安装程序..."
+            if fastforge package --platform windows --targets exe 2>&1 | tee -a "$log_file"; then
+                local exe_file
+                exe_file=$(find dist -maxdepth 2 -name "*.exe" -print -quit 2>/dev/null)
+                if [ -n "$exe_file" ]; then
+                    cp "$exe_file" "$output/"
+                    echo -e "${GREEN}✓ [Windows]${NC} EXE 安装程序构建完成"
+                else
+                    echo -e "${YELLOW}⚠ [Windows]${NC} 未找到 EXE 产物"
+                fi
+            else
+                echo -e "${YELLOW}⚠ [Windows]${NC} EXE 安装程序构建失败，跳过"
+            fi
+        else
+            echo -e "${YELLOW}⚠ [Windows]${NC} 未安装 Inno Setup，跳过 EXE 构建。安装方法：从 https://jrsoftware.org/isinfo.php 下载 Inno Setup 并将 iscc 添加到 PATH"
+        fi
+
+        # MSIX 包
+        echo -e "${BLUE}[Windows]${NC} 构建 MSIX 包..."
+        if fastforge package --platform windows --targets msix 2>&1 | tee -a "$log_file"; then
+            local msix_file
+            msix_file=$(find dist -maxdepth 2 -name "*.msix" -print -quit 2>/dev/null)
+            if [ -n "$msix_file" ]; then
+                cp "$msix_file" "$output/"
+                echo -e "${GREEN}✓ [Windows]${NC} MSIX 包构建完成"
+            else
+                echo -e "${YELLOW}⚠ [Windows]${NC} 未找到 MSIX 产物"
+            fi
+        else
+            echo -e "${YELLOW}⚠ [Windows]${NC} MSIX 包构建失败，跳过"
+        fi
+    else
+        echo -e "${YELLOW}⚠ [Windows]${NC} 未安装 fastforge，跳过安装包构建。安装命令：dart pub global activate fastforge"
+    fi
+
     echo -e "${GREEN}✓ [Windows]${NC} Windows 构建完成 → $output"
 }
 
@@ -142,8 +301,37 @@ build_macos() {
 
     echo -e "${BLUE}[macOS]${NC} 开始构建 macOS 版本..."
     cd "$FRONTEND_DIR"
+    mkdir -p "$output"
+
+    # 1. 构建 Flutter macOS .app
     flutter build macos --release 2>&1 | tee -a "$log_file"
     cp -r build/macos/Build/Products/Release/*.app "$output/"
+    echo -e "${GREEN}✓ [macOS]${NC} macOS .app 构建完成"
+
+    # 2. 使用 fastforge 生成 DMG
+    if command -v fastforge &>/dev/null; then
+        if command -v appdmg &>/dev/null; then
+            echo -e "${BLUE}[macOS]${NC} 使用 fastforge 生成 DMG..."
+
+            if fastforge package --platform macos --targets dmg 2>&1 | tee -a "$log_file"; then
+                local dmg_file
+                dmg_file=$(find dist -maxdepth 2 -name "*.dmg" -print -quit 2>/dev/null)
+                if [ -n "$dmg_file" ]; then
+                    cp "$dmg_file" "$output/"
+                    echo -e "${GREEN}✓ [macOS]${NC} DMG 磁盘映像构建完成"
+                else
+                    echo -e "${YELLOW}⚠ [macOS]${NC} 未找到 DMG 产物"
+                fi
+            else
+                echo -e "${YELLOW}⚠ [macOS]${NC} DMG 构建失败，跳过"
+            fi
+        else
+            echo -e "${YELLOW}⚠ [macOS]${NC} 未安装 appdmg，跳过 DMG 构建。安装命令：npm install -g appdmg"
+        fi
+    else
+        echo -e "${YELLOW}⚠ [macOS]${NC} 未安装 fastforge，跳过 DMG 构建。安装命令：dart pub global activate fastforge"
+    fi
+
     echo -e "${GREEN}✓ [macOS]${NC} macOS 构建完成 → $output"
 }
 
@@ -186,8 +374,28 @@ build_ios() {
 
     echo -e "${BLUE}[iOS]${NC} 开始构建 iOS 版本..."
     cd "$FRONTEND_DIR"
+    mkdir -p "$output"
+
+    # 1. 构建 Flutter iOS .app
     flutter build ios --release --no-codesign 2>&1 | tee -a "$log_file"
     cp -r build/ios/iphoneos/*.app "$output/" 2>/dev/null || true
+    echo -e "${GREEN}✓ [iOS]${NC} iOS .app 构建完成"
+
+    # 2. 手动 Payload/zip 方式打包 IPA（无需代码签名）
+    if [ -d "build/ios/iphoneos/Runner.app" ]; then
+        echo -e "${BLUE}[iOS]${NC} 打包 IPA（无签名）..."
+        local ipa_temp="$output/.ipa_temp"
+        mkdir -p "$ipa_temp/Payload"
+        cp -r build/ios/iphoneos/Runner.app "$ipa_temp/Payload/"
+        cd "$ipa_temp"
+        zip -r -y "$output/mimusic-ios-nosign.ipa" Payload 2>&1 | tee -a "$log_file"
+        cd "$FRONTEND_DIR"
+        rm -rf "$ipa_temp"
+        echo -e "${GREEN}✓ [iOS]${NC} IPA 打包完成 → $output/mimusic-ios-nosign.ipa"
+    else
+        echo -e "${YELLOW}⚠ [iOS]${NC} 未找到 Runner.app，跳过 IPA 打包"
+    fi
+
     echo -e "${GREEN}✓ [iOS]${NC} iOS 构建完成 → $output"
 }
 

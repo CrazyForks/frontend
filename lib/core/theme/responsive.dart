@@ -12,32 +12,33 @@ class ResponsiveBreakpoints {
 extension ResponsiveContext on BuildContext {
   double get screenWidth => MediaQuery.of(this).size.width;
   double get screenHeight => MediaQuery.of(this).size.height;
-  
+
   bool get isMobile => screenWidth < ResponsiveBreakpoints.tablet;
-  bool get isTablet => screenWidth >= ResponsiveBreakpoints.tablet && screenWidth < ResponsiveBreakpoints.desktop;
-  bool get isDesktop => screenWidth >= ResponsiveBreakpoints.desktop && screenWidth < ResponsiveBreakpoints.tv;
+  bool get isTablet =>
+      screenWidth >= ResponsiveBreakpoints.tablet &&
+      screenWidth < ResponsiveBreakpoints.desktop;
+  bool get isDesktop =>
+      screenWidth >= ResponsiveBreakpoints.desktop &&
+      screenWidth < ResponsiveBreakpoints.tv;
   bool get isTv => screenWidth >= ResponsiveBreakpoints.tv;
-  
+
   ScreenType get screenType {
     if (isTv) return ScreenType.tv;
     if (isDesktop) return ScreenType.desktop;
     if (isTablet) return ScreenType.tablet;
     return ScreenType.mobile;
   }
-  
-  bool get isLandscape => MediaQuery.of(this).orientation == Orientation.landscape;
-  bool get isPortrait => MediaQuery.of(this).orientation == Orientation.portrait;
-  
+
+  bool get isLandscape =>
+      MediaQuery.of(this).orientation == Orientation.landscape;
+  bool get isPortrait =>
+      MediaQuery.of(this).orientation == Orientation.portrait;
+
   /// 是否是宽屏（平板以上）
   bool get isWideScreen => screenWidth >= ResponsiveBreakpoints.tablet;
-  
+
   /// 根据屏幕类型返回不同值
-  T responsive<T>({
-    required T mobile,
-    T? tablet,
-    T? desktop,
-    T? tv,
-  }) {
+  T responsive<T>({required T mobile, T? tablet, T? desktop, T? tv}) {
     switch (screenType) {
       case ScreenType.tv:
         return tv ?? desktop ?? tablet ?? mobile;
@@ -47,6 +48,34 @@ extension ResponsiveContext on BuildContext {
         return tablet ?? mobile;
       case ScreenType.mobile:
         return mobile;
+    }
+  }
+
+  /// 获取响应式按钮最小尺寸
+  Size get responsiveButtonMinSize {
+    switch (screenType) {
+      case ScreenType.tv:
+        return const Size(120, 56);
+      case ScreenType.desktop:
+        return const Size(88, 44);
+      case ScreenType.tablet:
+        return const Size(80, 40);
+      case ScreenType.mobile:
+        return const Size(64, 36);
+    }
+  }
+
+  /// 获取响应式对话框最大宽度
+  double get responsiveDialogMaxWidth {
+    switch (screenType) {
+      case ScreenType.tv:
+        return 600;
+      case ScreenType.desktop:
+        return 480;
+      case ScreenType.tablet:
+        return 400;
+      case ScreenType.mobile:
+        return 300;
     }
   }
 }

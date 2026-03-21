@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/cover_url.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../shared/widgets/favorite_button.dart';
 import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
 import 'play_controls.dart';
@@ -24,10 +25,7 @@ class DesktopPlayer extends ConsumerWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.outlineVariant,
-            width: 1,
-          ),
+          top: BorderSide(color: theme.colorScheme.outlineVariant, width: 1),
         ),
       ),
       child: Column(
@@ -46,10 +44,7 @@ class DesktopPlayer extends ConsumerWidget {
               child: Row(
                 children: [
                   // 左侧：歌曲信息
-                  Expanded(
-                    flex: 3,
-                    child: _buildSongInfo(context, state),
-                  ),
+                  Expanded(flex: 3, child: _buildSongInfo(context, state)),
                   // 中间：播放控制
                   Expanded(
                     flex: 4,
@@ -116,19 +111,21 @@ class DesktopPlayer extends ConsumerWidget {
             color: theme.colorScheme.surfaceContainerHighest,
           ),
           clipBehavior: Clip.antiAlias,
-          child: coverUrl != null
-              ? Image.network(
-                  coverUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(
+          child:
+              coverUrl != null
+                  ? Image.network(
+                    coverUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (_, _, _) => Icon(
+                          Icons.music_note_rounded,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                  )
+                  : Icon(
                     Icons.music_note_rounded,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
-                )
-              : Icon(
-                  Icons.music_note_rounded,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
         ),
         const SizedBox(width: 12),
         // 标题和艺术家
@@ -159,14 +156,7 @@ class DesktopPlayer extends ConsumerWidget {
         ),
         const SizedBox(width: 8),
         // 收藏按钮
-        IconButton(
-          onPressed: () {
-            // TODO: 收藏功能
-          },
-          icon: const Icon(Icons.favorite_border_rounded),
-          iconSize: 20,
-          tooltip: '收藏',
-        ),
+        FavoriteButton(songId: song.id, size: 20),
       ],
     );
   }
@@ -234,44 +224,16 @@ class DesktopPlayer extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         // 播放模式
-        IconButton(
-          onPressed: () => _cyclePlayMode(notifier, state.playMode),
-          icon: Icon(
-            _getPlayModeIcon(state.playMode),
-            size: 20,
-            color: state.playMode != PlayMode.order
-                ? theme.colorScheme.primary
-                : null,
-          ),
-          tooltip: _getPlayModeTooltip(state.playMode),
-          visualDensity: VisualDensity.compact,
-        ),
-        // 音量控制
+        _buildPlayModeButton(context, state, notifier, theme),
+        // 音量控制：使用响应式组件自动适配
         Flexible(
-          child: VolumeControl(
+          child: ResponsiveVolumeControl(
             volume: state.volume,
             onVolumeChanged: notifier.setVolume,
-            showSlider: true,
-            sliderWidth: 80,
           ),
         ),
         // 睡眠定时
-        IconButton(
-          onPressed: () => _showSleepTimerMenu(context, notifier, state),
-          icon: Icon(
-            state.sleepTimerRemaining != null
-                ? Icons.alarm_on_rounded
-                : Icons.alarm_rounded,
-            size: 20,
-            color: state.sleepTimerRemaining != null
-                ? theme.colorScheme.primary
-                : null,
-          ),
-          tooltip: state.sleepTimerRemaining != null
-              ? '睡眠定时：${_formatDuration(state.sleepTimerRemaining!)}'
-              : '睡眠定时',
-          visualDensity: VisualDensity.compact,
-        ),
+        _buildSleepTimerButton(context, state, notifier, theme),
         // 播放列表
         IconButton(
           onPressed: notifier.togglePlaylistDrawer,
@@ -297,6 +259,8 @@ class DesktopPlayer extends ConsumerWidget {
         return Icons.repeat_one_rounded;
       case PlayMode.random:
         return Icons.shuffle_rounded;
+      case PlayMode.singlePlay:
+        return Icons.looks_one_rounded;
     }
   }
 
@@ -310,76 +274,129 @@ class DesktopPlayer extends ConsumerWidget {
         return '单曲循环';
       case PlayMode.random:
         return '随机播放';
+      case PlayMode.singlePlay:
+        return '单曲播放';
     }
   }
 
-  void _cyclePlayMode(PlayerNotifier notifier, PlayMode currentMode) {
-    const modes = PlayMode.values;
-    final nextIndex = (modes.indexOf(currentMode) + 1) % modes.length;
-    notifier.setPlayMode(modes[nextIndex]);
+  /// 构建播放模式按钮（使用 PopupMenuButton）
+  Widget _buildPlayModeButton(
+    BuildContext context,
+    PlayerState state,
+    PlayerNotifier notifier,
+    ThemeData theme,
+  ) {
+    return PopupMenuButton<PlayMode>(
+      icon: Icon(
+        _getPlayModeIcon(state.playMode),
+        size: 20,
+        color:
+            state.playMode != PlayMode.order ? theme.colorScheme.primary : null,
+      ),
+      tooltip: _getPlayModeTooltip(state.playMode),
+      padding: EdgeInsets.zero,
+      style: const ButtonStyle(visualDensity: VisualDensity.compact),
+      onSelected: (mode) {
+        notifier.setPlayMode(mode);
+      },
+      itemBuilder:
+          (context) => [
+            for (final mode in PlayMode.values)
+              PopupMenuItem<PlayMode>(
+                value: mode,
+                child: Row(
+                  children: [
+                    Icon(
+                      _getPlayModeIcon(mode),
+                      size: 20,
+                      color:
+                          state.playMode == mode
+                              ? theme.colorScheme.primary
+                              : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _getPlayModeTooltip(mode),
+                      style:
+                          state.playMode == mode
+                              ? TextStyle(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              )
+                              : null,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+    );
   }
 
-  void _showSleepTimerMenu(
+  /// 构建睡眠定时按钮（使用 PopupMenuButton）
+  Widget _buildSleepTimerButton(
     BuildContext context,
-    PlayerNotifier notifier,
     PlayerState state,
+    PlayerNotifier notifier,
+    ThemeData theme,
   ) {
-    final RenderBox button = context.findRenderObject() as RenderBox;
-    final RenderBox overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
-    final RelativeRect position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        button.localToGlobal(Offset.zero, ancestor: overlay),
-        button.localToGlobal(button.size.bottomRight(Offset.zero),
-            ancestor: overlay),
+    final hasTimer = state.sleepTimerRemaining != null;
+    return PopupMenuButton<Duration?>(
+      icon: Icon(
+        hasTimer ? Icons.alarm_on_rounded : Icons.alarm_rounded,
+        size: 20,
+        color: hasTimer ? theme.colorScheme.primary : null,
       ),
-      Offset.zero & overlay.size,
+      tooltip:
+          hasTimer
+              ? '睡眠定时：${_formatDuration(state.sleepTimerRemaining!)}'
+              : '睡眠定时',
+      padding: EdgeInsets.zero,
+      style: const ButtonStyle(visualDensity: VisualDensity.compact),
+      onSelected: (duration) {
+        if (duration == null) return;
+        if (duration == Duration.zero) {
+          notifier.cancelSleepTimer();
+        } else {
+          notifier.setSleepTimer(duration);
+        }
+      },
+      itemBuilder:
+          (context) => [
+            if (hasTimer) ...[
+              PopupMenuItem<Duration?>(
+                enabled: false,
+                child: Text(
+                  '剩余：${_formatDuration(state.sleepTimerRemaining!)}',
+                ),
+              ),
+              const PopupMenuItem<Duration?>(
+                value: Duration.zero,
+                child: Text('取消定时'),
+              ),
+              const PopupMenuDivider(),
+            ],
+            const PopupMenuItem<Duration?>(
+              value: Duration(minutes: 15),
+              child: Text('15 分钟'),
+            ),
+            const PopupMenuItem<Duration?>(
+              value: Duration(minutes: 30),
+              child: Text('30 分钟'),
+            ),
+            const PopupMenuItem<Duration?>(
+              value: Duration(minutes: 45),
+              child: Text('45 分钟'),
+            ),
+            const PopupMenuItem<Duration?>(
+              value: Duration(hours: 1),
+              child: Text('1 小时'),
+            ),
+            const PopupMenuItem<Duration?>(
+              value: Duration(hours: 2),
+              child: Text('2 小时'),
+            ),
+          ],
     );
-
-    showMenu<Duration?>(
-      context: context,
-      position: position,
-      items: [
-        if (state.sleepTimerRemaining != null) ...[
-          PopupMenuItem(
-            enabled: false,
-            child: Text('剩余：${_formatDuration(state.sleepTimerRemaining!)}'),
-          ),
-          const PopupMenuItem(
-            value: Duration.zero,
-            child: Text('取消定时'),
-          ),
-          const PopupMenuDivider(),
-        ],
-        const PopupMenuItem(
-          value: Duration(minutes: 15),
-          child: Text('15 分钟'),
-        ),
-        const PopupMenuItem(
-          value: Duration(minutes: 30),
-          child: Text('30 分钟'),
-        ),
-        const PopupMenuItem(
-          value: Duration(minutes: 45),
-          child: Text('45 分钟'),
-        ),
-        const PopupMenuItem(
-          value: Duration(hours: 1),
-          child: Text('1 小时'),
-        ),
-        const PopupMenuItem(
-          value: Duration(hours: 2),
-          child: Text('2 小时'),
-        ),
-      ],
-    ).then((duration) {
-      if (duration == null) return;
-      if (duration == Duration.zero) {
-        notifier.cancelSleepTimer();
-      } else {
-        notifier.setSleepTimer(duration);
-      }
-    });
   }
 
   String _formatDuration(Duration duration) {

@@ -3,7 +3,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/utils/color_extraction.dart';
 import '../../../../core/utils/cover_url.dart';
+import '../../../../shared/widgets/favorite_button.dart';
 import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
 import '../queue_page.dart';
@@ -21,18 +24,17 @@ class MobilePlayer extends ConsumerStatefulWidget {
     return Navigator.of(context).push(
       PageRouteBuilder(
         opaque: true,
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const MobilePlayer(),
+        pageBuilder:
+            (context, animation, secondaryAnimation) => const MobilePlayer(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           // 从下往上滑入动画
           return SlideTransition(
             position: Tween<Offset>(
               begin: const Offset(0, 1),
               end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-            )),
+            ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
             child: child,
           );
         },
@@ -44,16 +46,34 @@ class MobilePlayer extends ConsumerStatefulWidget {
   ConsumerState<MobilePlayer> createState() => _MobilePlayerState();
 }
 
-class _MobilePlayerState extends ConsumerState<MobilePlayer> {
+class _MobilePlayerState extends ConsumerState<MobilePlayer>
+    with SingleTickerProviderStateMixin {
   /// PageView 控制器
   final PageController _pageController = PageController();
 
   /// 当前页面索引（0: 封面, 1: 歌词）
   int _currentPage = 0;
 
+  /// 封面脉冲动画控制器
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.02).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -63,6 +83,35 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
     final notifier = ref.read(playerStateProvider.notifier);
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
+
+    // 播放列表被清空时，自动关闭全屏播放器并返回上一页
+    // 同时控制封面脉冲动画
+    ref.listen<PlayerState>(playerStateProvider, (previous, next) {
+      if (previous?.hasSong == true && !next.hasSong) {
+        debugPrint('[Player] MobilePlayer: playlist cleared, closing player');
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+      }
+      // 控制封面脉冲动画
+      if (next.isPlaying && !_pulseController.isAnimating) {
+        _pulseController.repeat(reverse: true);
+      } else if (!next.isPlaying && _pulseController.isAnimating) {
+        _pulseController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 300),
+        );
+      }
+    });
+
+    // 初始播放状态动画（listen 只响应变化，初始状态需要手动处理）
+    if (state.isPlaying && !_pulseController.isAnimating) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && state.isPlaying && !_pulseController.isAnimating) {
+          _pulseController.repeat(reverse: true);
+        }
+      });
+    }
 
     if (!state.hasSong) {
       debugPrint('[Player] MobilePlayer: no song, hiding');
@@ -74,6 +123,9 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
       coverUrl: song.coverUrl,
       coverPath: song.coverPath,
     );
+
+    final paletteAsync = ref.watch(coverColorsProvider(coverUrl));
+    final palette = paletteAsync.value;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -87,16 +139,29 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
                 child: Image.network(
                   coverUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                  ),
+                  errorBuilder:
+                      (_, _, _) => Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                      ),
                 ),
               ),
             ),
-          // 背景遮罩
+          // 背景遮罩 - 动态取色渐变
           Positioned.fill(
-            child: Container(
-              color: theme.colorScheme.surface.withValues(alpha: 0.85),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    (palette?.darkMutedColor ?? theme.colorScheme.surface)
+                        .withValues(alpha: 0.9),
+                    theme.colorScheme.surface.withValues(alpha: 0.95),
+                  ],
+                ),
+              ),
             ),
           ),
           // 主内容
@@ -120,9 +185,17 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
                             });
                           },
                           children: [
-                            // 页面1：封面
+                            // 页面1：封面（带脉冲动画）
                             Center(
-                              child: _buildCover(context, coverUrl, size.width * 0.75),
+                              child: ScaleTransition(
+                                scale: _pulseAnimation,
+                                child: _buildCover(
+                                  context,
+                                  coverUrl,
+                                  size.width * 0.75,
+                                  palette: palette,
+                                ),
+                              ),
                             ),
                             // 页面2：歌词
                             LyricsView(
@@ -141,7 +214,9 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
                 const SizedBox(height: 12),
                 // 歌曲信息
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                  ),
                   child: Column(
                     children: [
                       Text(
@@ -169,7 +244,9 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
                 const SizedBox(height: 24),
                 // 进度条
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
                   child: PlayerProgressBar(
                     position: state.currentTime,
                     duration: state.duration,
@@ -192,7 +269,7 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
                 const SizedBox(height: 24),
                 // 底部工具栏
                 _buildBottomBar(context, state, notifier),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
               ],
             ),
           ),
@@ -213,16 +290,21 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isActive
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+            color:
+                isActive
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.3),
           ),
         );
       }),
     );
   }
 
-  Widget _buildTopBar(BuildContext context, PlayerNotifier notifier, PlayerState state) {
+  Widget _buildTopBar(
+    BuildContext context,
+    PlayerNotifier notifier,
+    PlayerState state,
+  ) {
     final theme = Theme.of(context);
     final song = state.currentSong;
 
@@ -262,31 +344,39 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
     );
   }
 
-  Widget _buildCover(BuildContext context, String? coverUrl, double size) {
+  Widget _buildCover(
+    BuildContext context,
+    String? coverUrl,
+    double size, {
+    CoverPalette? palette,
+  }) {
     final theme = Theme.of(context);
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lgAll,
         color: theme.colorScheme.surfaceContainerHighest,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: (palette?.dominantColor ?? Colors.black).withValues(
+              alpha: 0.2,
+            ),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: coverUrl != null
-          ? Image.network(
-              coverUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildPlaceholder(theme, size),
-            )
-          : _buildPlaceholder(theme, size),
+      child:
+          coverUrl != null
+              ? Image.network(
+                coverUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _buildPlaceholder(theme, size),
+              )
+              : _buildPlaceholder(theme, size),
     );
   }
 
@@ -306,45 +396,51 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           // 收藏
-          IconButton(
-            onPressed: () {
-              // 收藏功能暂未实现，显示提示
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('收藏功能即将上线'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-            icon: const Icon(Icons.favorite_border_rounded),
-            tooltip: '收藏',
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(
+              child: FavoriteButton(songId: state.currentSong!.id, size: 24),
+            ),
           ),
           // 播放模式
-          IconButton(
-            onPressed: () => _cyclePlayMode(notifier, state.playMode),
-            icon: Icon(_getPlayModeIcon(state.playMode)),
-            tooltip: _getPlayModeTooltip(state.playMode),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: _buildPlayModeButton(context, state, notifier, theme),
           ),
           // 音量
-          PopupVolumeControl(
-            volume: state.volume,
-            onVolumeChanged: notifier.setVolume,
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: PopupVolumeControl(
+              volume: state.volume,
+              onVolumeChanged: notifier.setVolume,
+            ),
           ),
           // 睡眠定时（下拉菜单）
-          _buildSleepTimerButton(context, state, notifier, theme),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: _buildSleepTimerButton(context, state, notifier, theme),
+          ),
           // 播放列表 - 显示播放队列浮层（直接覆盖在播放器之上）
-          IconButton(
-            onPressed: () {
-              // 直接在播放器之上显示队列浮层，无需先关闭播放器
-              QueueBottomSheet.show(context);
-            },
-            icon: const Icon(Icons.queue_music_rounded),
-            tooltip: '播放队列',
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: IconButton(
+              onPressed: () {
+                // 直接在播放器之上显示队列浮层，无需先关闭播放器
+                QueueBottomSheet.show(context);
+              },
+              icon: const Icon(Icons.queue_music_rounded),
+              tooltip: '播放队列',
+            ),
           ),
         ],
       ),
@@ -361,6 +457,8 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
         return Icons.repeat_one_rounded;
       case PlayMode.random:
         return Icons.shuffle_rounded;
+      case PlayMode.singlePlay:
+        return Icons.looks_one_rounded;
     }
   }
 
@@ -374,13 +472,59 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
         return '单曲循环';
       case PlayMode.random:
         return '随机播放';
+      case PlayMode.singlePlay:
+        return '单曲播放';
     }
   }
 
-  void _cyclePlayMode(PlayerNotifier notifier, PlayMode currentMode) {
-    const modes = PlayMode.values;
-    final nextIndex = (modes.indexOf(currentMode) + 1) % modes.length;
-    notifier.setPlayMode(modes[nextIndex]);
+  /// 构建播放模式按钮（使用 PopupMenuButton）
+  Widget _buildPlayModeButton(
+    BuildContext context,
+    PlayerState state,
+    PlayerNotifier notifier,
+    ThemeData theme,
+  ) {
+    return PopupMenuButton<PlayMode>(
+      icon: Icon(
+        _getPlayModeIcon(state.playMode),
+        color:
+            state.playMode != PlayMode.order ? theme.colorScheme.primary : null,
+      ),
+      tooltip: _getPlayModeTooltip(state.playMode),
+      onSelected: (mode) {
+        notifier.setPlayMode(mode);
+      },
+      itemBuilder:
+          (context) => [
+            for (final mode in PlayMode.values)
+              PopupMenuItem<PlayMode>(
+                value: mode,
+                child: Row(
+                  children: [
+                    Icon(
+                      _getPlayModeIcon(mode),
+                      size: 20,
+                      color:
+                          state.playMode == mode
+                              ? theme.colorScheme.primary
+                              : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _getPlayModeTooltip(mode),
+                      style:
+                          state.playMode == mode
+                              ? TextStyle(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              )
+                              : null,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+    );
   }
 
   /// 构建睡眠定时按钮（使用 PopupMenuButton）
@@ -395,13 +539,15 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
         state.sleepTimerRemaining != null
             ? Icons.alarm_on_rounded
             : Icons.alarm_rounded,
-        color: state.sleepTimerRemaining != null
-            ? theme.colorScheme.primary
-            : null,
+        color:
+            state.sleepTimerRemaining != null
+                ? theme.colorScheme.primary
+                : null,
       ),
-      tooltip: state.sleepTimerRemaining != null
-          ? '睡眠定时：${_formatDuration(state.sleepTimerRemaining!)}'
-          : '睡眠定时',
+      tooltip:
+          state.sleepTimerRemaining != null
+              ? '睡眠定时：${_formatDuration(state.sleepTimerRemaining!)}'
+              : '睡眠定时',
       onSelected: (duration) {
         if (duration == null) return;
         if (duration == Duration.zero) {
@@ -412,47 +558,48 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer> {
           debugPrint('[Player] 设置睡眠定时：${duration.inMinutes}分钟');
         }
       },
-      itemBuilder: (context) => [
-        // 如果已设定定时器，显示剩余时间和取消选项
-        if (state.sleepTimerRemaining != null) ...[
-          PopupMenuItem<Duration?>(
-            enabled: false,
-            child: Text(
-              '剩余时间：${_formatDuration(state.sleepTimerRemaining!)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w500,
+      itemBuilder:
+          (context) => [
+            // 如果已设定定时器，显示剩余时间和取消选项
+            if (state.sleepTimerRemaining != null) ...[
+              PopupMenuItem<Duration?>(
+                enabled: false,
+                child: Text(
+                  '剩余时间：${_formatDuration(state.sleepTimerRemaining!)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
+              const PopupMenuItem<Duration?>(
+                value: Duration.zero,
+                child: Text('取消定时'),
+              ),
+              const PopupMenuDivider(),
+            ],
+            // 定时选项
+            const PopupMenuItem<Duration?>(
+              value: Duration(minutes: 15),
+              child: Text('15 分钟'),
             ),
-          ),
-          const PopupMenuItem<Duration?>(
-            value: Duration.zero,
-            child: Text('取消定时'),
-          ),
-          const PopupMenuDivider(),
-        ],
-        // 定时选项
-        const PopupMenuItem<Duration?>(
-          value: Duration(minutes: 15),
-          child: Text('15 分钟'),
-        ),
-        const PopupMenuItem<Duration?>(
-          value: Duration(minutes: 30),
-          child: Text('30 分钟'),
-        ),
-        const PopupMenuItem<Duration?>(
-          value: Duration(minutes: 45),
-          child: Text('45 分钟'),
-        ),
-        const PopupMenuItem<Duration?>(
-          value: Duration(hours: 1),
-          child: Text('1 小时'),
-        ),
-        const PopupMenuItem<Duration?>(
-          value: Duration(hours: 2),
-          child: Text('2 小时'),
-        ),
-      ],
+            const PopupMenuItem<Duration?>(
+              value: Duration(minutes: 30),
+              child: Text('30 分钟'),
+            ),
+            const PopupMenuItem<Duration?>(
+              value: Duration(minutes: 45),
+              child: Text('45 分钟'),
+            ),
+            const PopupMenuItem<Duration?>(
+              value: Duration(hours: 1),
+              child: Text('1 小时'),
+            ),
+            const PopupMenuItem<Duration?>(
+              value: Duration(hours: 2),
+              child: Text('2 小时'),
+            ),
+          ],
     );
   }
 

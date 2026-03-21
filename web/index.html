@@ -31,13 +31,23 @@
 
   <title>MiMusic</title>
   <link rel="manifest" href="manifest.json">
+
+
 </head>
 <body>
   <script>
     {{flutter_js}}
     {{flutter_build_config}}
 
-    _flutter.loader.load();
+    _flutter.loader.load({
+      config: {
+        useLocalCanvasKit: true,
+        canvasKitVariant: "full",
+        // 使用本地托管的字体文件，避免从 Google CDN 下载
+        // 字体文件位于 web/fonts/ 目录下
+        fontFallbackBaseUrl: "fonts/",
+      },
+    });
   </script>
 </body>
 </html>

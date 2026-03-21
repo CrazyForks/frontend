@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/domain/auth_state.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/home/presentation/home_page.dart';
@@ -21,14 +22,39 @@ class AppRoutes {
   static const String settings = '/settings';
 }
 
+/// 将 Riverpod 认证状态变化桥接为 GoRouter 的 refreshListenable，
+/// 避免每次 auth 状态变化都重建 GoRouter 实例。
+class _AuthChangeNotifier extends ChangeNotifier {
+  _AuthChangeNotifier(Ref ref) {
+    ref.listen(authStateProvider, (_, _) {
+      notifyListeners();
+    });
+  }
+}
+
 /// GoRouter Provider
 final routerProvider = Provider<GoRouter>((ref) {
-  final isAuthenticated = ref.watch(isAuthenticatedProvider);
+  final authChangeNotifier = _AuthChangeNotifier(ref);
+
+  ref.onDispose(() {
+    authChangeNotifier.dispose();
+  });
 
   return GoRouter(
     initialLocation: AppRoutes.home,
     debugLogDiagnostics: true,
+    refreshListenable: authChangeNotifier,
     redirect: (context, state) {
+      // 在 redirect 回调中直接读取最新状态（不使用 ref.watch）
+      final authState = ref.read(authStateProvider);
+      final isAuthenticated = authState.status == AuthStatus.authenticated;
+      final isAuthResolved = authState.status != AuthStatus.unknown;
+
+      // 认证状态尚未确定（正在从存储中读取 token），不做跳转
+      if (!isAuthResolved) {
+        return null;
+      }
+
       final isLoggingIn = state.uri.path == AppRoutes.login;
 
       // 未认证且不在登录页面，跳转到登录页
@@ -58,25 +84,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           // 首页
           GoRoute(
             path: AppRoutes.home,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: HomePage(),
-            ),
+            pageBuilder:
+                (context, state) => const NoTransitionPage(child: HomePage()),
           ),
 
           // 歌曲库
           GoRoute(
             path: AppRoutes.library,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: LibraryPage(),
-            ),
+            pageBuilder:
+                (context, state) =>
+                    const NoTransitionPage(child: LibraryPage()),
           ),
 
           // 歌单列表
           GoRoute(
             path: AppRoutes.playlists,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: PlaylistsPage(),
-            ),
+            pageBuilder:
+                (context, state) =>
+                    const NoTransitionPage(child: PlaylistsPage()),
           ),
 
           // 歌单详情
@@ -91,44 +116,42 @@ final routerProvider = Provider<GoRouter>((ref) {
           // 设置
           GoRoute(
             path: AppRoutes.settings,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: SettingsPage(),
-            ),
+            pageBuilder:
+                (context, state) =>
+                    const NoTransitionPage(child: SettingsPage()),
           ),
         ],
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '页面未找到',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              state.uri.path,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+    errorBuilder:
+        (context, state) => Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                const SizedBox(height: 16),
+                Text('页面未找到', style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 8),
+                Text(
+                  state.uri.path,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () => context.go(AppRoutes.home),
+                  icon: const Icon(Icons.home),
+                  label: const Text('返回首页'),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () => context.go(AppRoutes.home),
-              icon: const Icon(Icons.home),
-              label: const Text('返回首页'),
-            ),
-          ],
+          ),
         ),
-      ),
-    ),
   );
 });

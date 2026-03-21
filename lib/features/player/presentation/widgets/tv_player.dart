@@ -9,7 +9,7 @@ import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
 
 /// TV 全屏播放器界面
-/// 
+///
 /// 专为 TV 端设计的播放器，特性：
 /// - 大尺寸封面图（300x300）
 /// - 大号字体（标题 24sp，艺术家 20sp）
@@ -96,7 +96,7 @@ class TvPlayer extends ConsumerWidget {
   /// 顶部工具栏
   Widget _buildTopBar(BuildContext context, PlayerNotifier notifier) {
     final theme = Theme.of(context);
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: TvTheme.contentPadding,
@@ -135,7 +135,7 @@ class TvPlayer extends ConsumerWidget {
   /// 封面图
   Widget _buildCoverArt(BuildContext context, String? coverUrl) {
     final theme = Theme.of(context);
-    
+
     return Container(
       width: TvTheme.largeCoverSize,
       height: TvTheme.largeCoverSize,
@@ -151,13 +151,14 @@ class TvPlayer extends ConsumerWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: coverUrl != null
-          ? Image.network(
-              coverUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildPlaceholderIcon(context),
-            )
-          : _buildPlaceholderIcon(context),
+      child:
+          coverUrl != null
+              ? Image.network(
+                coverUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _buildPlaceholderIcon(context),
+              )
+              : _buildPlaceholderIcon(context),
     );
   }
 
@@ -175,7 +176,7 @@ class TvPlayer extends ConsumerWidget {
   /// 歌曲信息
   Widget _buildSongInfo(BuildContext context, PlayerState state) {
     final theme = Theme.of(context);
-    
+
     if (!state.hasSong) {
       return Text(
         '无播放内容',
@@ -186,7 +187,7 @@ class TvPlayer extends ConsumerWidget {
     }
 
     final song = state.currentSong!;
-    
+
     return Column(
       children: [
         // 标题
@@ -217,7 +218,7 @@ class TvPlayer extends ConsumerWidget {
     PlayerNotifier notifier,
   ) {
     final theme = Theme.of(context);
-    
+
     return SizedBox(
       width: 600,
       child: Column(
@@ -254,11 +255,15 @@ class TvPlayer extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  Formatters.formatDuration(state.currentTime.inSeconds.toDouble()),
+                  Formatters.formatDuration(
+                    state.currentTime.inSeconds.toDouble(),
+                  ),
                   style: TvTheme.captionStyle(context),
                 ),
                 Text(
-                  Formatters.formatDuration(state.duration.inSeconds.toDouble()),
+                  Formatters.formatDuration(
+                    state.duration.inSeconds.toDouble(),
+                  ),
                   style: TvTheme.captionStyle(context),
                 ),
               ],
@@ -309,7 +314,7 @@ class TvPlayer extends ConsumerWidget {
     PlayerNotifier notifier,
   ) {
     final theme = Theme.of(context);
-    
+
     if (state.isBuffering) {
       return Container(
         width: 100,
@@ -355,19 +360,22 @@ class TvPlayer extends ConsumerWidget {
     PlayerNotifier notifier,
   ) {
     final theme = Theme.of(context);
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // 播放模式
-        TvIconButton(
-          icon: _getPlayModeIcon(state.playMode),
-          onPressed: () => _cyclePlayMode(notifier, state.playMode),
-          size: 64,
-          iconSize: 28,
-          iconColor: state.playMode != PlayMode.order
-              ? theme.colorScheme.primary
-              : null,
+        Builder(
+          builder: (buttonContext) => TvIconButton(
+            icon: _getPlayModeIcon(state.playMode),
+            onPressed: () => _showPlayModeMenu(buttonContext, notifier, state, theme),
+            size: 64,
+            iconSize: 28,
+            iconColor:
+                state.playMode != PlayMode.order
+                    ? theme.colorScheme.primary
+                    : null,
+          ),
         ),
         const SizedBox(width: TvTheme.spacingMedium),
         // 音量减
@@ -408,9 +416,8 @@ class TvPlayer extends ConsumerWidget {
           onPressed: notifier.togglePlaylistDrawer,
           size: 64,
           iconSize: 28,
-          iconColor: state.showPlaylistDrawer
-              ? theme.colorScheme.primary
-              : null,
+          iconColor:
+              state.showPlaylistDrawer ? theme.colorScheme.primary : null,
         ),
       ],
     );
@@ -426,18 +433,86 @@ class TvPlayer extends ConsumerWidget {
         return Icons.repeat_one_rounded;
       case PlayMode.random:
         return Icons.shuffle_rounded;
+      case PlayMode.singlePlay:
+        return Icons.looks_one_rounded;
     }
   }
 
-  void _cyclePlayMode(PlayerNotifier notifier, PlayMode currentMode) {
-    const modes = PlayMode.values;
-    final nextIndex = (modes.indexOf(currentMode) + 1) % modes.length;
-    notifier.setPlayMode(modes[nextIndex]);
+  String _getPlayModeTooltip(PlayMode mode) {
+    switch (mode) {
+      case PlayMode.order:
+        return '顺序播放';
+      case PlayMode.loop:
+        return '列表循环';
+      case PlayMode.single:
+        return '单曲循环';
+      case PlayMode.random:
+        return '随机播放';
+      case PlayMode.singlePlay:
+        return '单曲播放';
+    }
+  }
+
+  void _showPlayModeMenu(
+    BuildContext context,
+    PlayerNotifier notifier,
+    PlayerState state,
+    ThemeData theme,
+  ) {
+    final RenderBox button = context.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(
+          button.size.bottomRight(Offset.zero),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    showMenu<PlayMode>(
+      context: context,
+      position: position,
+      items: [
+        for (final mode in PlayMode.values)
+          PopupMenuItem<PlayMode>(
+            value: mode,
+            child: Row(
+              children: [
+                Icon(
+                  _getPlayModeIcon(mode),
+                  size: 24,
+                  color: state.playMode == mode
+                      ? theme.colorScheme.primary
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  _getPlayModeTooltip(mode),
+                  style: state.playMode == mode
+                      ? TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        )
+                      : null,
+                ),
+              ],
+            ),
+          ),
+      ],
+    ).then((mode) {
+      if (mode != null) {
+        notifier.setPlayMode(mode);
+      }
+    });
   }
 }
 
 /// TV 迷你播放器（用于底部显示）
-/// 
+///
 /// 专为 TV 端设计的迷你播放器，显示在底部
 class TvMiniPlayer extends ConsumerWidget {
   const TvMiniPlayer({super.key});
@@ -463,10 +538,7 @@ class TvMiniPlayer extends ConsumerWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.outlineVariant,
-            width: 1,
-          ),
+          top: BorderSide(color: theme.colorScheme.outlineVariant, width: 1),
         ),
       ),
       child: Padding(
@@ -486,12 +558,13 @@ class TvMiniPlayer extends ConsumerWidget {
                   color: theme.colorScheme.surfaceContainerHighest,
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: coverUrl != null
-                    ? Image.network(coverUrl, fit: BoxFit.cover)
-                    : Icon(
-                        Icons.music_note_rounded,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                child:
+                    coverUrl != null
+                        ? Image.network(coverUrl, fit: BoxFit.cover)
+                        : Icon(
+                          Icons.music_note_rounded,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
               ),
               const SizedBox(width: TvTheme.spacingMedium),
               // 歌曲信息
@@ -502,9 +575,9 @@ class TvMiniPlayer extends ConsumerWidget {
                   children: [
                     Text(
                       song.title,
-                      style: TvTheme.bodyStyle(context).copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: TvTheme.bodyStyle(
+                        context,
+                      ).copyWith(fontWeight: FontWeight.w500),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -531,9 +604,10 @@ class TvMiniPlayer extends ConsumerWidget {
                   ),
                   const SizedBox(width: TvTheme.spacingSmall),
                   TvIconButton(
-                    icon: state.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
+                    icon:
+                        state.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
                     onPressed: notifier.togglePlay,
                     size: 56,
                     iconSize: 32,

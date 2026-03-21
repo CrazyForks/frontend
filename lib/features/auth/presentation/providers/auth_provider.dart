@@ -32,26 +32,39 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 });
 
 /// 认证状态 Notifier
-class AuthNotifier extends StateNotifier<AuthState> {
-  final SecureStorageService _secureStorage;
-  final Ref _ref;
+class AuthNotifier extends Notifier<AuthState> {
+  late SecureStorageService _secureStorage;
+  bool _disposed = false;
 
-  AuthNotifier(this._secureStorage, this._ref) : super(AuthState.initial) {
-    // 初始化时检查认证状态
-    checkAuth();
+  @override
+  AuthState build() {
+    _secureStorage = ref.watch(secureStorageProvider);
+    _disposed = false;
+
+    ref.onDispose(() {
+      _disposed = true;
+    });
+
+    // 延迟到微任务中执行，避免在首次帧渲染的 addPostFrameCallback 阶段
+    // 与 widget 树构建产生竞态（auth 状态变化触发 GoRouter redirect 导致 provider flush 冲突）
+    Future.microtask(() => checkAuth());
+    return AuthState.initial;
   }
 
   /// 检查认证状态
+  /// 注意：不设置中间 loading 状态，直接从 unknown 跳到最终状态，
+  /// 避免触发多余的 GoRouter redirect 重新评估导致 widget 树重建竞态。
   Future<void> checkAuth() async {
-    state = state.loading();
     try {
       final hasTokens = await _secureStorage.hasTokens();
+      if (_disposed) return;
       if (hasTokens) {
         state = state.authenticated();
       } else {
         state = state.unauthenticated();
       }
     } catch (e) {
+      if (_disposed) return;
       state = state.unauthenticated(e.toString());
     }
   }
@@ -69,10 +82,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (apiBaseUrl != null && apiBaseUrl.isNotEmpty) {
         AppConfig.baseUrl = apiBaseUrl;
         // 保存到偏好设置
-        final prefs = await _ref.read(appPreferencesProvider.future);
+        final prefs = await ref.read(appPreferencesProvider.future);
         await prefs.setApiBaseUrl(apiBaseUrl);
         // 使已缓存的 dioProvider 失效，下次访问时会使用新的 baseUrl 重新创建
-        _ref.invalidate(dioProvider);
+        ref.invalidate(dioProvider);
       }
 
       // 创建临时 Dio 进行登录（不带认证拦截器）
@@ -114,7 +127,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.loading();
 
     try {
-      final repository = _ref.read(authRepositoryProvider);
+      final repository = ref.read(authRepositoryProvider);
       await repository.logout();
     } catch (e) {
       // 忽略登出错误，仍然清除本地状态
@@ -131,16 +144,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
 }
 
 /// 认证状态 Provider
-final authStateProvider =
-    StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final secureStorage = ref.watch(secureStorageProvider);
-  return AuthNotifier(secureStorage, ref);
-});
+final authStateProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
 
 /// 是否已认证 Provider
 final isAuthenticatedProvider = Provider<bool>((ref) {
   final authState = ref.watch(authStateProvider);
   return authState.status == AuthStatus.authenticated;
+});
+
+/// 认证状态是否已确定（非 unknown）
+final isAuthResolvedProvider = Provider<bool>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState.status != AuthStatus.unknown;
 });
 
 /// 认证状态枚举 Provider

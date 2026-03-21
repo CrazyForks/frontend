@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/utils/cover_url.dart';
 
 import '../providers/player_provider.dart';
@@ -12,10 +13,7 @@ import 'progress_bar.dart';
 class MiniPlayer extends ConsumerWidget {
   final VoidCallback? onTap; // 点击展开全屏
 
-  const MiniPlayer({
-    super.key,
-    this.onTap,
-  });
+  const MiniPlayer({super.key, this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,15 +42,25 @@ class MiniPlayer extends ConsumerWidget {
             onSeek: notifier.seek,
             mini: true,
           ),
+          // 顶部分割线
+          Divider(
+            height: 1,
+            thickness: 0.5,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
           // 主体内容（高度 64px）
           Material(
             color: theme.colorScheme.surface,
-            elevation: 8,
+            elevation: 2,
             child: InkWell(
-              onTap: onTap ?? () {
-                debugPrint('[Player] MiniPlayer tapped, showing MobilePlayer');
-                MobilePlayer.show(context);
-              },
+              onTap:
+                  onTap ??
+                  () {
+                    debugPrint(
+                      '[Player] MiniPlayer tapped, showing MobilePlayer',
+                    );
+                    MobilePlayer.show(context);
+                  },
               child: SizedBox(
                 height: 64,
                 child: Padding(
@@ -60,10 +68,13 @@ class MiniPlayer extends ConsumerWidget {
                   child: Row(
                     children: [
                       // 封面
-                      _buildCover(context, CoverUrl.buildCoverUrl(
-                        coverUrl: song.coverUrl,
-                        coverPath: song.coverPath,
-                      )),
+                      _buildCover(
+                        context,
+                        CoverUrl.buildCoverUrl(
+                          coverUrl: song.coverUrl,
+                          coverPath: song.coverPath,
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       // 标题和艺术家
                       Expanded(
@@ -117,17 +128,18 @@ class MiniPlayer extends ConsumerWidget {
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.mdAll,
         color: theme.colorScheme.surfaceContainerHighest,
       ),
       clipBehavior: Clip.antiAlias,
-      child: coverUrl != null && coverUrl.isNotEmpty
-          ? Image.network(
-              coverUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildPlaceholder(theme),
-            )
-          : _buildPlaceholder(theme),
+      child:
+          coverUrl != null && coverUrl.isNotEmpty
+              ? Image.network(
+                coverUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _buildPlaceholder(theme),
+              )
+              : _buildPlaceholder(theme),
     );
   }
 

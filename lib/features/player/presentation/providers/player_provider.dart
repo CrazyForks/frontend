@@ -8,81 +8,82 @@ import 'package:just_audio/just_audio.dart' as ja;
 import '../../../../core/audio/audio_service.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage.dart';
+import '../../../../main.dart';
 import '../../../../shared/models/song.dart';
+import '../../../playlist/data/playlist_api.dart';
+import '../../../playlist/presentation/providers/playlist_provider.dart';
 import '../../domain/player_state.dart';
 
-/// AudioPlayerService Provider (单例)
-final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
-  final service = AudioPlayerService();
-  ref.onDispose(() {
-    service.dispose();
-  });
-  return service;
-});
-
 /// 播放器状态 Provider
-final playerStateProvider =
-    StateNotifierProvider<PlayerNotifier, PlayerState>((ref) {
-  final audioService = ref.watch(audioPlayerServiceProvider);
-  final secureStorage = ref.watch(secureStorageProvider);
-  return PlayerNotifier(audioService, secureStorage);
-});
+final playerStateProvider = NotifierProvider<PlayerNotifier, PlayerState>(
+  PlayerNotifier.new,
+);
 
 /// 播放器状态管理 Notifier
-class PlayerNotifier extends StateNotifier<PlayerState> {
-  final AudioPlayerService _audioService;
-  final SecureStorageService _secureStorage;
+class PlayerNotifier extends Notifier<PlayerState> {
+  late MiMusicAudioHandler _audioHandler;
+  late SecureStorageService _secureStorage;
 
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
   StreamSubscription<ja.PlayerState>? _playerStateSubscription;
-  StreamSubscription<ja.ProcessingState>? _processingStateSubscription;
 
   Timer? _sleepTimer;
   Timer? _sleepTimerCountdown;
 
   final Random _random = Random();
   final Set<int> _playedIndices = {}; // 随机模式下已播放的索引
+  int _loadGeneration = 0; // 后台加载代次，用于取消过期的异步加载任务
 
-  PlayerNotifier(this._audioService, this._secureStorage)
-      : super(PlayerState.initial) {
+  @override
+  PlayerState build() {
+    _audioHandler = ref.watch(audioHandlerProvider);
+    _secureStorage = ref.watch(secureStorageProvider);
+
+    // 设置通知栏回调
+    _audioHandler.onSkipToNext = () => playNext();
+    _audioHandler.onSkipToPrevious = () => playPrev();
+    _audioHandler.onSongCompleted = _onSongCompleted;
+
     _initListeners();
+    ref.onDispose(() {
+      _positionSubscription?.cancel();
+      _durationSubscription?.cancel();
+      _playerStateSubscription?.cancel();
+      _sleepTimer?.cancel();
+      _sleepTimerCountdown?.cancel();
+    });
+    return PlayerState.initial;
   }
 
   /// 初始化监听器
   void _initListeners() {
     // 监听播放位置
-    _positionSubscription = _audioService.positionStream.listen((position) {
-      if (mounted) {
-        state = state.copyWith(currentTime: position);
-      }
+    _positionSubscription = _audioHandler.positionStream.listen((position) {
+      state = state.copyWith(currentTime: position);
     });
 
     // 监听总时长
-    _durationSubscription = _audioService.durationStream.listen((duration) {
-      if (mounted && duration != null) {
+    _durationSubscription = _audioHandler.durationStream.listen((duration) {
+      if (duration != null) {
         state = state.copyWith(duration: duration);
+        // 同时更新通知栏的 duration
+        _audioHandler.updateDuration(duration);
       }
     });
 
     // 监听播放状态
-    _audioService.playerStateStream.listen((playerState) {
-      if (mounted) {
-        state = state.copyWith(
-          isPlaying: playerState.playing,
-          isBuffering: playerState.processingState == ja.ProcessingState.buffering ||
-              playerState.processingState == ja.ProcessingState.loading,
-        );
-      }
+    _playerStateSubscription = _audioHandler.playerStateStream.listen((
+      playerState,
+    ) {
+      state = state.copyWith(
+        isPlaying: playerState.playing,
+        isBuffering:
+            playerState.processingState == ja.ProcessingState.buffering ||
+            playerState.processingState == ja.ProcessingState.loading,
+      );
     });
-
-    // 监听处理状态（检测歌曲结束）
-    _processingStateSubscription =
-        _audioService.processingStateStream.listen((processingState) {
-      if (mounted && processingState == ja.ProcessingState.completed) {
-        _onSongCompleted();
-      }
-    });
+    // 歌曲结束通过 _audioHandler.onSongCompleted 回调处理
   }
 
   /// 歌曲播放完成处理
@@ -92,8 +93,13 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       case PlayMode.single:
         // 单曲循环
         debugPrint('[Player] Single loop: restarting current song');
-        _audioService.seek(Duration.zero);
-        _audioService.play();
+        _audioHandler.seek(Duration.zero);
+        _audioHandler.play();
+        break;
+      case PlayMode.singlePlay:
+        // 单曲播放：播完停止，不循环、不切换下一首
+        debugPrint('[Player] SinglePlay mode: pausing after song completed');
+        _audioHandler.pause();
         break;
       case PlayMode.order:
       case PlayMode.loop:
@@ -107,11 +113,14 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
 
   /// 播放单曲（添加到播放列表并播放）
   Future<void> playSong(Song song) async {
-    debugPrint('[Player] playSong: ${song.title} (id: ${song.id}, type: ${song.type})');
+    debugPrint(
+      '[Player] playSong: ${song.title} (id: ${song.id}, type: ${song.type})',
+    );
     // 检查是否已在播放列表中
     final existingIndex = state.playlist.indexWhere(
-        (s) => s.id == song.id && s.type == song.type);
-    
+      (s) => s.id == song.id && s.type == song.type,
+    );
+
     if (existingIndex >= 0) {
       // 已存在，直接跳转播放
       debugPrint('[Player] Song already in playlist at index $existingIndex');
@@ -132,14 +141,21 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
 
   /// 播放歌单
   Future<void> playPlaylist(List<Song> songs, {int startIndex = 0}) async {
-    debugPrint('[Player] playPlaylist: ${songs.length} songs, startIndex: $startIndex');
+    debugPrint(
+      '[Player] playPlaylist: ${songs.length} songs, startIndex: $startIndex',
+    );
     if (songs.isEmpty) {
       debugPrint('[Player] playPlaylist: empty songs list, returning');
       return;
     }
 
+    // 递增代次，使正在进行的后台加载自动取消
+    _loadGeneration++;
+
     final safeIndex = startIndex.clamp(0, songs.length - 1);
-    debugPrint('[Player] playPlaylist: starting with song: ${songs[safeIndex].title}');
+    debugPrint(
+      '[Player] playPlaylist: starting with song: ${songs[safeIndex].title}',
+    );
     _playedIndices.clear();
 
     state = state.copyWith(
@@ -158,13 +174,33 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     final newPlaylist = [...state.playlist];
     for (final song in songs) {
       final exists = newPlaylist.any(
-          (s) => s.id == song.id && s.type == song.type);
+        (s) => s.id == song.id && s.type == song.type,
+      );
       if (!exists) {
         newPlaylist.add(song);
       }
     }
 
     state = state.copyWith(playlist: newPlaylist);
+  }
+
+  /// 将歌曲插入到播放列表的指定位置
+  /// 用于撤销删除等场景，不会触发播放
+  void insertToPlaylist(int index, Song song) {
+    final newPlaylist = List<Song>.from(state.playlist);
+    final safeIndex = index.clamp(0, newPlaylist.length);
+    newPlaylist.insert(safeIndex, song);
+
+    // 调整当前播放索引：插入位置在当前歌曲之前或等于当前位置时，索引后移
+    int newCurrentIndex = state.currentIndex;
+    if (state.currentIndex >= 0 && safeIndex <= state.currentIndex) {
+      newCurrentIndex++;
+    }
+
+    state = state.copyWith(
+      playlist: newPlaylist,
+      currentIndex: newCurrentIndex,
+    );
   }
 
   /// 暂停/播放切换
@@ -176,16 +212,18 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
 
     if (state.isPlaying) {
       debugPrint('[Player] togglePlay: pausing');
-      await _audioService.pause();
+      await _audioHandler.pause();
     } else {
       debugPrint('[Player] togglePlay: resuming');
-      await _audioService.play();
+      await _audioHandler.play();
     }
   }
 
   /// 播放下一首
   Future<void> playNext() async {
-    debugPrint('[Player] playNext: currentIndex: ${state.currentIndex}, playlistLength: ${state.playlist.length}');
+    debugPrint(
+      '[Player] playNext: currentIndex: ${state.currentIndex}, playlistLength: ${state.playlist.length}',
+    );
     if (state.playlist.isEmpty) {
       debugPrint('[Player] playNext: playlist is empty');
       return;
@@ -214,7 +252,9 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
 
   /// 播放上一首
   Future<void> playPrev() async {
-    debugPrint('[Player] playPrev: currentIndex: ${state.currentIndex}, currentTime: ${state.currentTime.inSeconds}s');
+    debugPrint(
+      '[Player] playPrev: currentIndex: ${state.currentIndex}, currentTime: ${state.currentTime.inSeconds}s',
+    );
     if (state.playlist.isEmpty) {
       debugPrint('[Player] playPrev: playlist is empty');
       return;
@@ -223,7 +263,7 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     // 如果当前播放超过 3 秒，重新开始当前歌曲
     if (state.currentTime.inSeconds > 3) {
       debugPrint('[Player] playPrev: seeking to start of current song');
-      await _audioService.seek(Duration.zero);
+      await _audioHandler.seek(Duration.zero);
       return;
     }
 
@@ -240,7 +280,7 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
         } else {
           debugPrint('[Player] playPrev: order mode, already at first song');
           // 顺序模式，已是第一首
-          await _audioService.seek(Duration.zero);
+          await _audioHandler.seek(Duration.zero);
           return;
         }
       }
@@ -251,14 +291,14 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
 
   /// 跳转进度
   Future<void> seek(Duration position) async {
-    await _audioService.seek(position);
+    await _audioHandler.seek(position);
   }
 
   /// 设置音量 (0-100)
   Future<void> setVolume(double volume) async {
     final clampedVolume = volume.clamp(0.0, 100.0);
     state = state.copyWith(volume: clampedVolume, clearPreviousVolume: true);
-    await _audioService.setVolume(clampedVolume / 100);
+    await _audioHandler.setVolume(clampedVolume / 100);
   }
 
   /// 切换静音
@@ -295,7 +335,7 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       if (newPlaylist.isEmpty) {
         newIndex = -1;
         newSong = null;
-        _audioService.stop();
+        _audioHandler.stop();
       } else if (index >= newPlaylist.length) {
         newIndex = newPlaylist.length - 1;
         newSong = newPlaylist[newIndex];
@@ -321,7 +361,7 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
 
     final newPlaylist = List<Song>.from(state.playlist);
     final song = newPlaylist.removeAt(oldIndex);
-    
+
     // 如果新位置在旧位置之后，需要调整
     final insertIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
     newPlaylist.insert(insertIndex, song);
@@ -333,7 +373,8 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     } else {
       if (oldIndex < state.currentIndex && insertIndex >= state.currentIndex) {
         newCurrentIndex--;
-      } else if (oldIndex > state.currentIndex && insertIndex <= state.currentIndex) {
+      } else if (oldIndex > state.currentIndex &&
+          insertIndex <= state.currentIndex) {
         newCurrentIndex++;
       }
     }
@@ -346,7 +387,9 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
 
   /// 清空播放列表
   void clearPlaylist() {
-    _audioService.stop();
+    // 递增代次，使正在进行的后台加载自动取消
+    _loadGeneration++;
+    _audioHandler.stop();
     _playedIndices.clear();
     state = state.copyWith(
       playlist: [],
@@ -356,6 +399,156 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       currentTime: Duration.zero,
       duration: Duration.zero,
     );
+  }
+
+  /// 通过歌单 ID 播放全部歌曲
+  /// 策略：先取第一页（100首）立即开始播放，后台异步加载剩余歌曲
+  /// 使用 _loadGeneration 防止竞态：用户切换歌单或清空时自动取消旧的后台加载
+  /// [playlistId] 歌单 ID
+  /// 返回用于展示的总歌曲数（-1 表示失败）
+  Future<int> playPlaylistById(int playlistId) async {
+    final playlistApi = ref.read(playlistApiProvider);
+    const firstPageLimit = 100;
+
+    debugPrint('[Player] playPlaylistById: start, playlistId=$playlistId');
+    try {
+      final firstPageResponse = await playlistApi.getPlaylistSongs(
+        playlistId,
+        limit: firstPageLimit,
+        offset: 0,
+      );
+      final firstPageSongs = firstPageResponse.songs;
+      final total = firstPageResponse.total;
+
+      debugPrint(
+        '[Player] playPlaylistById: firstPage=${firstPageSongs.length}, total=$total',
+      );
+
+      if (firstPageSongs.isEmpty) {
+        debugPrint('[Player] playPlaylistById: playlist is empty');
+        return 0;
+      }
+
+      // playPlaylist 内部会递增 _loadGeneration，取消之前的后台加载
+      await playPlaylist(firstPageSongs);
+
+      if (total > firstPageSongs.length) {
+        // 记录当前代次，传给后台加载任务用于检测是否过期
+        final generation = _loadGeneration;
+        debugPrint(
+          '[Player] playPlaylistById: starting background load, generation=$generation, offset=${firstPageSongs.length}',
+        );
+        _loadRemainingSongsById(
+          playlistId,
+          playlistApi,
+          firstPageSongs.length,
+          total,
+          generation,
+        );
+      } else {
+        debugPrint('[Player] playPlaylistById: all songs loaded in first page');
+        ref.read(playlistNotifierProvider.notifier).touchPlaylist(playlistId);
+      }
+
+      return total;
+    } catch (e, st) {
+      debugPrint('[Player] playPlaylistById error: $e\n$st');
+      return -1;
+    }
+  }
+
+  /// 后台异步加载剩余歌曲并追加到播放列表，完成后调用 touchPlaylist
+  /// [generation] 启动时的代次快照，每次 await 后检查是否过期
+  Future<void> _loadRemainingSongsById(
+    int playlistId,
+    PlaylistApi playlistApi,
+    int startOffset,
+    int total,
+    int generation,
+  ) async {
+    const batchLimit = 100;
+    const maxRetries = 3; // 单批次最大重试次数
+    int offset = startOffset;
+    try {
+      while (offset < total) {
+        // 每次网络请求前检查代次，若已过期则中止
+        if (_loadGeneration != generation) {
+          debugPrint(
+            '[Player] _loadRemainingSongsById: cancelled before fetch'
+            ' (generation: expected=$generation, current=$_loadGeneration, offset=$offset)',
+          );
+          return;
+        }
+
+        // 带重试的批次加载，防止网络波动导致加载中断
+        SongListResponse? response;
+        for (int retry = 0; retry < maxRetries; retry++) {
+          try {
+            debugPrint(
+              '[Player] _loadRemainingSongsById: fetching offset=$offset'
+              ' (retry=$retry, generation=$generation)',
+            );
+            response = await playlistApi.getPlaylistSongs(
+              playlistId,
+              limit: batchLimit,
+              offset: offset,
+            );
+            break; // 成功则跳出重试循环
+          } catch (e) {
+            debugPrint(
+              '[Player] _loadRemainingSongsById: fetch failed at offset=$offset,'
+              ' retry=$retry/$maxRetries: $e',
+            );
+            if (retry == maxRetries - 1) rethrow; // 最后一次重试失败则抛出
+            // 指数退避重试：500ms / 1000ms
+            await Future<void>.delayed(
+              Duration(milliseconds: 500 * (retry + 1)),
+            );
+          }
+        }
+
+        // 网络请求返回后再次检查，防止期间用户切换了歌单
+        if (_loadGeneration != generation) {
+          debugPrint(
+            '[Player] _loadRemainingSongsById: cancelled after fetch'
+            ' (generation: expected=$generation, current=$_loadGeneration, offset=$offset)',
+          );
+          return;
+        }
+
+        final batch = response!.songs;
+        debugPrint(
+          '[Player] _loadRemainingSongsById: got ${batch.length} songs at offset=$offset,'
+          ' playlist size=${state.playlist.length + batch.length}',
+        );
+        if (batch.isEmpty) {
+          debugPrint(
+            '[Player] _loadRemainingSongsById: empty batch at offset=$offset, stopping',
+          );
+          break;
+        }
+        addToPlaylist(batch);
+        offset += batchLimit;
+      }
+      debugPrint(
+        '[Player] _loadRemainingSongsById: done,'
+        ' loaded=${state.playlist.length}, total=$total',
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[Player] _loadRemainingSongsById: failed at offset=$offset/$total'
+        ' (generation=$generation): $e\n$st',
+      );
+    }
+    // 仅当代次未变化时才执行 touchPlaylist，避免对错误的歌单更新时间
+    if (_loadGeneration == generation) {
+      ref.read(playlistNotifierProvider.notifier).touchPlaylist(playlistId);
+    } else {
+      debugPrint(
+        '[Player] _loadRemainingSongsById: skip touchPlaylist'
+        ' (generation: expected=$generation, current=$_loadGeneration)',
+      );
+    }
   }
 
   /// 切换全屏播放器
@@ -383,17 +576,13 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     cancelSleepTimer();
 
     _sleepTimer = Timer(duration, () {
-      _audioService.pause();
+      _audioHandler.pause();
       cancelSleepTimer();
     });
 
     // 启动倒计时更新
     state = state.copyWith(sleepTimerRemaining: duration);
     _sleepTimerCountdown = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
       final remaining = state.sleepTimerRemaining;
       if (remaining != null && remaining.inSeconds > 0) {
         state = state.copyWith(
@@ -412,9 +601,7 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     _sleepTimer = null;
     _sleepTimerCountdown?.cancel();
     _sleepTimerCountdown = null;
-    if (mounted) {
-      state = state.copyWith(clearSleepTimer: true);
-    }
+    state = state.copyWith(clearSleepTimer: true);
   }
 
   /// 播放指定索引
@@ -439,16 +626,20 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       return;
     }
 
-    debugPrint('[Player] _playCurrent: ${song.title} (id: ${song.id}, type: ${song.type})');
-    debugPrint('[Player] _playCurrent: filePath: ${song.filePath}, url: ${song.url}');
+    debugPrint(
+      '[Player] _playCurrent: ${song.title} (id: ${song.id}, type: ${song.type})',
+    );
+    debugPrint(
+      '[Player] _playCurrent: filePath: ${song.filePath}, url: ${song.url}',
+    );
 
     try {
       state = state.copyWith(isBuffering: true);
       final token = await _secureStorage.getAccessToken();
-      debugPrint('[Player] _playCurrent: calling audioService.playSong');
-      await _audioService.playSong(song, token);
+      debugPrint('[Player] _playCurrent: calling audioHandler.playSong');
+      await _audioHandler.playSong(song, token);
       // 设置音量
-      await _audioService.setVolume(state.volume / 100);
+      await _audioHandler.setVolume(state.volume / 100);
       debugPrint('[Player] _playCurrent: playback started successfully');
     } catch (e) {
       debugPrint('[Player] _playCurrent: error - $e');
@@ -471,27 +662,17 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     }
 
     // 获取未播放的索引
-    final availableIndices = List<int>.generate(
-      state.playlist.length,
-      (i) => i,
-    ).where((i) => !_playedIndices.contains(i)).toList();
+    final availableIndices =
+        List<int>.generate(
+          state.playlist.length,
+          (i) => i,
+        ).where((i) => !_playedIndices.contains(i)).toList();
 
     if (availableIndices.isEmpty) {
       return _random.nextInt(state.playlist.length);
     }
 
     return availableIndices[_random.nextInt(availableIndices.length)];
-  }
-
-  @override
-  void dispose() {
-    _positionSubscription?.cancel();
-    _durationSubscription?.cancel();
-    _playerStateSubscription?.cancel();
-    _processingStateSubscription?.cancel();
-    _sleepTimer?.cancel();
-    _sleepTimerCountdown?.cancel();
-    super.dispose();
   }
 }
 

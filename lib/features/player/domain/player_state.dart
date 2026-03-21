@@ -4,12 +4,18 @@ import '../../../shared/models/song.dart';
 enum PlayMode {
   /// 顺序播放
   order,
+
   /// 列表循环
   loop,
+
   /// 单曲循环
   single,
+
   /// 随机播放
   random,
+
+  /// 单曲播放（播完停止）
+  singlePlay,
 }
 
 /// 播放器状态
@@ -51,6 +57,7 @@ class PlayerState {
   bool get hasNext {
     if (playlist.isEmpty) return false;
     if (playMode == PlayMode.loop || playMode == PlayMode.random) return true;
+    // singlePlay 和 order 模式下，判断是否还有下一首
     return currentIndex < playlist.length - 1;
   }
 
@@ -58,6 +65,7 @@ class PlayerState {
   bool get hasPrev {
     if (playlist.isEmpty) return false;
     if (playMode == PlayMode.loop || playMode == PlayMode.random) return true;
+    // singlePlay 和 order 模式下，判断是否还有上一首
     return currentIndex > 0;
   }
 
@@ -74,7 +82,10 @@ class PlayerState {
   /// 播放进度 (0.0 - 1.0)
   double get progress {
     if (duration.inMilliseconds <= 0) return 0;
-    return (currentTime.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    return (currentTime.inMilliseconds / duration.inMilliseconds).clamp(
+      0.0,
+      1.0,
+    );
   }
 
   /// 是否静音
@@ -111,8 +122,12 @@ class PlayerState {
       isBuffering: isBuffering ?? this.isBuffering,
       showFullPlayer: showFullPlayer ?? this.showFullPlayer,
       showPlaylistDrawer: showPlaylistDrawer ?? this.showPlaylistDrawer,
-      sleepTimerRemaining: clearSleepTimer ? null : (sleepTimerRemaining ?? this.sleepTimerRemaining),
-      previousVolume: clearPreviousVolume ? null : (previousVolume ?? this.previousVolume),
+      sleepTimerRemaining:
+          clearSleepTimer
+              ? null
+              : (sleepTimerRemaining ?? this.sleepTimerRemaining),
+      previousVolume:
+          clearPreviousVolume ? null : (previousVolume ?? this.previousVolume),
     );
   }
 
