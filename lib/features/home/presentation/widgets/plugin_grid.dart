@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../config/app_config.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/responsive.dart';
 import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../../settings/data/plugin_api.dart';
@@ -137,18 +141,35 @@ class _PluginCard extends StatelessWidget {
   }
 
   /// 打开插件入口
-  Future<void> _openPluginEntry(BuildContext context) async {
+  void _openPluginEntry(BuildContext context) {
     if (plugin.entryPath == null || plugin.entryPath!.isEmpty) {
       return;
     }
 
     // 构建完整 URL: baseUrl + /api/v1/plugin + entryPath
-    final url = Uri.parse(
-      '${AppConfig.baseUrl}${AppConfig.apiPrefix}/plugin${plugin.entryPath}',
-    );
+    final url =
+        '${AppConfig.baseUrl}${AppConfig.apiPrefix}/plugin${plugin.entryPath}';
 
     try {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (kIsWeb) {
+        // Web 平台：新标签页打开，通过 URL query parameter 传递 token
+        // static_handler.go 注入的 auth-bridge 脚本会从 URL 读取 token 存入 localStorage
+        final token = SecureStorageService.cachedAccessToken ?? '';
+        final separator = url.contains('?') ? '&' : '?';
+        final webUrl =
+            token.isNotEmpty
+                ? Uri.parse('$url${separator}access_token=$token')
+                : Uri.parse(url);
+        launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      } else {
+        // 原生平台：应用内 WebView，通过 initialUserScripts 注入 token
+        context.push(
+          Uri(
+            path: AppRoutes.plugin,
+            queryParameters: {'url': url, 'name': plugin.displayName},
+          ).toString(),
+        );
+      }
     } catch (e) {
       if (context.mounted) {
         ResponsiveSnackBar.showError(context, message: '无法打开插件: $e');

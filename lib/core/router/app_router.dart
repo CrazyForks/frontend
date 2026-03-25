@@ -6,6 +6,7 @@ import '../../features/auth/domain/auth_state.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/home/presentation/home_page.dart';
+import '../../features/home/presentation/plugin_webview_page.dart';
 import '../../features/library/presentation/library_page.dart';
 import '../../features/playlist/presentation/playlists_page.dart';
 import '../../features/playlist/presentation/playlist_detail_page.dart';
@@ -20,6 +21,7 @@ class AppRoutes {
   static const String playlists = '/playlists';
   static const String playlistDetail = '/playlists/:id';
   static const String settings = '/settings';
+  static const String plugin = '/plugin';
 }
 
 /// 将 Riverpod 认证状态变化桥接为 GoRouter 的 refreshListenable，
@@ -75,6 +77,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.login,
         builder: (context, state) => const LoginPage(),
+      ),
+
+      // 插件 WebView 页面（独立路由，全屏显示，不显示底部导航）
+      GoRoute(
+        path: AppRoutes.plugin,
+        builder: (context, state) {
+          final url = state.uri.queryParameters['url'] ?? '';
+          final name = state.uri.queryParameters['name'] ?? '';
+          return PluginWebViewPage(pluginUrl: url, pluginName: name);
+        },
       ),
 
       // 主应用路由（使用 ShellRoute 包含导航和播放器）
