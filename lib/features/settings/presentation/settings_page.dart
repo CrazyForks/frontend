@@ -1,12 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/app_config.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_dimensions.dart';
 import '../../../shared/utils/responsive_snackbar.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
-import 'providers/settings_provider.dart';
 import 'widgets/config_manager.dart';
 import 'widgets/plugin_manager.dart';
 import 'widgets/scan_manager.dart';
@@ -384,16 +386,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     String? gitCommit;
 
     try {
-      final check = await ref.read(upgradeCheckProvider.future);
-      final current = check.currentVersion;
-      if (current != null && current.isNotEmpty) {
-        version = current;
-        // 尝试从版本信息中提取 git commit（如果格式为 v1.0.0-abc1234）
-        final parts = current.split('-');
-        if (parts.length > 1) {
-          version = parts[0];
-          gitCommit = parts.sublist(1).join('-');
-        }
+      final dio = ref.read(dioProvider);
+      final response = await dio
+          .get('${AppConfig.apiPrefix}/version')
+          .timeout(const Duration(seconds: 3));
+      final data = response.data as Map<String, dynamic>;
+      final ver = data['version'] as String?;
+      if (ver != null && ver.isNotEmpty) {
+        version = ver;
+      }
+      final commit = data['git_commit'] as String?;
+      if (commit != null && commit != 'unknown' && commit.isNotEmpty) {
+        gitCommit = commit;
       }
     } catch (_) {
       // 忽略错误，使用默认版本号

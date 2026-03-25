@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +30,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
   bool _isChecking = true;
   bool _isStarting = false;
   String? _error;
+  UpgradeCheck? _checkResult;
 
   @override
   void initState() {
@@ -42,18 +45,24 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     setState(() {
       _isChecking = true;
       _error = null;
+      _checkResult = null;
     });
 
     try {
-      // 刷新检查更新
-      ref.invalidate(upgradeCheckProvider);
-      await ref.read(upgradeCheckProvider.future);
+      // 直接调用 API，避免 ref.invalidate + ref.read(.future) 的状态问题
+      final upgradeApi = ref.read(upgradeApiProvider);
+      final result = await upgradeApi.checkUpgrade().timeout(
+        const Duration(seconds: 10),
+      );
+      if (mounted) setState(() => _checkResult = result);
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
+    } on TimeoutException {
+      if (mounted) setState(() => _error = '检查更新超时，请稍后重试');
     } catch (e) {
-      setState(() => _error = '检查更新失败: $e');
+      if (mounted) setState(() => _error = '检查更新失败: $e');
     } finally {
-      setState(() => _isChecking = false);
+      if (mounted) setState(() => _isChecking = false);
     }
   }
 
@@ -78,7 +87,6 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final upgradeCheckAsync = ref.watch(upgradeCheckProvider);
     final upgradeProgress = ref.watch(upgradeProgressProvider);
 
     return AlertDialog(
@@ -146,22 +154,13 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
               else if (_error != null)
                 const SizedBox.shrink()
               // 显示检查结果
-              else
-                upgradeCheckAsync.when(
-                  data: (check) => _buildCheckResult(check),
-                  loading:
-                      () => const Center(child: CircularProgressIndicator()),
-                  error:
-                      (e, _) => Text(
-                        e is ApiException ? e.message : '检查失败',
-                        style: TextStyle(color: colorScheme.error),
-                      ),
-                ),
+              else if (_checkResult != null)
+                _buildCheckResult(_checkResult!),
             ],
           ),
         ),
       ),
-      actions: _buildActions(upgradeCheckAsync, upgradeProgress),
+      actions: _buildActions(upgradeProgress),
     );
   }
 
@@ -289,10 +288,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     );
   }
 
-  List<Widget> _buildActions(
-    AsyncValue<UpgradeCheck> upgradeCheckAsync,
-    UpgradeProgress upgradeProgress,
-  ) {
+  List<Widget> _buildActions(UpgradeProgress upgradeProgress) {
     // 正在升级时不显示按钮
     if (upgradeProgress.isUpgrading) {
       return [];
@@ -368,61 +364,44 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     }
 
     // 检查结果
-    return upgradeCheckAsync.when(
-      data: (check) {
-        if (check.hasUpdate) {
-          return [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                minimumSize: context.responsiveButtonMinSize,
-              ),
-              child: const Text('稍后'),
-            ),
-            FilledButton(
-              onPressed: _isStarting ? null : _startUpgrade,
-              style: FilledButton.styleFrom(
-                minimumSize: context.responsiveButtonMinSize,
-              ),
-              child:
-                  _isStarting
-                      ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : const Text('立即升级'),
-            ),
-          ];
-        }
-        return [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            style: FilledButton.styleFrom(
-              minimumSize: context.responsiveButtonMinSize,
-            ),
-            child: const Text('关闭'),
+    if (_checkResult != null && _checkResult!.hasUpdate) {
+      return [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
           ),
-        ];
-      },
-      loading: () => [],
-      error:
-          (_, _) => [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                minimumSize: context.responsiveButtonMinSize,
-              ),
-              child: const Text('关闭'),
-            ),
-            FilledButton(
-              onPressed: _checkUpgrade,
-              style: FilledButton.styleFrom(
-                minimumSize: context.responsiveButtonMinSize,
-              ),
-              child: const Text('重试'),
-            ),
-          ],
-    );
+          child: const Text('稍后'),
+        ),
+        FilledButton(
+          onPressed: _isStarting ? null : _startUpgrade,
+          style: FilledButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child:
+              _isStarting
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Text('立即升级'),
+        ),
+      ];
+    }
+
+    if (_checkResult != null) {
+      return [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          style: FilledButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('关闭'),
+        ),
+      ];
+    }
+
+    return [];
   }
 }
