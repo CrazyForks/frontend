@@ -4,6 +4,10 @@
 
 MiMusic 跨平台音乐播放器，基于 Flutter 构建，支持 6 个目标平台。
 
+## 截图
+
+https://github.com/mimusic-org/mimusic/issues/6
+
 ## 下载安装
 
 从 [GitHub Releases](https://github.com/mimusic-org/frontend/releases/latest) 下载最新版本：
