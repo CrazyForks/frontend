@@ -173,9 +173,6 @@ jobs:
           if ($msixFile) {
             Copy-Item $msixFile.FullName -Destination mimusic-windows-x64.msix
           }
-      # TODO: EXE (Inno Setup) 安装程序需要安装 Inno Setup，配置较复杂，暂跳过
-      # - name: Build EXE installer
-      #   run: fastforge package --platform windows --targets exe
       - uses: actions/upload-artifact@v4
         with:
           name: mimusic-windows-x64

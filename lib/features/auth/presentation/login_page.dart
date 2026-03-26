@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/app_config.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/theme/tv_theme.dart';
 import '../../../shared/utils/responsive_snackbar.dart';
 import '../domain/auth_state.dart';
 import 'providers/auth_provider.dart';
@@ -21,6 +22,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiUrlController = TextEditingController();
+
+  // TV 焦点节点
+  final _usernameFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  final _apiUrlFocusNode = FocusNode();
+  final _loginButtonFocusNode = FocusNode();
 
   bool _obscurePassword = true;
 
@@ -46,6 +53,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     _usernameController.dispose();
     _passwordController.dispose();
     _apiUrlController.dispose();
+    _usernameFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _apiUrlFocusNode.dispose();
+    _loginButtonFocusNode.dispose();
     super.dispose();
   }
 
@@ -63,6 +74,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ? _apiUrlController.text.trim()
               : null,
     );
+  }
+
+  /// 判断是否为 TV 端（屏幕宽度 >= 1920）
+  bool _isTv(BuildContext context) {
+    return MediaQuery.of(context).size.width >= 1920;
   }
 
   @override
@@ -83,6 +99,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       }
     });
 
+    if (_isTv(context)) {
+      return _buildTvLayout(context, authState, theme, colorScheme);
+    }
+
+    return _buildDefaultLayout(context, authState, theme, colorScheme);
+  }
+
+  // ========== 默认布局（手机/平板/桌面）==========
+
+  Widget _buildDefaultLayout(
+    BuildContext context,
+    AuthState authState,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -142,6 +173,331 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       ),
     );
   }
+
+  // ========== TV 专用布局（宽度 >= 1920）==========
+
+  Widget _buildTvLayout(
+    BuildContext context,
+    AuthState authState,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    return Scaffold(
+      body: SafeArea(
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: Form(
+            key: _formKey,
+            child: Row(
+              children: [
+                // 左侧：Logo 和品牌区域（40%）
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.15),
+                    child: Center(child: _buildTvBranding(theme, colorScheme)),
+                  ),
+                ),
+
+                // 分割线
+                Container(
+                  width: 1,
+                  height: double.infinity,
+                  color: colorScheme.outlineVariant,
+                ),
+
+                // 右侧：登录表单（60%）
+                Expanded(
+                  flex: 6,
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(TvTheme.contentPadding),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              '登录',
+                              style: theme.textTheme.headlineLarge?.copyWith(
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: TvTheme.spacingSmall),
+                            Text(
+                              '使用您的账号登录 MiMusic',
+                              style: TvTheme.captionStyle(context),
+                            ),
+                            const SizedBox(height: TvTheme.spacingXLarge),
+
+                            // 用户名
+                            _buildTvInputField(
+                              context: context,
+                              controller: _usernameController,
+                              focusNode: _usernameFocusNode,
+                              nextFocusNode: _passwordFocusNode,
+                              colorScheme: colorScheme,
+                              labelText: '用户名',
+                              hintText: '请输入用户名',
+                              prefixIcon: Icons.person_outline,
+                              autofocus: true,
+                              autofillHints: const [AutofillHints.username],
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return '请输入用户名';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: TvTheme.spacingLarge),
+
+                            // 密码
+                            _buildTvPasswordField(context, colorScheme),
+                            const SizedBox(height: TvTheme.spacingLarge),
+
+                            // API 地址 — 嵌入模式下隐藏
+                            if (!AppConfig.isEmbedded) ...[
+                              _buildTvInputField(
+                                context: context,
+                                controller: _apiUrlController,
+                                focusNode: _apiUrlFocusNode,
+                                nextFocusNode: _loginButtonFocusNode,
+                                colorScheme: colorScheme,
+                                labelText: 'API 地址',
+                                hintText: AppConfig.baseUrl,
+                                prefixIcon: Icons.cloud_outlined,
+                                keyboardType: TextInputType.url,
+                                validator: (value) {
+                                  if (value != null && value.isNotEmpty) {
+                                    if (!value.startsWith('http://') &&
+                                        !value.startsWith('https://')) {
+                                      return '请输入有效的 URL（以 http:// 或 https:// 开头）';
+                                    }
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: TvTheme.spacingLarge),
+                            ],
+
+                            // 登录按钮
+                            _buildTvLoginButton(
+                              context,
+                              authState,
+                              colorScheme,
+                            ),
+
+                            const SizedBox(height: TvTheme.spacingXLarge),
+
+                            // 底部提示
+                            Text(
+                              '© ${DateTime.now().year} MiMusic',
+                              textAlign: TextAlign.center,
+                              style: TvTheme.captionStyle(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// TV 左侧品牌区域
+  Widget _buildTvBranding(ThemeData theme, ColorScheme colorScheme) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Logo
+        Container(
+          width: 160,
+          height: 160,
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(40),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(alpha: 0.3),
+                blurRadius: 40,
+                spreadRadius: 8,
+              ),
+            ],
+          ),
+          child: Icon(
+            Icons.music_note_rounded,
+            size: 96,
+            color: colorScheme.onPrimaryContainer,
+          ),
+        ),
+        const SizedBox(height: 40),
+        Text(
+          'MiMusic',
+          style: theme.textTheme.displayMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+            fontSize: 52,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          '自托管本地音乐服务',
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontSize: TvTheme.fontSizeBody,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// TV 通用输入框
+  Widget _buildTvInputField({
+    required BuildContext context,
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required FocusNode nextFocusNode,
+    required ColorScheme colorScheme,
+    required String labelText,
+    required String hintText,
+    required IconData prefixIcon,
+    bool autofocus = false,
+    List<String>? autofillHints,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return _TvFocusableTextField(
+      controller: controller,
+      focusNode: focusNode,
+      colorScheme: colorScheme,
+      labelText: labelText,
+      hintText: hintText,
+      prefixIcon: prefixIcon,
+      autofocus: autofocus,
+      autofillHints: autofillHints,
+      keyboardType: keyboardType,
+      textInputAction: TextInputAction.next,
+      onFieldSubmitted: (_) {
+        nextFocusNode.requestFocus();
+      },
+      validator: validator,
+    );
+  }
+
+  /// TV 密码输入框（带显示/隐藏切换）
+  Widget _buildTvPasswordField(BuildContext context, ColorScheme colorScheme) {
+    return _TvFocusableTextField(
+      controller: _passwordController,
+      focusNode: _passwordFocusNode,
+      colorScheme: colorScheme,
+      labelText: '密码',
+      hintText: '请输入密码',
+      prefixIcon: Icons.lock_outline,
+      obscureText: _obscurePassword,
+      autofillHints: const [AutofillHints.password],
+      textInputAction:
+          AppConfig.isEmbedded ? TextInputAction.done : TextInputAction.next,
+      onFieldSubmitted: (_) {
+        if (AppConfig.isEmbedded) {
+          _loginButtonFocusNode.requestFocus();
+        } else {
+          _apiUrlFocusNode.requestFocus();
+        }
+      },
+      suffixIconBuilder:
+          (hasFocus) => IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+              color:
+                  hasFocus ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            ),
+            iconSize: 28,
+            onPressed: () {
+              setState(() {
+                _obscurePassword = !_obscurePassword;
+              });
+            },
+          ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return '请输入密码';
+        }
+        return null;
+      },
+    );
+  }
+
+  /// TV 登录按钮
+  Widget _buildTvLoginButton(
+    BuildContext context,
+    AuthState authState,
+    ColorScheme colorScheme,
+  ) {
+    return Focus(
+      focusNode: _loginButtonFocusNode,
+      child: Builder(
+        builder: (context) {
+          final hasFocus = Focus.of(context).hasFocus;
+          return AnimatedContainer(
+            duration: TvTheme.focusAnimationDuration,
+            curve: Curves.easeOutCubic,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border:
+                  hasFocus
+                      ? Border.all(
+                        color: colorScheme.primary,
+                        width: TvTheme.focusBorderWidth,
+                      )
+                      : null,
+              boxShadow:
+                  hasFocus
+                      ? [
+                        BoxShadow(
+                          color: colorScheme.primary.withValues(alpha: 0.4),
+                          blurRadius: 16,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                      : null,
+            ),
+            child: FilledButton(
+              focusNode: null,
+              onPressed: authState.isLoading ? null : _handleLogin,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(TvTheme.minButtonSize),
+                textStyle: TvTheme.buttonStyle(context),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child:
+                  authState.isLoading
+                      ? SizedBox(
+                        height: 28,
+                        width: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          color: colorScheme.onPrimary,
+                        ),
+                      )
+                      : const Text('登录'),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ========== 共用 Widget 方法（非 TV 端使用）==========
 
   Widget _buildHeader(ThemeData theme, ColorScheme colorScheme) {
     return Column(
@@ -275,6 +631,165 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       textAlign: TextAlign.center,
       style: theme.textTheme.bodySmall?.copyWith(
         color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+// ========== TV 焦点输入框组件 ==========
+
+/// TV 端带焦点高亮效果的输入框
+class _TvFocusableTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ColorScheme colorScheme;
+  final String labelText;
+  final String hintText;
+  final IconData prefixIcon;
+  final bool autofocus;
+  final bool obscureText;
+  final List<String>? autofillHints;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final void Function(String)? onFieldSubmitted;
+  final Widget Function(bool hasFocus)? suffixIconBuilder;
+  final String? Function(String?)? validator;
+
+  const _TvFocusableTextField({
+    required this.controller,
+    required this.focusNode,
+    required this.colorScheme,
+    required this.labelText,
+    required this.hintText,
+    required this.prefixIcon,
+    this.autofocus = false,
+    this.obscureText = false,
+    this.autofillHints,
+    this.keyboardType,
+    this.textInputAction,
+    this.onFieldSubmitted,
+    this.suffixIconBuilder,
+    this.validator,
+  });
+
+  @override
+  State<_TvFocusableTextField> createState() => _TvFocusableTextFieldState();
+}
+
+class _TvFocusableTextFieldState extends State<_TvFocusableTextField> {
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    setState(() {
+      _hasFocus = widget.focusNode.hasFocus;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+
+    return AnimatedContainer(
+      duration: TvTheme.focusAnimationDuration,
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border:
+            _hasFocus
+                ? Border.all(
+                  color: colorScheme.primary,
+                  width: TvTheme.focusBorderWidth,
+                )
+                : Border.all(
+                  color: colorScheme.outline.withValues(alpha: 0.4),
+                  width: 1.5,
+                ),
+        boxShadow:
+            _hasFocus
+                ? [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    spreadRadius: 1,
+                  ),
+                ]
+                : null,
+      ),
+      child: TextFormField(
+        controller: widget.controller,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        obscureText: widget.obscureText,
+        autofillHints: widget.autofillHints,
+        keyboardType: widget.keyboardType,
+        textInputAction: widget.textInputAction,
+        onFieldSubmitted: widget.onFieldSubmitted,
+        validator: widget.validator,
+        style: TextStyle(
+          fontSize: TvTheme.fontSizeBody,
+          color: colorScheme.onSurface,
+        ),
+        decoration: InputDecoration(
+          labelText: widget.labelText,
+          hintText: widget.hintText,
+          labelStyle: TextStyle(
+            fontSize: TvTheme.fontSizeCaption,
+            color:
+                _hasFocus ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+          hintStyle: TextStyle(
+            fontSize: TvTheme.fontSizeBody,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+          prefixIcon: Icon(
+            widget.prefixIcon,
+            size: 28,
+            color:
+                _hasFocus ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+          suffixIcon: widget.suffixIconBuilder?.call(_hasFocus),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 20,
+          ),
+          filled: true,
+          fillColor:
+              _hasFocus
+                  ? colorScheme.primaryContainer.withValues(alpha: 0.15)
+                  : colorScheme.surfaceContainerLow,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide.none,
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide(color: colorScheme.error, width: 1.5),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide.none,
+          ),
+        ),
       ),
     );
   }
