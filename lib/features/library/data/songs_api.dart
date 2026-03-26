@@ -20,10 +20,7 @@ class SongsApi {
     int limit = 20,
     int offset = 0,
   }) async {
-    final queryParams = <String, dynamic>{
-      'limit': limit,
-      'offset': offset,
-    };
+    final queryParams = <String, dynamic>{'limit': limit, 'offset': offset};
     if (type != null && type.isNotEmpty) {
       queryParams['type'] = type;
     }
@@ -120,6 +117,16 @@ class SongsApi {
   /// 删除歌曲
   Future<void> deleteSong(int id) async {
     await dio.delete('${AppConfig.apiPrefix}/songs/$id');
+  }
+
+  /// 批量删除歌曲
+  /// POST /api/v1/songs/batch-delete
+  Future<int> batchDeleteSongs(List<int> ids) async {
+    final response = await dio.post<Map<String, dynamic>>(
+      '${AppConfig.apiPrefix}/songs/batch-delete',
+      data: {'ids': ids},
+    );
+    return response.data?['deleted'] as int? ?? 0;
   }
 
   /// 清理无效歌曲

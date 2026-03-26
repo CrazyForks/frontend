@@ -134,6 +134,28 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       state.selectedSongIds.toList(),
                     ),
           ),
+          TextButton.icon(
+            icon: Icon(
+              Icons.delete,
+              color:
+                  state.selectedSongIds.isEmpty
+                      ? null
+                      : Theme.of(context).colorScheme.error,
+            ),
+            label: Text(
+              '删除(${state.selectedSongIds.length})',
+              style: TextStyle(
+                color:
+                    state.selectedSongIds.isEmpty
+                        ? null
+                        : Theme.of(context).colorScheme.error,
+              ),
+            ),
+            onPressed:
+                state.selectedSongIds.isEmpty
+                    ? null
+                    : () => _showBatchDeleteConfirmDialog(context),
+          ),
           TextButton(
             onPressed: () {
               ref.read(songsListProvider.notifier).selectAll();
@@ -519,5 +541,45 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   void _showAddToPlaylistDialog(BuildContext context, List<int> songIds) {
     AddToPlaylistModal.show(context, songIds: songIds);
+  }
+
+  void _showBatchDeleteConfirmDialog(BuildContext context) {
+    final count = ref.read(songsListProvider).selectedSongIds.length;
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('批量删除'),
+            content: Text('确定要删除选中的 $count 首歌曲吗？此操作不可恢复。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _executeBatchDelete();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _executeBatchDelete() async {
+    final deleted =
+        await ref.read(songsListProvider.notifier).batchDeleteSongs();
+    if (mounted) {
+      if (deleted > 0) {
+        ResponsiveSnackBar.showSuccess(context, message: '已删除 $deleted 首歌曲');
+      } else {
+        ResponsiveSnackBar.showError(context, message: '删除失败');
+      }
+    }
   }
 }

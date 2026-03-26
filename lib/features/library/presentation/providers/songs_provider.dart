@@ -123,10 +123,7 @@ class SongsListNotifier extends Notifier<SongsListState> {
         currentPage: page,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -153,56 +150,34 @@ class SongsListNotifier extends Notifier<SongsListState> {
         currentPage: nextPage,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoadingMore: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }
 
   /// 刷新
   Future<void> refresh() async {
-    await loadSongs(
-      page: 0,
-      keyword: state.keyword,
-      type: state.type,
-    );
+    await loadSongs(page: 0, keyword: state.keyword, type: state.type);
   }
 
   /// 搜索
   Future<void> search(String keyword) async {
-    await loadSongs(
-      page: 0,
-      keyword: keyword,
-      type: state.type,
-    );
+    await loadSongs(page: 0, keyword: keyword, type: state.type);
   }
 
   /// 设置类型筛选
   Future<void> setTypeFilter(String? type) async {
     if (type == null) {
       // 点击"全部"时，清除 type 筛选
-      await loadSongs(
-        page: 0,
-        keyword: state.keyword,
-        clearType: true,
-      );
+      await loadSongs(page: 0, keyword: state.keyword, clearType: true);
     } else {
-      await loadSongs(
-        page: 0,
-        keyword: state.keyword,
-        type: type,
-      );
+      await loadSongs(page: 0, keyword: state.keyword, type: type);
     }
   }
 
   /// 切换多选模式
   void toggleSelectMode() {
     if (state.isSelectionMode) {
-      state = state.copyWith(
-        isSelectionMode: false,
-        selectedSongIds: {},
-      );
+      state = state.copyWith(isSelectionMode: false, selectedSongIds: {});
     } else {
       state = state.copyWith(isSelectionMode: true);
     }
@@ -244,6 +219,40 @@ class SongsListNotifier extends Notifier<SongsListState> {
     }
   }
 
+  /// 批量删除歌曲
+  Future<int> batchDeleteSongs() async {
+    if (state.selectedSongIds.isEmpty) return 0;
+
+    final selectedIds = state.selectedSongIds.toList();
+
+    try {
+      final deleted = await _repository.batchDeleteSongs(selectedIds);
+
+      // 如果服务端返回的数量与选中数量不一致，状态可能已脏，直接全量刷新列表
+      if (deleted != selectedIds.length) {
+        await refresh();
+        state = state.copyWith(isSelectionMode: false, selectedSongIds: {});
+        return deleted;
+      }
+
+      // 正常路径：全部删除成功，按选中集合更新本地状态
+      state = state.copyWith(
+        songs:
+            state.songs
+                .where((s) => !state.selectedSongIds.contains(s.id))
+                .toList(),
+        total: state.total - deleted,
+        isSelectionMode: false,
+        selectedSongIds: {},
+      );
+
+      return deleted;
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return 0;
+    }
+  }
+
   /// 清理歌曲
   Future<int> cleanSongs() async {
     try {
@@ -263,11 +272,15 @@ class SongsListNotifier extends Notifier<SongsListState> {
 }
 
 /// 歌曲列表 NotifierProvider
-final songsListProvider = NotifierProvider<SongsListNotifier, SongsListState>(SongsListNotifier.new);
+final songsListProvider = NotifierProvider<SongsListNotifier, SongsListState>(
+  SongsListNotifier.new,
+);
 
 /// 单首歌曲 Provider
-final songDetailProvider =
-    FutureProvider.family<Song, int>((ref, songId) async {
+final songDetailProvider = FutureProvider.family<Song, int>((
+  ref,
+  songId,
+) async {
   final repository = ref.watch(songsRepositoryProvider);
   return repository.getSong(songId);
 });

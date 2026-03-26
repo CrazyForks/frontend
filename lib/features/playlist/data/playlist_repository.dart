@@ -85,9 +85,9 @@ class PlaylistRepository {
   }
 
   /// 自动创建歌单
-  Future<void> autoCreatePlaylists() async {
+  Future<void> autoCreatePlaylists({bool includeSubdirs = false}) async {
     try {
-      await playlistApi.autoCreatePlaylists();
+      await playlistApi.autoCreatePlaylists(includeSubdirs: includeSubdirs);
     } on DioException catch (e) {
       throw _handleError(e);
     }

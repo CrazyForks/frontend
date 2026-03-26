@@ -117,6 +117,15 @@ class SongsRepository {
     }
   }
 
+  /// 批量删除歌曲
+  Future<int> batchDeleteSongs(List<int> ids) async {
+    try {
+      return await songsApi.batchDeleteSongs(ids);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// 清理无效歌曲
   Future<int> cleanSongs() async {
     try {

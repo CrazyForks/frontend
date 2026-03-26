@@ -147,10 +147,10 @@ class PlaylistNotifier extends Notifier<AsyncValue<void>> {
   }
 
   /// 自动创建歌单
-  Future<bool> autoCreatePlaylists() async {
+  Future<bool> autoCreatePlaylists({bool includeSubdirs = false}) async {
     state = const AsyncValue.loading();
     try {
-      await _repository.autoCreatePlaylists();
+      await _repository.autoCreatePlaylists(includeSubdirs: includeSubdirs);
       state = const AsyncValue.data(null);
       // 刷新歌单列表
       ref.invalidate(playlistListProvider);

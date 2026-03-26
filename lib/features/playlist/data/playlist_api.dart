@@ -17,10 +17,7 @@ class PlaylistApi {
     int limit = 20,
     int offset = 0,
   }) async {
-    final queryParams = <String, dynamic>{
-      'limit': limit,
-      'offset': offset,
-    };
+    final queryParams = <String, dynamic>{'limit': limit, 'offset': offset};
     if (type != null) {
       queryParams['type'] = type;
     }
@@ -40,10 +37,7 @@ class PlaylistApi {
     String? description,
     String? coverPath,
   }) async {
-    final data = <String, dynamic>{
-      'type': type,
-      'name': name,
-    };
+    final data = <String, dynamic>{'type': type, 'name': name};
     if (description != null) {
       data['description'] = description;
     }
@@ -99,8 +93,11 @@ class PlaylistApi {
 
   /// 自动创建歌单（根据目录结构）
   /// POST /api/v1/playlists/auto-create
-  Future<void> autoCreatePlaylists() async {
-    await dio.post('${AppConfig.apiPrefix}/playlists/auto-create');
+  Future<void> autoCreatePlaylists({bool includeSubdirs = false}) async {
+    await dio.post(
+      '${AppConfig.apiPrefix}/playlists/auto-create',
+      queryParameters: {'include_subdirs': includeSubdirs},
+    );
   }
 
   /// 获取歌单内歌曲
@@ -112,10 +109,7 @@ class PlaylistApi {
   }) async {
     final response = await dio.get(
       '${AppConfig.apiPrefix}/playlists/$id/songs',
-      queryParameters: {
-        'limit': limit,
-        'offset': offset,
-      },
+      queryParameters: {'limit': limit, 'offset': offset},
     );
     return SongListResponse.fromJson(response.data as Map<String, dynamic>);
   }
