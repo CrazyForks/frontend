@@ -1,6 +1,8 @@
 display_name: MiMusic客户端
 msix_version: 1.0.0.0
 store: "true"
+logo_path: web/icons/Icon-512.png
+languages: zh-cn, en-us
 
 # Microsoft Store 发布必需配置
 # 以下字段需要与 Microsoft Store 仪表板中注册的信息匹配
