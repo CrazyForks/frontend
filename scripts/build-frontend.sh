@@ -115,28 +115,41 @@ build_web() {
     echo -e "${BLUE}[Web]${NC} 开始构建 Web ${mode} 版..."
     cd "$FRONTEND_DIR"
 
-    # 检查并下载本地字体文件（用于 CanvasKit 字体 fallback）
-    # 检查 Roboto 字体文件是否存在
-    local need_download=false
-    if [ ! -d "$FRONTEND_DIR/web/fonts/roboto/v32" ] || [ -z "$(ls -A "$FRONTEND_DIR/web/fonts/roboto/v32" 2>/dev/null)" ]; then
-        need_download=true
-    fi
-
-    if [ "$need_download" = true ]; then
-        echo -e "${BLUE}[Web]${NC} 下载本地字体文件..."
-        if [ -f "$SCRIPT_DIR/download-fonts.sh" ]; then
-            bash "$SCRIPT_DIR/download-fonts.sh"
-        else
-            echo -e "${YELLOW}⚠ [Web]${NC} 字体下载脚本不存在，跳过字体下载"
+    # 仅在 embedded 模式下检查并下载本地字体文件（standalone 模式使用 CDN 字体，无需本地文件）
+    if [ "$mode" = "embedded" ]; then
+        local need_download=false
+        if [ ! -d "$FRONTEND_DIR/web/fonts/roboto/v32" ] || [ -z "$(ls -A "$FRONTEND_DIR/web/fonts/roboto/v32" 2>/dev/null)" ]; then
+            need_download=true
         fi
-    else
-        echo -e "${GREEN}✓ [Web]${NC} 本地字体文件已存在"
+
+        if [ "$need_download" = true ]; then
+            echo -e "${BLUE}[Web]${NC} 下载本地字体文件..."
+            if [ -f "$SCRIPT_DIR/download-fonts.sh" ]; then
+                bash "$SCRIPT_DIR/download-fonts.sh"
+            else
+                echo -e "${YELLOW}⚠ [Web]${NC} 字体下载脚本不存在，跳过字体下载"
+            fi
+        else
+            echo -e "${GREEN}✓ [Web]${NC} 本地字体文件已存在"
+        fi
     fi
 
-    flutter build web --release --no-web-resources-cdn --no-wasm-dry-run --dart-define=DEPLOY_MODE=${mode} --output="$output" 2>&1 | tee -a "$log_file"
+    # 构建命令按模式区分是否使用 --no-web-resources-cdn：
+    # embedded 模式：使用本地引擎资源（--no-web-resources-cdn），canvaskit 路径由构建标志写入 flutter_build_config
+    # standalone 模式：不传此标志，flutter_build_config 会配置从 CDN 加载引擎资源
+    if [ "$mode" = "embedded" ]; then
+        flutter build web --release --no-web-resources-cdn --no-wasm-dry-run --dart-define=DEPLOY_MODE=${mode} --output="$output" 2>&1 | tee -a "$log_file"
+    else
+        flutter build web --release --no-wasm-dry-run --dart-define=DEPLOY_MODE=${mode} --output="$output" 2>&1 | tee -a "$log_file"
+    fi
 
-    # 清理 canvaskit 目录中未使用的渲染器变体（skwasm、wimp、symbols），仅保留 canvaskit 本体
-    if [ -d "$output/canvaskit" ]; then
+    # 生成部署模式配置文件，供 index.html 读取
+    echo "var _deployMode = '${mode}';" > "$output/deploy-mode.js"
+    echo -e "${GREEN}✓ [Web]${NC} 已生成部署模式配置 (${mode})"
+
+    # canvaskit 清理：仅在 embedded 模式下清理未使用的渲染器变体（skwasm、wimp、symbols），仅保留 canvaskit 本体
+    # standalone 模式不生成本地 canvaskit，无需清理
+    if [ "$mode" = "embedded" ] && [ -d "$output/canvaskit" ]; then
         rm -f "$output/canvaskit"/skwasm* "$output/canvaskit"/wimp* "$output/canvaskit"/*.symbols
         rm -rf "$output/canvaskit/chromium"
         echo -e "${GREEN}✓ [Web]${NC} 已清理未使用的渲染器变体"
