@@ -43,7 +43,20 @@ class SongsApi {
     return Song.fromJson(response.data!);
   }
 
-  /// 创建网络歌曲
+  /// 批量创建网络歌曲
+  /// 返回 {songs: List<Song>, count: int}
+  Future<List<Song>> createRemoteSongs(
+    List<Map<String, dynamic>> items,
+  ) async {
+    final response = await dio.post<Map<String, dynamic>>(
+      '${AppConfig.apiPrefix}/songs/remote',
+      data: items,
+    );
+    final list = response.data!['songs'] as List<dynamic>;
+    return list.map((e) => Song.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// 创建单首网络歌曲（便捷方法，内部调用批量接口）
   Future<Song> createRemoteSong({
     required String title,
     String? artist,
@@ -52,9 +65,8 @@ class SongsApi {
     String? coverUrl,
     double? duration,
   }) async {
-    final response = await dio.post<Map<String, dynamic>>(
-      '${AppConfig.apiPrefix}/songs/remote',
-      data: {
+    final songs = await createRemoteSongs([
+      {
         'title': title,
         'artist': artist,
         'album': album,
@@ -62,29 +74,38 @@ class SongsApi {
         'cover_url': coverUrl,
         'duration': duration,
       },
-    );
-    return Song.fromJson(response.data!);
+    ]);
+    return songs.first;
   }
 
-  /// 创建电台歌曲
+  /// 批量创建电台歌曲
+  Future<List<Song>> createRadioSongs(
+    List<Map<String, dynamic>> items,
+  ) async {
+    final response = await dio.post<Map<String, dynamic>>(
+      '${AppConfig.apiPrefix}/songs/radio',
+      data: items,
+    );
+    final list = response.data!['songs'] as List<dynamic>;
+    return list.map((e) => Song.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// 创建单首电台歌曲（便捷方法，内部调用批量接口）
   Future<Song> createRadioSong({
     required String title,
     String? artist,
     required String url,
     String? coverUrl,
-    bool isLive = false,
   }) async {
-    final response = await dio.post<Map<String, dynamic>>(
-      '${AppConfig.apiPrefix}/songs/radio',
-      data: {
+    final songs = await createRadioSongs([
+      {
         'title': title,
         'artist': artist,
         'url': url,
         'cover_url': coverUrl,
-        'is_live': isLive,
       },
-    );
-    return Song.fromJson(response.data!);
+    ]);
+    return songs.first;
   }
 
   /// 更新歌曲
