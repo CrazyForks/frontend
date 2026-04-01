@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../../shared/models/song.dart';
@@ -62,6 +64,7 @@ class PlaylistRepository {
     String? name,
     String? description,
     String? coverPath,
+    String? coverUrl,
   }) async {
     try {
       return await playlistApi.updatePlaylist(
@@ -69,6 +72,26 @@ class PlaylistRepository {
         name: name,
         description: description,
         coverPath: coverPath,
+        coverUrl: coverUrl,
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 上传歌单封面图片
+  Future<Playlist> uploadPlaylistCover(
+    int playlistId, {
+    Uint8List? bytes,
+    String? filePath,
+    required String fileName,
+  }) async {
+    try {
+      return await playlistApi.uploadPlaylistCover(
+        playlistId,
+        bytes: bytes,
+        filePath: filePath,
+        fileName: fileName,
       );
     } on DioException catch (e) {
       throw _handleError(e);

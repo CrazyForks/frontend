@@ -1,0 +1,228 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/utils/cover_url.dart';
+import '../../../../shared/models/song.dart';
+import '../providers/playlist_provider.dart';
+
+/// 从歌单内歌曲中选择封面的弹窗组件
+class SongCoverPickerModal extends ConsumerWidget {
+  final int playlistId;
+
+  const SongCoverPickerModal({super.key, required this.playlistId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final songsAsync = ref.watch(playlistSongsProvider(playlistId));
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // 拖拽指示器
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withAlpha(100),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // 标题栏
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                const Text(
+                  '选择歌曲封面',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          // 歌曲封面网格
+          Expanded(
+            child: songsAsync.when(
+              data: (response) {
+                // 过滤有封面的歌曲
+                final songsWithCover =
+                    response.songs.where((song) {
+                      return (song.coverPath != null &&
+                              song.coverPath!.isNotEmpty) ||
+                          (song.coverUrl != null && song.coverUrl!.isNotEmpty);
+                    }).toList();
+
+                if (songsWithCover.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_not_supported_outlined,
+                          size: 64,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '歌单中没有带封面的歌曲',
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.8,
+                  ),
+                  itemCount: songsWithCover.length,
+                  itemBuilder: (context, index) {
+                    final song = songsWithCover[index];
+                    return _CoverGridItem(
+                      song: song,
+                      onTap: () {
+                        Navigator.of(context).pop({
+                          'coverPath': song.coverPath,
+                          'coverUrl': song.coverUrl,
+                        });
+                      },
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error:
+                  (error, _) => Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: colorScheme.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '加载失败',
+                          style: TextStyle(color: colorScheme.error),
+                        ),
+                      ],
+                    ),
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 封面网格项
+class _CoverGridItem extends StatelessWidget {
+  final Song song;
+  final VoidCallback onTap;
+
+  const _CoverGridItem({required this.song, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final coverUrl = CoverUrl.buildCoverUrl(
+      coverUrl: song.coverUrl,
+      coverPath: song.coverPath,
+    );
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 封面图片
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child:
+                  coverUrl != null
+                      ? CachedNetworkImage(
+                        imageUrl: coverUrl,
+                        fit: BoxFit.cover,
+                        placeholder:
+                            (context, url) => Container(
+                              color: colorScheme.surfaceContainerHighest,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                        errorWidget:
+                            (context, url, error) => Container(
+                              color: colorScheme.surfaceContainerHighest,
+                              child: Icon(
+                                Icons.music_note,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                      )
+                      : Container(
+                        color: colorScheme.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.music_note,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          // 歌曲标题
+          Text(
+            song.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 显示歌曲封面选择弹窗的便捷方法
+///
+/// 返回选中的封面信息 Map，包含 'coverPath' 和 'coverUrl'，取消返回 null
+Future<Map<String, String?>?> showSongCoverPicker(
+  BuildContext context,
+  int playlistId,
+) {
+  return showModalBottomSheet<Map<String, String?>>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (context) => SongCoverPickerModal(playlistId: playlistId),
+  );
+}

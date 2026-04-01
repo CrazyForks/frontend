@@ -1,14 +1,21 @@
+import 'dart:io' show File;
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../config/constants.dart';
 import '../../../core/theme/responsive.dart';
+import '../../../core/utils/cover_url.dart';
 import '../../../shared/utils/responsive_snackbar.dart';
 import '../../player/presentation/providers/player_provider.dart';
 import '../domain/playlist.dart';
 import 'providers/playlist_provider.dart';
 import 'widgets/playlist_card.dart';
+import 'widgets/song_cover_picker_modal.dart';
 
 /// 歌单列表页面
 class PlaylistsPage extends ConsumerStatefulWidget {
@@ -247,20 +254,83 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
             initialName: playlist.name,
             initialDescription: playlist.description,
             initialType: playlist.type,
+            initialCoverPath: playlist.coverPath,
+            initialCoverUrl: playlist.coverUrl,
+            playlistId: playlist.id,
             isEdit: true,
           ),
     );
 
     if (result != null && mounted) {
       final notifier = ref.read(playlistNotifierProvider.notifier);
-      final updated = await notifier.updatePlaylist(
-        playlist.id,
-        name: result['name'] as String,
-        description: result['description'] as String?,
-      );
 
-      if (updated != null && mounted) {
-        ResponsiveSnackBar.showSuccess(context, message: '歌单更新成功');
+      // 处理封面
+      final coverMode = result['coverMode'] as String?;
+      final localFile = result['localFile'] as PlatformFile?;
+      final selectedCoverPath = result['selectedCoverPath'] as String?;
+      final selectedCoverUrl = result['selectedCoverUrl'] as String?;
+
+      if (coverMode == 'local' && localFile != null) {
+        // 上传本地图片
+        final uploadedPlaylist = await notifier.uploadPlaylistCover(
+          playlist.id,
+          bytes: localFile.bytes,
+          filePath: localFile.path,
+          fileName: localFile.name,
+        );
+        if (uploadedPlaylist == null && mounted) {
+          ResponsiveSnackBar.showError(context, message: '封面上传失败');
+          return;
+        }
+        // 更新其他信息，同时传递封面信息防止被后端覆盖
+        final updated = await notifier.updatePlaylist(
+          playlist.id,
+          name: result['name'] as String,
+          description: result['description'] as String?,
+          coverPath: uploadedPlaylist?.coverPath,
+          coverUrl: uploadedPlaylist?.coverUrl,
+        );
+
+        if (updated != null && mounted) {
+          ResponsiveSnackBar.showSuccess(context, message: '歌单更新成功');
+        }
+      } else if (coverMode == 'song') {
+        // 从歌曲选择的封面
+        final updated = await notifier.updatePlaylist(
+          playlist.id,
+          name: result['name'] as String,
+          description: result['description'] as String?,
+          coverPath: selectedCoverPath ?? '',
+          coverUrl: selectedCoverUrl ?? '',
+        );
+
+        if (updated != null && mounted) {
+          ResponsiveSnackBar.showSuccess(context, message: '歌单更新成功');
+        }
+      } else if (coverMode == 'clear') {
+        // 清除封面
+        final updated = await notifier.updatePlaylist(
+          playlist.id,
+          name: result['name'] as String,
+          description: result['description'] as String?,
+          coverPath: '',
+          coverUrl: '',
+        );
+
+        if (updated != null && mounted) {
+          ResponsiveSnackBar.showSuccess(context, message: '歌单更新成功');
+        }
+      } else {
+        // 未修改封面
+        final updated = await notifier.updatePlaylist(
+          playlist.id,
+          name: result['name'] as String,
+          description: result['description'] as String?,
+        );
+
+        if (updated != null && mounted) {
+          ResponsiveSnackBar.showSuccess(context, message: '歌单更新成功');
+        }
       }
     }
   }
@@ -456,6 +526,9 @@ class _PlaylistFormDialog extends StatefulWidget {
   final String? initialName;
   final String? initialDescription;
   final String? initialType;
+  final String? initialCoverPath;
+  final String? initialCoverUrl;
+  final int? playlistId;
   final bool isEdit;
 
   const _PlaylistFormDialog({
@@ -463,6 +536,9 @@ class _PlaylistFormDialog extends StatefulWidget {
     this.initialName,
     this.initialDescription,
     this.initialType,
+    this.initialCoverPath,
+    this.initialCoverUrl,
+    this.playlistId,
     this.isEdit = false,
   });
 
@@ -475,6 +551,12 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
   late final TextEditingController _descriptionController;
   late String _type;
   final _formKey = GlobalKey<FormState>();
+
+  /// 封面选择模式（仅编辑模式）
+  String? _coverMode;
+  PlatformFile? _localFile;
+  String? _selectedCoverPath;
+  String? _selectedCoverUrl;
 
   @override
   void initState() {
@@ -493,69 +575,193 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
     super.dispose();
   }
 
+  /// 获取当前预览的封面 URL
+  String? get _previewCoverUrl {
+    if (_coverMode == 'clear') return null;
+    if (_coverMode == 'song') {
+      return CoverUrl.buildCoverUrl(
+        coverUrl: _selectedCoverUrl,
+        coverPath: _selectedCoverPath,
+      );
+    }
+    // 未修改时显示原有封面
+    if (_coverMode == null) {
+      return CoverUrl.buildCoverUrl(
+        coverUrl: widget.initialCoverUrl,
+        coverPath: widget.initialCoverPath,
+      );
+    }
+    return null;
+  }
+
+  /// 上传本地图片
+  Future<void> _pickLocalImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: kIsWeb,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _localFile = result.files.first;
+          _coverMode = 'local';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ResponsiveSnackBar.showError(context, message: '选择图片失败: $e');
+      }
+    }
+  }
+
+  /// 从歌曲选择封面
+  Future<void> _pickFromSongs() async {
+    if (widget.playlistId == null) return;
+    final result = await showSongCoverPicker(context, widget.playlistId!);
+    if (result != null) {
+      setState(() {
+        _selectedCoverPath = result['coverPath'];
+        _selectedCoverUrl = result['coverUrl'];
+        _coverMode = 'song';
+        _localFile = null;
+      });
+    }
+  }
+
+  /// 清除封面
+  void _clearCover() {
+    setState(() {
+      _coverMode = 'clear';
+      _localFile = null;
+      _selectedCoverPath = null;
+      _selectedCoverUrl = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final hasCover =
+        _coverMode != 'clear' &&
+        (_coverMode == 'local' ||
+            _coverMode == 'song' ||
+            widget.initialCoverPath?.isNotEmpty == true ||
+            widget.initialCoverUrl?.isNotEmpty == true);
+
     return AlertDialog(
       title: Text(widget.title),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 歌单名称
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: '歌单名称',
-                  hintText: '请输入歌单名称',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '请输入歌单名称';
-                  }
-                  return null;
-                },
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-
-              // 歌单描述
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: '歌单描述',
-                  hintText: '请输入歌单描述（可选）',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-
-              // 歌单类型（仅创建时可选）
-              if (!widget.isEdit)
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(
-                      value: AppConstants.playlistTypeNormal,
-                      label: Text('普通歌单'),
-                      icon: Icon(Icons.queue_music),
+          child: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 编辑模式显示封面选择
+                if (widget.isEdit) ...[
+                  // 封面预览区域
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    ButtonSegment(
-                      value: AppConstants.playlistTypeRadio,
-                      label: Text('电台歌单'),
-                      icon: Icon(Icons.radio),
-                    ),
-                  ],
-                  selected: {_type},
-                  onSelectionChanged: (selected) {
-                    setState(() {
-                      _type = selected.first;
-                    });
+                    clipBehavior: Clip.antiAlias,
+                    child: _buildCoverPreview(colorScheme),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 封面操作按钮
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _pickLocalImage,
+                        icon: const Icon(Icons.upload, size: 18),
+                        label: const Text('上传图片'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _pickFromSongs,
+                        icon: const Icon(Icons.music_note, size: 18),
+                        label: const Text('从歌曲选择'),
+                      ),
+                      if (hasCover)
+                        TextButton.icon(
+                          onPressed: _clearCover,
+                          icon: Icon(
+                            Icons.clear,
+                            size: 18,
+                            color: colorScheme.error,
+                          ),
+                          label: Text(
+                            '清除',
+                            style: TextStyle(color: colorScheme.error),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // 歌单名称
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: '歌单名称',
+                    hintText: '请输入歌单名称',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '请输入歌单名称';
+                    }
+                    return null;
                   },
+                  autofocus: !widget.isEdit,
                 ),
-            ],
+                const SizedBox(height: 16),
+
+                // 歌单描述
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: '歌单描述',
+                    hintText: '请输入歌单描述（可选）',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+
+                // 歌单类型（仅创建时可选）
+                if (!widget.isEdit)
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: AppConstants.playlistTypeNormal,
+                        label: Text('普通歌单'),
+                        icon: Icon(Icons.queue_music),
+                      ),
+                      ButtonSegment(
+                        value: AppConstants.playlistTypeRadio,
+                        label: Text('电台歌单'),
+                        icon: Icon(Icons.radio),
+                      ),
+                    ],
+                    selected: {_type},
+                    onSelectionChanged: (selected) {
+                      setState(() {
+                        _type = selected.first;
+                      });
+                    },
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -569,16 +775,63 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
     );
   }
 
+  Widget _buildCoverPreview(ColorScheme colorScheme) {
+    // 本地文件预览
+    if (_coverMode == 'local' && _localFile != null) {
+      if (kIsWeb && _localFile!.bytes != null) {
+        return Image.memory(_localFile!.bytes!, fit: BoxFit.cover);
+      } else if (!kIsWeb && _localFile!.path != null) {
+        return Image.file(File(_localFile!.path!), fit: BoxFit.cover);
+      }
+    }
+
+    // 网络图片预览
+    final previewUrl = _previewCoverUrl;
+    if (previewUrl != null) {
+      return CachedNetworkImage(
+        imageUrl: previewUrl,
+        fit: BoxFit.cover,
+        placeholder:
+            (context, url) =>
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        errorWidget: (context, url, error) => _buildPlaceholder(colorScheme),
+      );
+    }
+
+    // 占位图
+    return _buildPlaceholder(colorScheme);
+  }
+
+  Widget _buildPlaceholder(ColorScheme colorScheme) {
+    return Center(
+      child: Icon(
+        Icons.queue_music,
+        size: 40,
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+      ),
+    );
+  }
+
   void _submit() {
     if (_formKey.currentState?.validate() == true) {
-      Navigator.of(context).pop({
+      final Map<String, dynamic> result = {
         'name': _nameController.text.trim(),
         'description':
             _descriptionController.text.trim().isEmpty
                 ? null
                 : _descriptionController.text.trim(),
         'type': _type,
-      });
+      };
+
+      // 编辑模式时添加封面信息
+      if (widget.isEdit) {
+        result['coverMode'] = _coverMode;
+        result['localFile'] = _localFile;
+        result['selectedCoverPath'] = _selectedCoverPath;
+        result['selectedCoverUrl'] = _selectedCoverUrl;
+      }
+
+      Navigator.of(context).pop(result);
     }
   }
 }

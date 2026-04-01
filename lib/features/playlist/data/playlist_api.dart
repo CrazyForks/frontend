@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../../config/app_config.dart';
@@ -66,6 +68,7 @@ class PlaylistApi {
     String? name,
     String? description,
     String? coverPath,
+    String? coverUrl,
   }) async {
     final data = <String, dynamic>{};
     if (name != null) {
@@ -77,10 +80,43 @@ class PlaylistApi {
     if (coverPath != null) {
       data['cover_path'] = coverPath;
     }
+    if (coverUrl != null) {
+      data['cover_url'] = coverUrl;
+    }
 
     final response = await dio.put(
       '${AppConfig.apiPrefix}/playlists/$id',
       data: data,
+    );
+    return Playlist.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// 上传歌单封面图片
+  /// Web 平台使用 bytes，原生平台使用 filePath
+  /// POST /api/v1/playlists/{id}/cover
+  Future<Playlist> uploadPlaylistCover(
+    int playlistId, {
+    Uint8List? bytes,
+    String? filePath,
+    required String fileName,
+  }) async {
+    late final MultipartFile multipartFile;
+    if (bytes != null) {
+      multipartFile = MultipartFile.fromBytes(bytes, filename: fileName);
+    } else if (filePath != null) {
+      multipartFile = await MultipartFile.fromFile(
+        filePath,
+        filename: fileName,
+      );
+    } else {
+      throw ArgumentError('Either bytes or filePath must be provided');
+    }
+
+    final formData = FormData.fromMap({'file': multipartFile});
+
+    final response = await dio.post(
+      '${AppConfig.apiPrefix}/playlists/$playlistId/cover',
+      data: formData,
     );
     return Playlist.fromJson(response.data as Map<String, dynamic>);
   }

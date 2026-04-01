@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
@@ -111,6 +113,7 @@ class PlaylistNotifier extends Notifier<AsyncValue<void>> {
     String? name,
     String? description,
     String? coverPath,
+    String? coverUrl,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -119,10 +122,37 @@ class PlaylistNotifier extends Notifier<AsyncValue<void>> {
         name: name,
         description: description,
         coverPath: coverPath,
+        coverUrl: coverUrl,
       );
       state = const AsyncValue.data(null);
       // 刷新歌单详情和列表
       ref.invalidate(playlistDetailProvider(id));
+      ref.invalidate(playlistListProvider);
+      return playlist;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  /// 上传歌单封面图片
+  Future<Playlist?> uploadPlaylistCover(
+    int playlistId, {
+    Uint8List? bytes,
+    String? filePath,
+    required String fileName,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final playlist = await _repository.uploadPlaylistCover(
+        playlistId,
+        bytes: bytes,
+        filePath: filePath,
+        fileName: fileName,
+      );
+      state = const AsyncValue.data(null);
+      // 刷新相关 Provider
+      ref.invalidate(playlistDetailProvider(playlistId));
       ref.invalidate(playlistListProvider);
       return playlist;
     } catch (e, st) {
