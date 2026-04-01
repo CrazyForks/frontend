@@ -268,6 +268,8 @@ main() {
     echo -e "${BLUE}[5/5]${NC} 推送 git tag 到远程仓库..."
     push_git_tag "$new_version"
 
+    git push --follow-tags
+
     echo ""
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}✓ Flutter 前端版本发布完成！${NC}"
