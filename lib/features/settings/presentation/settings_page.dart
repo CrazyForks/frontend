@@ -335,7 +335,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               FilledButton(
                 onPressed: () async {
                   final dialogContext = context;
-                  final url = _apiUrlController.text.trim();
+                  final url = _apiUrlController.text.trim().replaceAll(
+                    RegExp(r'/+$'),
+                    '',
+                  );
                   if (url.isNotEmpty && !Uri.tryParse(url)!.hasScheme) {
                     ResponsiveSnackBar.show(
                       dialogContext,

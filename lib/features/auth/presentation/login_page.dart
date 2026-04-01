@@ -71,7 +71,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // 嵌入模式不传 apiBaseUrl，baseUrl 已在 main() 中通过 Uri.base.origin 设定
       apiBaseUrl:
           (!AppConfig.isEmbedded && _apiUrlController.text.trim().isNotEmpty)
-              ? _apiUrlController.text.trim()
+              ? _apiUrlController.text.trim().replaceAll(RegExp(r'/+$'), '')
               : null,
     );
   }
