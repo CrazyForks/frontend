@@ -7,6 +7,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../shared/widgets/tv_focusable.dart';
 import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
+import 'popup_controls.dart';
 
 /// TV 全屏播放器界面
 ///
@@ -366,16 +367,23 @@ class TvPlayer extends ConsumerWidget {
       children: [
         // 播放模式
         Builder(
-          builder: (buttonContext) => TvIconButton(
-            icon: _getPlayModeIcon(state.playMode),
-            onPressed: () => _showPlayModeMenu(buttonContext, notifier, state, theme),
-            size: 64,
-            iconSize: 28,
-            iconColor:
-                state.playMode != PlayMode.order
-                    ? theme.colorScheme.primary
-                    : null,
-          ),
+          builder:
+              (buttonContext) => TvIconButton(
+                icon: _getPlayModeIcon(state.playMode),
+                onPressed:
+                    () => _showPlayModeOverlay(
+                      buttonContext,
+                      notifier,
+                      state,
+                      theme,
+                    ),
+                size: 64,
+                iconSize: 28,
+                iconColor:
+                    state.playMode != PlayMode.order
+                        ? theme.colorScheme.primary
+                        : null,
+              ),
         ),
         const SizedBox(width: TvTheme.spacingMedium),
         // 音量减
@@ -453,7 +461,8 @@ class TvPlayer extends ConsumerWidget {
     }
   }
 
-  void _showPlayModeMenu(
+  /// 显示播放模式弹出层（使用自定义 Overlay）
+  void _showPlayModeOverlay(
     BuildContext context,
     PlayerNotifier notifier,
     PlayerState state,
@@ -462,52 +471,157 @@ class TvPlayer extends ConsumerWidget {
     final RenderBox button = context.findRenderObject() as RenderBox;
     final RenderBox overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
-    final RelativeRect position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        button.localToGlobal(Offset.zero, ancestor: overlay),
-        button.localToGlobal(
-          button.size.bottomRight(Offset.zero),
-          ancestor: overlay,
-        ),
-      ),
-      Offset.zero & overlay.size,
+    final position = button.localToGlobal(Offset.zero, ancestor: overlay);
+    final size = button.size;
+
+    late OverlayEntry overlayEntry;
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => _TvPlayModeOverlayPanel(
+            playMode: state.playMode,
+            onPlayModeChanged: (mode) {
+              notifier.setPlayMode(mode);
+              overlayEntry.remove();
+            },
+            onDismiss: () => overlayEntry.remove(),
+            anchorPosition: position,
+            anchorSize: size,
+            getIcon: _getPlayModeIcon,
+            getTooltip: _getPlayModeTooltip,
+          ),
     );
 
-    showMenu<PlayMode>(
-      context: context,
-      position: position,
-      items: [
-        for (final mode in PlayMode.values)
-          PopupMenuItem<PlayMode>(
-            value: mode,
-            child: Row(
-              children: [
-                Icon(
-                  _getPlayModeIcon(mode),
-                  size: 24,
-                  color: state.playMode == mode
-                      ? theme.colorScheme.primary
-                      : null,
+    Overlay.of(context).insert(overlayEntry);
+  }
+}
+
+/// TV 端播放模式弹出面板
+/// 使用自定义 Overlay 实现，与音量控制弹出层定位方式一致
+class _TvPlayModeOverlayPanel extends StatelessWidget {
+  final PlayMode playMode;
+  final ValueChanged<PlayMode> onPlayModeChanged;
+  final VoidCallback onDismiss;
+  final Offset anchorPosition;
+  final Size anchorSize;
+  final IconData Function(PlayMode) getIcon;
+  final String Function(PlayMode) getTooltip;
+
+  const _TvPlayModeOverlayPanel({
+    required this.playMode,
+    required this.onPlayModeChanged,
+    required this.onDismiss,
+    required this.anchorPosition,
+    required this.anchorSize,
+    required this.getIcon,
+    required this.getTooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
+    // TV 端面板尺寸
+    const itemHeight = 56.0;
+    const panelWidth = 200.0;
+    const iconSize = 24.0;
+    const fontSize = 16.0;
+
+    final panelHeight = PlayMode.values.length * itemHeight + 16;
+
+    // 计算面板位置（居中对齐按钮）
+    double left = anchorPosition.dx + anchorSize.width / 2 - panelWidth / 2;
+    // 确保不超出屏幕
+    if (left < 16) left = 16;
+    if (left + panelWidth > screenSize.width - 16) {
+      left = screenSize.width - panelWidth - 16;
+    }
+
+    // 面板从按钮上方弹出
+    double top = anchorPosition.dy - panelHeight - 8;
+
+    // 如果面板会超出屏幕可见区域，显示在按钮下方
+    final safeAreaTop = MediaQuery.of(context).padding.top;
+    if (top < safeAreaTop + 16) {
+      top = anchorPosition.dy + anchorSize.height + 8;
+    }
+
+    return Stack(
+      children: [
+        // 透明背景层，点击关闭
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: onDismiss,
+            behavior: HitTestBehavior.opaque,
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+        // 播放模式面板
+        Positioned(
+          left: left,
+          top: top,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(12),
+            color: theme.colorScheme.surfaceContainerHigh,
+            child: Container(
+              width: panelWidth,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: FocusTraversalGroup(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final mode in PlayMode.values)
+                      Builder(
+                        builder:
+                            (itemContext) => TvFocusable(
+                              onSelect: () => onPlayModeChanged(mode),
+                              borderRadius: 8,
+                              child: Container(
+                                width: double.infinity,
+                                height: itemHeight,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      getIcon(mode),
+                                      size: iconSize,
+                                      color:
+                                          playMode == mode
+                                              ? theme.colorScheme.primary
+                                              : theme.colorScheme.onSurface,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      getTooltip(mode),
+                                      style: TextStyle(
+                                        fontSize: fontSize,
+                                        color:
+                                            playMode == mode
+                                                ? theme.colorScheme.primary
+                                                : theme.colorScheme.onSurface,
+                                        fontWeight:
+                                            playMode == mode
+                                                ? FontWeight.w500
+                                                : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  _getPlayModeTooltip(mode),
-                  style: state.playMode == mode
-                      ? TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        )
-                      : null,
-                ),
-              ],
+              ),
             ),
           ),
+        ),
       ],
-    ).then((mode) {
-      if (mode != null) {
-        notifier.setPlayMode(mode);
-      }
-    });
+    );
   }
 }
 

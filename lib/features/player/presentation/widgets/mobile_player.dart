@@ -12,6 +12,7 @@ import '../providers/player_provider.dart';
 import '../queue_page.dart';
 import 'lyrics_view.dart';
 import 'play_controls.dart';
+import 'popup_controls.dart';
 import 'progress_bar.dart';
 import 'volume_control.dart';
 
@@ -412,7 +413,10 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
           SizedBox(
             width: 48,
             height: 48,
-            child: _buildPlayModeButton(context, state, notifier, theme),
+            child: PopupPlayModeControl(
+              playMode: state.playMode,
+              onPlayModeChanged: notifier.setPlayMode,
+            ),
           ),
           // 音量
           SizedBox(
@@ -423,11 +427,15 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
               onVolumeChanged: notifier.setVolume,
             ),
           ),
-          // 睡眠定时（下拉菜单）
+          // 睡眠定时
           SizedBox(
             width: 48,
             height: 48,
-            child: _buildSleepTimerButton(context, state, notifier, theme),
+            child: PopupSleepTimerControl(
+              sleepTimerRemaining: state.sleepTimerRemaining,
+              onSetTimer: notifier.setSleepTimer,
+              onCancelTimer: notifier.cancelSleepTimer,
+            ),
           ),
           // 播放列表 - 显示播放队列浮层（直接覆盖在播放器之上）
           SizedBox(
@@ -447,21 +455,6 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
     );
   }
 
-  IconData _getPlayModeIcon(PlayMode mode) {
-    switch (mode) {
-      case PlayMode.order:
-        return Icons.repeat_rounded;
-      case PlayMode.loop:
-        return Icons.repeat_rounded;
-      case PlayMode.single:
-        return Icons.repeat_one_rounded;
-      case PlayMode.random:
-        return Icons.shuffle_rounded;
-      case PlayMode.singlePlay:
-        return Icons.looks_one_rounded;
-    }
-  }
-
   String _getPlayModeTooltip(PlayMode mode) {
     switch (mode) {
       case PlayMode.order:
@@ -475,137 +468,5 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
       case PlayMode.singlePlay:
         return '单曲播放';
     }
-  }
-
-  /// 构建播放模式按钮（使用 PopupMenuButton）
-  Widget _buildPlayModeButton(
-    BuildContext context,
-    PlayerState state,
-    PlayerNotifier notifier,
-    ThemeData theme,
-  ) {
-    return PopupMenuButton<PlayMode>(
-      icon: Icon(
-        _getPlayModeIcon(state.playMode),
-        color:
-            state.playMode != PlayMode.order ? theme.colorScheme.primary : null,
-      ),
-      tooltip: _getPlayModeTooltip(state.playMode),
-      onSelected: (mode) {
-        notifier.setPlayMode(mode);
-      },
-      itemBuilder:
-          (context) => [
-            for (final mode in PlayMode.values)
-              PopupMenuItem<PlayMode>(
-                value: mode,
-                child: Row(
-                  children: [
-                    Icon(
-                      _getPlayModeIcon(mode),
-                      size: 20,
-                      color:
-                          state.playMode == mode
-                              ? theme.colorScheme.primary
-                              : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      _getPlayModeTooltip(mode),
-                      style:
-                          state.playMode == mode
-                              ? TextStyle(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w500,
-                              )
-                              : null,
-                    ),
-                  ],
-                ),
-              ),
-          ],
-    );
-  }
-
-  /// 构建睡眠定时按钮（使用 PopupMenuButton）
-  Widget _buildSleepTimerButton(
-    BuildContext context,
-    PlayerState state,
-    PlayerNotifier notifier,
-    ThemeData theme,
-  ) {
-    return PopupMenuButton<Duration?>(
-      icon: Icon(
-        state.sleepTimerRemaining != null
-            ? Icons.alarm_on_rounded
-            : Icons.alarm_rounded,
-        color:
-            state.sleepTimerRemaining != null
-                ? theme.colorScheme.primary
-                : null,
-      ),
-      tooltip:
-          state.sleepTimerRemaining != null
-              ? '睡眠定时：${_formatDuration(state.sleepTimerRemaining!)}'
-              : '睡眠定时',
-      onSelected: (duration) {
-        if (duration == null) return;
-        if (duration == Duration.zero) {
-          notifier.cancelSleepTimer();
-          debugPrint('[Player] 睡眠定时已取消');
-        } else {
-          notifier.setSleepTimer(duration);
-          debugPrint('[Player] 设置睡眠定时：${duration.inMinutes}分钟');
-        }
-      },
-      itemBuilder:
-          (context) => [
-            // 如果已设定定时器，显示剩余时间和取消选项
-            if (state.sleepTimerRemaining != null) ...[
-              PopupMenuItem<Duration?>(
-                enabled: false,
-                child: Text(
-                  '剩余时间：${_formatDuration(state.sleepTimerRemaining!)}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const PopupMenuItem<Duration?>(
-                value: Duration.zero,
-                child: Text('取消定时'),
-              ),
-              const PopupMenuDivider(),
-            ],
-            // 定时选项
-            const PopupMenuItem<Duration?>(
-              value: Duration(minutes: 15),
-              child: Text('15 分钟'),
-            ),
-            const PopupMenuItem<Duration?>(
-              value: Duration(minutes: 30),
-              child: Text('30 分钟'),
-            ),
-            const PopupMenuItem<Duration?>(
-              value: Duration(minutes: 45),
-              child: Text('45 分钟'),
-            ),
-            const PopupMenuItem<Duration?>(
-              value: Duration(hours: 1),
-              child: Text('1 小时'),
-            ),
-            const PopupMenuItem<Duration?>(
-              value: Duration(hours: 2),
-              child: Text('2 小时'),
-            ),
-          ],
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 }

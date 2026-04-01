@@ -8,6 +8,7 @@ import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
 import 'play_controls.dart';
 import 'progress_bar.dart';
+import 'popup_controls.dart';
 import 'volume_control.dart';
 
 /// 桌面端底部播放器栏
@@ -249,159 +250,30 @@ class DesktopPlayer extends ConsumerWidget {
     );
   }
 
-  IconData _getPlayModeIcon(PlayMode mode) {
-    switch (mode) {
-      case PlayMode.order:
-        return Icons.repeat_rounded;
-      case PlayMode.loop:
-        return Icons.repeat_rounded;
-      case PlayMode.single:
-        return Icons.repeat_one_rounded;
-      case PlayMode.random:
-        return Icons.shuffle_rounded;
-      case PlayMode.singlePlay:
-        return Icons.looks_one_rounded;
-    }
-  }
-
-  String _getPlayModeTooltip(PlayMode mode) {
-    switch (mode) {
-      case PlayMode.order:
-        return '顺序播放';
-      case PlayMode.loop:
-        return '列表循环';
-      case PlayMode.single:
-        return '单曲循环';
-      case PlayMode.random:
-        return '随机播放';
-      case PlayMode.singlePlay:
-        return '单曲播放';
-    }
-  }
-
-  /// 构建播放模式按钮（使用 PopupMenuButton）
+  /// 构建播放模式按钮（使用自定义弹出层）
   Widget _buildPlayModeButton(
     BuildContext context,
     PlayerState state,
     PlayerNotifier notifier,
     ThemeData theme,
   ) {
-    return PopupMenuButton<PlayMode>(
-      icon: Icon(
-        _getPlayModeIcon(state.playMode),
-        size: 20,
-        color:
-            state.playMode != PlayMode.order ? theme.colorScheme.primary : null,
-      ),
-      tooltip: _getPlayModeTooltip(state.playMode),
-      padding: EdgeInsets.zero,
-      style: const ButtonStyle(visualDensity: VisualDensity.compact),
-      onSelected: (mode) {
-        notifier.setPlayMode(mode);
-      },
-      itemBuilder:
-          (context) => [
-            for (final mode in PlayMode.values)
-              PopupMenuItem<PlayMode>(
-                value: mode,
-                child: Row(
-                  children: [
-                    Icon(
-                      _getPlayModeIcon(mode),
-                      size: 20,
-                      color:
-                          state.playMode == mode
-                              ? theme.colorScheme.primary
-                              : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      _getPlayModeTooltip(mode),
-                      style:
-                          state.playMode == mode
-                              ? TextStyle(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w500,
-                              )
-                              : null,
-                    ),
-                  ],
-                ),
-              ),
-          ],
+    return PopupPlayModeControl(
+      playMode: state.playMode,
+      onPlayModeChanged: notifier.setPlayMode,
     );
   }
 
-  /// 构建睡眠定时按钮（使用 PopupMenuButton）
+  /// 构建睡眠定时按钮（使用自定义弹出层）
   Widget _buildSleepTimerButton(
     BuildContext context,
     PlayerState state,
     PlayerNotifier notifier,
     ThemeData theme,
   ) {
-    final hasTimer = state.sleepTimerRemaining != null;
-    return PopupMenuButton<Duration?>(
-      icon: Icon(
-        hasTimer ? Icons.alarm_on_rounded : Icons.alarm_rounded,
-        size: 20,
-        color: hasTimer ? theme.colorScheme.primary : null,
-      ),
-      tooltip:
-          hasTimer
-              ? '睡眠定时：${_formatDuration(state.sleepTimerRemaining!)}'
-              : '睡眠定时',
-      padding: EdgeInsets.zero,
-      style: const ButtonStyle(visualDensity: VisualDensity.compact),
-      onSelected: (duration) {
-        if (duration == null) return;
-        if (duration == Duration.zero) {
-          notifier.cancelSleepTimer();
-        } else {
-          notifier.setSleepTimer(duration);
-        }
-      },
-      itemBuilder:
-          (context) => [
-            if (hasTimer) ...[
-              PopupMenuItem<Duration?>(
-                enabled: false,
-                child: Text(
-                  '剩余：${_formatDuration(state.sleepTimerRemaining!)}',
-                ),
-              ),
-              const PopupMenuItem<Duration?>(
-                value: Duration.zero,
-                child: Text('取消定时'),
-              ),
-              const PopupMenuDivider(),
-            ],
-            const PopupMenuItem<Duration?>(
-              value: Duration(minutes: 15),
-              child: Text('15 分钟'),
-            ),
-            const PopupMenuItem<Duration?>(
-              value: Duration(minutes: 30),
-              child: Text('30 分钟'),
-            ),
-            const PopupMenuItem<Duration?>(
-              value: Duration(minutes: 45),
-              child: Text('45 分钟'),
-            ),
-            const PopupMenuItem<Duration?>(
-              value: Duration(hours: 1),
-              child: Text('1 小时'),
-            ),
-            const PopupMenuItem<Duration?>(
-              value: Duration(hours: 2),
-              child: Text('2 小时'),
-            ),
-          ],
+    return PopupSleepTimerControl(
+      sleepTimerRemaining: state.sleepTimerRemaining,
+      onSetTimer: notifier.setSleepTimer,
+      onCancelTimer: notifier.cancelSleepTimer,
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 }

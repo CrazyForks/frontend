@@ -383,8 +383,10 @@ class _VolumeOverlayPanelState extends State<_VolumeOverlayPanel> {
 
     // 面板从按钮上方弹出
     double top = widget.anchorPosition.dy - panelHeight - 8;
-    // 如果上方空间不足，显示在下方
-    if (top < 16) {
+
+    // 如果面板会超出屏幕可见区域，显示在按钮下方
+    final safeAreaTop = MediaQuery.of(context).padding.top;
+    if (top < safeAreaTop + 16) {
       top = widget.anchorPosition.dy + widget.anchorSize.height + 8;
     }
 
