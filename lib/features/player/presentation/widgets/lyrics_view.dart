@@ -8,6 +8,7 @@ import '../../domain/lyric_parser.dart';
 ///
 /// 支持自动滚动到当前歌词行，高亮显示当前行。
 /// 用户手动滚动时会暂停自动滚动，几秒后自动恢复。
+/// 点击歌词行可跳转到对应时间点播放。
 class LyricsView extends StatefulWidget {
   /// 歌词文本（LRC 格式）
   final String? lyricText;
@@ -15,10 +16,14 @@ class LyricsView extends StatefulWidget {
   /// 当前播放位置
   final Duration currentPosition;
 
+  /// 点击歌词行时的回调，传入被点击行的时间点
+  final ValueChanged<Duration>? onSeek;
+
   const LyricsView({
     super.key,
     this.lyricText,
     required this.currentPosition,
+    this.onSeek,
   });
 
   @override
@@ -92,7 +97,10 @@ class _LyricsViewState extends State<LyricsView> {
 
   /// 更新当前歌词行
   void _updateCurrentLine() {
-    final newIndex = LyricParser.findCurrentLine(_lyrics, widget.currentPosition);
+    final newIndex = LyricParser.findCurrentLine(
+      _lyrics,
+      widget.currentPosition,
+    );
     if (newIndex != _currentLineIndex) {
       setState(() {
         _currentLineIndex = newIndex;
@@ -111,7 +119,8 @@ class _LyricsViewState extends State<LyricsView> {
 
     // 计算目标偏移量（将当前行滚动到视图中央）
     final viewportHeight = _scrollController.position.viewportDimension;
-    final targetOffset = (index * _lineHeight) - (viewportHeight / 2) + (_lineHeight / 2);
+    final targetOffset =
+        (index * _lineHeight) - (viewportHeight / 2) + (_lineHeight / 2);
     final clampedOffset = targetOffset.clamp(
       0.0,
       _scrollController.position.maxScrollExtent,
@@ -184,7 +193,13 @@ class _LyricsViewState extends State<LyricsView> {
 
           return GestureDetector(
             onTap: () {
-              // 点击歌词行时可以触发跳转（可选功能，暂不实现）
+              // 点击歌词行跳转到对应时间点
+              if (widget.onSeek != null) {
+                widget.onSeek!(lyric.time);
+                // 恢复自动滚动状态
+                _isUserScrolling = false;
+                _resumeTimer?.cancel();
+              }
             },
             child: Container(
               height: _lineHeight,
@@ -194,9 +209,10 @@ class _LyricsViewState extends State<LyricsView> {
                 style: TextStyle(
                   fontSize: isCurrent ? 18 : 15,
                   fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                  color: isCurrent
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  color:
+                      isCurrent
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,

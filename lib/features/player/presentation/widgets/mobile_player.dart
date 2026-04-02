@@ -202,6 +202,7 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
                             LyricsView(
                               lyricText: song.lyric,
                               currentPosition: state.currentTime,
+                              onSeek: notifier.seek,
                             ),
                           ],
                         ),

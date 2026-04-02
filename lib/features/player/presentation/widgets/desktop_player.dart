@@ -6,6 +6,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../shared/widgets/favorite_button.dart';
 import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
+import 'lyrics_view.dart';
 import 'play_controls.dart';
 import 'progress_bar.dart';
 import 'popup_controls.dart';
@@ -235,6 +236,8 @@ class DesktopPlayer extends ConsumerWidget {
         ),
         // 睡眠定时
         _buildSleepTimerButton(context, state, notifier, theme),
+        // 歌词按钮
+        _buildLyricsButton(context, state, theme),
         // 播放列表
         IconButton(
           onPressed: notifier.togglePlaylistDrawer,
@@ -274,6 +277,109 @@ class DesktopPlayer extends ConsumerWidget {
       sleepTimerRemaining: state.sleepTimerRemaining,
       onSetTimer: notifier.setSleepTimer,
       onCancelTimer: notifier.cancelSleepTimer,
+    );
+  }
+
+  /// 构建歌词按钮
+  Widget _buildLyricsButton(
+    BuildContext context,
+    PlayerState state,
+    ThemeData theme,
+  ) {
+    final hasSong = state.hasSong;
+    final hasLyrics =
+        hasSong &&
+        state.currentSong?.lyric != null &&
+        state.currentSong!.lyric!.isNotEmpty;
+
+    return IconButton(
+      onPressed: hasSong ? () => _showLyricsDialog(context, state) : null,
+      icon: Icon(
+        Icons.lyrics_rounded,
+        size: 20,
+        color:
+            hasLyrics
+                ? null
+                : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+      ),
+      tooltip: '歌词',
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  /// 显示歌词对话框
+  void _showLyricsDialog(BuildContext context, PlayerState state) {
+    final song = state.currentSong;
+    if (song == null) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _LyricsDialog(song: song),
+    );
+  }
+}
+
+/// 歌词对话框组件
+class _LyricsDialog extends ConsumerWidget {
+  final dynamic song;
+
+  const _LyricsDialog({required this.song});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(playerStateProvider);
+    final theme = Theme.of(context);
+    final currentSong = state.currentSong;
+
+    // 如果歌曲变化了，关闭对话框
+    if (currentSong == null || currentSong.id != song.id) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+      });
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: 400,
+        height: 500,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // 标题栏
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    currentSong?.title ?? song.title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // 歌词内容
+            Expanded(
+              child: LyricsView(
+                lyricText: currentSong?.lyric ?? song.lyric,
+                currentPosition: state.currentTime,
+                onSeek: ref.read(playerStateProvider.notifier).seek,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
