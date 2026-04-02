@@ -77,11 +77,16 @@ void main() async {
         debugPrint('[Main] 调用 MiMusicAudioHandler builder...');
         return MiMusicAudioHandler();
       },
+      // androidStopForegroundOnPause 设为 false 保持前台服务持续运行：
+      // HyperOS3 等系统在前台服务停止后会激进回收资源，
+      // 导致歌曲播放完成后 playNext() 命令失效无法自动切歌
+      // 注意：audio_service 要求 androidStopForegroundOnPause=false 时
+      // androidNotificationOngoing 也必须为 false
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.mimusic.playback',
         androidNotificationChannelName: 'MiMusic 播放控制',
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: true,
+        androidNotificationOngoing: false,
+        androidStopForegroundOnPause: false,
       ),
     );
     // 等待 handler 内部初始化完成（AudioSession + stream listeners）

@@ -130,6 +130,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
   void _onSongCompleted() {
     _consecutiveFailures = 0;
     debugPrint('[Player] Song completed, playMode: ${state.playMode}');
+
+    if (state.playlist.isEmpty) {
+      debugPrint('[Player] Playlist empty, stopping');
+      _audioHandler.stop();
+      return;
+    }
+
     switch (state.playMode) {
       case PlayMode.single:
         // 单曲循环
@@ -143,11 +150,31 @@ class PlayerNotifier extends Notifier<PlayerState> {
         _audioHandler.pause();
         break;
       case PlayMode.order:
+        if (state.currentIndex >= state.playlist.length - 1) {
+          debugPrint('[Player] Order mode: reached end of playlist, stopping');
+          state = state.copyWith(isPlaying: false);
+          _audioHandler.stop();
+          return;
+        }
+        // 非末尾，继续播放下一首
+        debugPrint('[Player] Playing next song');
+        unawaited(
+          playNext().catchError((e, st) {
+            debugPrint('[Player] playNext failed after song completed: $e');
+            _audioHandler.stop();
+          }),
+        );
+        break;
       case PlayMode.loop:
       case PlayMode.random:
         // 播放下一首
         debugPrint('[Player] Playing next song');
-        playNext();
+        unawaited(
+          playNext().catchError((e, st) {
+            debugPrint('[Player] playNext failed after song completed: $e');
+            _audioHandler.stop();
+          }),
+        );
         break;
     }
   }

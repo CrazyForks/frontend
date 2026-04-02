@@ -46,12 +46,22 @@ class MiMusicAudioHandler extends BaseAudioHandler with SeekHandler {
     });
 
     // 监听播放完成
-    _player.processingStateStream.listen((state) {
-      debugPrint('[AudioService] processingState 变化: $state');
-      if (state == ja.ProcessingState.completed) {
-        onSongCompleted?.call();
-      }
-    });
+    _player.processingStateStream.listen(
+      (state) {
+        debugPrint('[AudioService] processingState 变化: $state');
+        if (state == ja.ProcessingState.completed) {
+          try {
+            onSongCompleted?.call();
+          } catch (e) {
+            debugPrint('[AudioService] onSongCompleted error: $e');
+            // 不重新抛出，避免 stream 断裂
+          }
+        }
+      },
+      onError: (error) {
+        debugPrint('[AudioService] processingStateStream error: $error');
+      },
+    );
 
     // 异步初始化 AudioSession（不影响核心功能）
     _initFuture = _initAudioSession();
@@ -70,6 +80,11 @@ class MiMusicAudioHandler extends BaseAudioHandler with SeekHandler {
       final session = await AudioSession.instance;
       await session.configure(const AudioSessionConfiguration.music());
       debugPrint('[AudioService] AudioSession configured');
+      session.interruptionEventStream.listen((event) {
+        debugPrint(
+          '[AudioService] Audio interruption: type=${event.type}, begin=${event.begin}',
+        );
+      });
     } catch (e) {
       debugPrint('[AudioService] AudioSession init failed: $e');
     }
