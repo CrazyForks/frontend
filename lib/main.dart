@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'config/app_config.dart';
 import 'core/audio/audio_service.dart';
 import 'core/storage/app_preferences.dart';
+import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/responsive.dart';
 import 'core/router/app_router.dart';
@@ -68,6 +69,14 @@ void main() async {
       debugPrint('[Main] ⚠️ 通知权限被永久拒绝，需要在系统设置中手动开启');
     }
   }
+
+  // 预加载 access token 到内存缓存，避免 UI 首帧渲染时 cachedAccessToken 为 null
+  // 解决 Windows 等平台上封面图和音乐 URL 中 access_token= 为空导致 401 的竞态问题
+  // （checkAuth() 使用 Future.microtask 异步执行，比 UI 首帧渲染更晚填充缓存）
+  await SecureStorageService().getAccessToken();
+  debugPrint(
+    '[Main] 预加载 token 完成: cachedAccessToken is ${SecureStorageService.cachedAccessToken != null ? "set" : "null"}',
+  );
 
   // 初始化 audio_service（带降级保护）
   MiMusicAudioHandler audioHandler;
