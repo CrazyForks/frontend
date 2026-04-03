@@ -8,6 +8,7 @@ class AppPreferences {
   static const _lastUsedDeviceKey = 'last_used_device';
   static const _volumeKey = 'player_volume';
   static const _playModeKey = 'player_play_mode';
+  static const _playlistViewModeKey = 'playlist_view_mode';
   static const _lastUsernameKey = 'last_username';
   static const _lastPasswordKey = 'last_password';
 
@@ -99,6 +100,16 @@ class AppPreferences {
   /// 设置播放模式
   Future<bool> setPlayMode(String mode) {
     return _prefs.setString(_playModeKey, mode);
+  }
+
+  /// 获取歌单视图模式 ('grid' 或 'list')
+  String getPlaylistViewMode() {
+    return _prefs.getString(_playlistViewModeKey) ?? 'grid';
+  }
+
+  /// 设置歌单视图模式
+  Future<bool> setPlaylistViewMode(String mode) {
+    return _prefs.setString(_playlistViewModeKey, mode);
   }
 
   /// 获取上次登录的用户名

@@ -395,8 +395,6 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
     PlayerState state,
     PlayerNotifier notifier,
   ) {
-    final theme = Theme.of(context);
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       child: Row(
@@ -454,20 +452,5 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
         ],
       ),
     );
-  }
-
-  String _getPlayModeTooltip(PlayMode mode) {
-    switch (mode) {
-      case PlayMode.order:
-        return '顺序播放';
-      case PlayMode.loop:
-        return '列表循环';
-      case PlayMode.single:
-        return '单曲循环';
-      case PlayMode.random:
-        return '随机播放';
-      case PlayMode.singlePlay:
-        return '单曲播放';
-    }
   }
 }

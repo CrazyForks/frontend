@@ -14,7 +14,9 @@ import '../../../shared/utils/responsive_snackbar.dart';
 import '../../player/presentation/providers/player_provider.dart';
 import '../domain/playlist.dart';
 import 'providers/playlist_provider.dart';
+import 'providers/playlist_view_provider.dart';
 import 'widgets/playlist_card.dart';
+import 'widgets/playlist_list_item.dart';
 import 'widgets/song_cover_picker_modal.dart';
 
 /// 歌单列表页面
@@ -36,6 +38,21 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       appBar: AppBar(
         title: const Text('歌单'),
         actions: [
+          // 视图模式切换按钮
+          IconButton(
+            icon: Icon(
+              ref.watch(playlistViewModeProvider) == PlaylistViewMode.grid
+                  ? Icons.view_list
+                  : Icons.grid_view,
+            ),
+            tooltip:
+                ref.watch(playlistViewModeProvider) == PlaylistViewMode.grid
+                    ? '切换到列表视图'
+                    : '切换到卡片视图',
+            onPressed: () {
+              ref.read(playlistViewModeProvider.notifier).toggleViewMode();
+            },
+          ),
           // 自动创建按钮
           IconButton(
             icon: const Icon(Icons.auto_fix_high),
@@ -91,7 +108,8 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
             // 歌单列表
             playlistsAsync.when(
               data:
-                  (response) => _buildPlaylistGrid(context, response.playlists),
+                  (response) =>
+                      _buildPlaylistContent(context, response.playlists),
               loading:
                   () => const SliverToBoxAdapter(
                     child: Padding(
@@ -117,11 +135,21 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
     );
   }
 
-  Widget _buildPlaylistGrid(BuildContext context, List<Playlist> playlists) {
+  Widget _buildPlaylistContent(BuildContext context, List<Playlist> playlists) {
     if (playlists.isEmpty) {
       return SliverToBoxAdapter(child: _buildEmptyContent());
     }
 
+    final viewMode = ref.watch(playlistViewModeProvider);
+
+    if (viewMode == PlaylistViewMode.list) {
+      return _buildListView(context, playlists);
+    } else {
+      return _buildGridView(context, playlists);
+    }
+  }
+
+  Widget _buildGridView(BuildContext context, List<Playlist> playlists) {
     final crossAxisCount = context.responsive<int>(
       mobile: 2,
       tablet: 3,
@@ -136,13 +164,31 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
           crossAxisCount: crossAxisCount,
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
-          childAspectRatio: 0.7, // 卡片高度比宽度略高，预留文字区域
+          childAspectRatio: 0.7,
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           final playlist = playlists[index];
           return PlaylistCard(
             playlist: playlist,
-            // 使用 push 保持导航栈，便于返回
+            onTap: () => context.push('/playlists/${playlist.id}'),
+            onEdit: () => _showEditDialog(playlist),
+            onDelete:
+                playlist.isBuiltIn ? null : () => _confirmDelete(playlist),
+            onPlayAll: () => _playAll(playlist),
+          );
+        }, childCount: playlists.length),
+      ),
+    );
+  }
+
+  Widget _buildListView(BuildContext context, List<Playlist> playlists) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final playlist = playlists[index];
+          return PlaylistListItem(
+            playlist: playlist,
             onTap: () => context.push('/playlists/${playlist.id}'),
             onEdit: () => _showEditDialog(playlist),
             onDelete:

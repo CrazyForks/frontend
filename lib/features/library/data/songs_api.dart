@@ -44,7 +44,8 @@ class SongsApi {
   }
 
   /// 批量创建网络歌曲
-  /// 返回 {songs: List<Song>, count: int}
+  ///
+  /// 返回 `{songs: List<Song>, count: int}`
   Future<List<Song>> createRemoteSongs(List<Map<String, dynamic>> items) async {
     final response = await dio.post<Map<String, dynamic>>(
       '${AppConfig.apiPrefix}/songs/remote',
