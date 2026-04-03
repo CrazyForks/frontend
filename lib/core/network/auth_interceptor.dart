@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../config/app_config.dart';
 import '../../features/auth/domain/auth_state.dart';
@@ -13,6 +14,7 @@ import '../storage/secure_storage.dart';
 /// 2. 401 错误时自动刷新 Token
 /// 3. 刷新成功后重试原请求
 /// 4. 并发刷新保护（多个 401 只触发一次刷新）
+/// 5. Windows 平台优先使用内存缓存的 token，避免存储读取不稳定
 class AuthInterceptor extends Interceptor {
   final SecureStorageService _secureStorage;
   final Dio _dio;
@@ -36,8 +38,8 @@ class AuthInterceptor extends Interceptor {
     required SecureStorageService secureStorage,
     required Dio dio,
     this.onTokenExpired,
-  })  : _secureStorage = secureStorage,
-        _dio = dio;
+  }) : _secureStorage = secureStorage,
+       _dio = dio;
 
   @override
   void onRequest(
@@ -50,10 +52,26 @@ class AuthInterceptor extends Interceptor {
     );
 
     if (!isPublicPath) {
-      // 获取 Access Token
-      final accessToken = await _secureStorage.getAccessToken();
+      // 优先使用内存缓存的 token（解决 Windows 平台存储读取不稳定问题）
+      String? accessToken = SecureStorageService.cachedAccessToken;
+
+      // 缓存为空时才从安全存储读取
+      if (accessToken == null || accessToken.isEmpty) {
+        accessToken = await _secureStorage.getAccessToken();
+        debugPrint(
+          '[AuthInterceptor] onRequest: cachedAccessToken was null, read from storage: ${accessToken != null}',
+        );
+      }
+
       if (accessToken != null && accessToken.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $accessToken';
+        debugPrint(
+          '[AuthInterceptor] onRequest: ${options.path} - token attached',
+        );
+      } else {
+        debugPrint(
+          '[AuthInterceptor] onRequest: ${options.path} - NO token available',
+        );
       }
     }
 
@@ -62,6 +80,10 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
+    debugPrint(
+      '[AuthInterceptor] onError: ${err.requestOptions.path} - status: ${err.response?.statusCode}',
+    );
+
     // 只处理 401 错误
     if (err.response?.statusCode != 401) {
       handler.next(err);
@@ -69,13 +91,17 @@ class AuthInterceptor extends Interceptor {
     }
 
     // 如果是刷新 Token 请求失败，直接返回错误
-    if (err.requestOptions.path.contains('${AppConfig.apiPrefix}/auth/refresh')) {
+    if (err.requestOptions.path.contains(
+      '${AppConfig.apiPrefix}/auth/refresh',
+    )) {
+      debugPrint('[AuthInterceptor] onError: refresh token request failed');
       await _handleTokenExpired();
       handler.next(err);
       return;
     }
 
     // 尝试刷新 Token
+    debugPrint('[AuthInterceptor] onError: attempting token refresh');
     final refreshed = await _refreshToken();
 
     if (refreshed) {
@@ -84,10 +110,12 @@ class AuthInterceptor extends Interceptor {
         final response = await _retryRequest(err.requestOptions);
         handler.resolve(response);
       } catch (e) {
+        debugPrint('[AuthInterceptor] onError: retry failed - $e');
         handler.next(err);
       }
     } else {
       // 刷新失败
+      debugPrint('[AuthInterceptor] onError: token refresh failed');
       handler.next(err);
     }
   }
@@ -153,9 +181,11 @@ class AuthInterceptor extends Interceptor {
 
   /// 重试原请求
   Future<Response<dynamic>> _retryRequest(RequestOptions options) async {
-    // 获取新的 Token
-    final accessToken = await _secureStorage.getAccessToken();
+    // 优先使用内存缓存的新 Token
+    String? accessToken = SecureStorageService.cachedAccessToken;
+    accessToken ??= await _secureStorage.getAccessToken();
     options.headers['Authorization'] = 'Bearer $accessToken';
+    debugPrint('[AuthInterceptor] _retryRequest: retrying ${options.path}');
 
     return _dio.fetch(options);
   }
