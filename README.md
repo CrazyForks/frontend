@@ -1,8 +1,21 @@
 # MiMusic Flutter
 
 [![Build and Release](https://github.com/mimusic-org/frontend/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/mimusic-org/frontend/actions/workflows/build-and-release.yml)
+[![GitHub License](https://img.shields.io/github/license/mimusic-org/frontend)](https://github.com/mimusic-org/frontend)
+[![GitHub Release](https://img.shields.io/github/v/release/mimusic-org/frontend)](https://github.com/mimusic-org/frontend/releases)
+[![Stars](https://img.shields.io/github/stars/mimusic-org/frontend)](https://github.com/mimusic-org/frontend/stargazers)
 
-MiMusic 跨平台音乐播放器，基于 Flutter 构建，支持 6 个目标平台。
+<p align="center">
+  <strong>🎵 MiMusic 跨平台音乐播放器 — 基于 Flutter 构建</strong>
+</p>
+
+MiMusic 跨平台音乐播放器，基于 Flutter 构建，支持 iOS、Android、macOS、Windows、Linux、Web 六端。
+
+<p align="center">
+  <a href="https://github.com/mimusic-org/frontend">🏠 GitHub</a> •
+  <a href="https://github.com/mimusic-org/frontend/releases">📥 下载</a> •
+  <a href="https://github.com/mimusic-org/frontend/issues">💬 问题反馈</a>
+</p>
 
 ## 截图
 
@@ -174,3 +187,26 @@ scripts/
 ## 许可证
 
 [Apache-2.0 license](LICENSE)
+
+## 💖 支持项目
+
+如果这个项目对你有帮助，欢迎通过以下方式支持：
+
+### ⭐ Star 项目
+
+点击右上角的 ⭐ Star 按钮，让更多人发现这个项目
+
+### 💰 赞赏支持
+
+- [💝 爱发电](https://afdian.com/a/imhanxi) - 持续支持项目发展
+- 扫码请作者喝杯奶茶 ☕
+
+<p align="center">
+  <img src="https://i.v2ex.co/7Q03axO5l.png" alt="赞赏码" width="300">
+</p>
+
+### 🎁 其他支持方式
+
+- 📢 分享给更多需要的朋友
+- 🐛 提交 Bug 报告和功能建议
+- 📝 贡献代码
