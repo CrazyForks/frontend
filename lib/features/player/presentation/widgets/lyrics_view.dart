@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../config/app_config.dart';
+import '../../../../core/storage/secure_storage.dart';
 import '../../domain/lyric_parser.dart';
 
 /// 歌词显示组件
@@ -9,9 +13,18 @@ import '../../domain/lyric_parser.dart';
 /// 支持自动滚动到当前歌词行，高亮显示当前行。
 /// 用户手动滚动时会暂停自动滚动，几秒后自动恢复。
 /// 点击歌词行可跳转到对应时间点播放。
+///
+/// 当 [lyricSource] 为 "url" 时，会通过 [lyricUrl] 从网络按需加载歌词。
+/// 其他情况直接渲染 [lyricText]。
 class LyricsView extends StatefulWidget {
   /// 歌词文本（LRC 格式）
   final String? lyricText;
+
+  /// 歌词来源类型（file / embedded / cached / url）
+  final String? lyricSource;
+
+  /// 歌词获取 URL（当 lyricSource == "url" 时使用，相对路径）
+  final String? lyricUrl;
 
   /// 当前播放位置
   final Duration currentPosition;
@@ -22,6 +35,8 @@ class LyricsView extends StatefulWidget {
   const LyricsView({
     super.key,
     this.lyricText,
+    this.lyricSource,
+    this.lyricUrl,
     required this.currentPosition,
     this.onSeek,
   });
@@ -52,20 +67,34 @@ class _LyricsViewState extends State<LyricsView> {
   /// 用户手动滚动后恢复自动滚动的延迟时间
   static const Duration _resumeDelay = Duration(seconds: 3);
 
+  /// 网络加载状态
+  bool _isLoadingFromUrl = false;
+
+  /// 网络加载失败
+  bool _loadFailed = false;
+
+  /// 从网络加载到的歌词文本
+  String? _fetchedLyricText;
+
+  /// 上一次加载的 URL（用于避免重复请求）
+  String? _lastFetchedUrl;
+
   @override
   void initState() {
     super.initState();
-    _parseLyrics();
     _scrollController.addListener(_onScroll);
+    _initLyrics();
   }
 
   @override
   void didUpdateWidget(LyricsView oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // 歌词内容变化时重新解析
-    if (widget.lyricText != oldWidget.lyricText) {
-      _parseLyrics();
+    // 歌词来源或内容变化时重新处理
+    if (widget.lyricText != oldWidget.lyricText ||
+        widget.lyricSource != oldWidget.lyricSource ||
+        widget.lyricUrl != oldWidget.lyricUrl) {
+      _initLyrics();
     }
 
     // 播放位置变化时更新高亮行并滚动
@@ -82,17 +111,104 @@ class _LyricsViewState extends State<LyricsView> {
     super.dispose();
   }
 
-  /// 解析歌词
-  void _parseLyrics() {
-    if (widget.lyricText == null || widget.lyricText!.isEmpty) {
+  /// 初始化歌词：判断来源，按需加载或直接解析
+  void _initLyrics() {
+    if (widget.lyricSource == 'url' &&
+        widget.lyricUrl != null &&
+        widget.lyricUrl!.isNotEmpty) {
+      // URL 来源：需要从网络加载
+      if (_lastFetchedUrl == widget.lyricUrl && _fetchedLyricText != null) {
+        // 同一个 URL 且已成功加载过，直接使用缓存
+        _parseLyrics(_fetchedLyricText);
+      } else {
+        _fetchLyricFromUrl(widget.lyricUrl!);
+      }
+    } else {
+      // 非 URL 来源：直接解析歌词文本
+      _isLoadingFromUrl = false;
+      _loadFailed = false;
+      _fetchedLyricText = null;
+      _lastFetchedUrl = null;
+      _parseLyrics(widget.lyricText);
+    }
+  }
+
+  /// 从网络加载歌词
+  Future<void> _fetchLyricFromUrl(String lyricUrl) async {
+    setState(() {
+      _isLoadingFromUrl = true;
+      _loadFailed = false;
       _lyrics = [];
       _currentLineIndex = -1;
+    });
+
+    try {
+      // 构建完整的绝对 URL
+      String fullUrl;
+      if (lyricUrl.startsWith('/')) {
+        // 本服务相对路径：拼接 baseUrl + access_token
+        final token = SecureStorageService.cachedAccessToken ?? '';
+        final separator = lyricUrl.contains('?') ? '&' : '?';
+        fullUrl =
+            '${AppConfig.baseUrl}$lyricUrl${separator}access_token=$token';
+      } else {
+        // 外部绝对 URL：直接使用
+        fullUrl = lyricUrl;
+      }
+
+      final response = await Dio().get(fullUrl);
+
+      if (!mounted) return;
+
+      // 解析返回的 JSON：{"code": 0, "data": {"lyric": "歌词文本"}}
+      final data = response.data;
+      final Map<String, dynamic> jsonData;
+      if (data is String) {
+        jsonData = json.decode(data) as Map<String, dynamic>;
+      } else {
+        jsonData = data as Map<String, dynamic>;
+      }
+
+      final code = jsonData['code'] as int?;
+      if (code == 0 && jsonData['data'] != null) {
+        final lyricText =
+            (jsonData['data'] as Map<String, dynamic>)['lyric'] as String?;
+        _fetchedLyricText = lyricText;
+        _lastFetchedUrl = lyricUrl;
+        setState(() {
+          _isLoadingFromUrl = false;
+          _loadFailed = false;
+        });
+        _parseLyrics(lyricText);
+      } else {
+        setState(() {
+          _isLoadingFromUrl = false;
+          _loadFailed = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('[LyricsView] Failed to load lyric from URL: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingFromUrl = false;
+        _loadFailed = true;
+      });
+    }
+  }
+
+  /// 解析歌词
+  void _parseLyrics(String? lyricText) {
+    if (lyricText == null || lyricText.isEmpty) {
+      _lyrics = [];
+      _currentLineIndex = -1;
+      if (mounted) setState(() {});
       return;
     }
 
-    _lyrics = LyricParser.parse(widget.lyricText!);
+    _lyrics = LyricParser.parse(lyricText);
     _currentLineIndex = -1;
     _updateCurrentLine();
+    if (mounted) setState(() {});
   }
 
   /// 更新当前歌词行
@@ -160,6 +276,45 @@ class _LyricsViewState extends State<LyricsView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // 正在从网络加载歌词
+    if (_isLoadingFromUrl) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '正在加载歌词...',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 网络加载失败
+    if (_loadFailed) {
+      return Center(
+        child: Text(
+          '歌词加载失败',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+        ),
+      );
+    }
 
     // 无歌词时显示占位
     if (_lyrics.isEmpty) {

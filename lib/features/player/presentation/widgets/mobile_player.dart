@@ -200,7 +200,11 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
                             ),
                             // 页面2：歌词
                             LyricsView(
-                              lyricText: song.lyric,
+                              lyricText:
+                                  song.lyricSource == 'url' ? null : song.lyric,
+                              lyricSource: song.lyricSource,
+                              lyricUrl:
+                                  song.lyricSource == 'url' ? song.lyric : null,
                               currentPosition: state.currentTime,
                               onSeek: notifier.seek,
                             ),

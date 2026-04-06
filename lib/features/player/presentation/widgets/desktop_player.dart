@@ -371,10 +371,23 @@ class _LyricsDialog extends ConsumerWidget {
             const SizedBox(height: 8),
             // 歌词内容
             Expanded(
-              child: LyricsView(
-                lyricText: currentSong?.lyric ?? song.lyric,
-                currentPosition: state.currentTime,
-                onSeek: ref.read(playerStateProvider.notifier).seek,
+              child: Builder(
+                builder: (_) {
+                  final activeSong = currentSong ?? song;
+                  return LyricsView(
+                    lyricText:
+                        activeSong.lyricSource == 'url'
+                            ? null
+                            : activeSong.lyric,
+                    lyricSource: activeSong.lyricSource,
+                    lyricUrl:
+                        activeSong.lyricSource == 'url'
+                            ? activeSong.lyric
+                            : null,
+                    currentPosition: state.currentTime,
+                    onSeek: ref.read(playerStateProvider.notifier).seek,
+                  );
+                },
               ),
             ),
           ],
