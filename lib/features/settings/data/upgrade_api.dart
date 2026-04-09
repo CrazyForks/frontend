@@ -44,11 +44,34 @@ class UpgradeCheck {
   });
 
   factory UpgradeCheck.fromJson(Map<String, dynamic> json) {
+    // 优先读取扁平字段，fallback 到嵌套结构
+    String? currentVersion = json['current_version'] as String?;
+    if (currentVersion == null || currentVersion.isEmpty) {
+      final current = json['current'] as Map<String, dynamic>?;
+      currentVersion = current?['version'] as String?;
+    }
+
+    String? latestVersion = json['latest_version'] as String?;
+    String? releaseNotes = json['release_notes'] as String?;
+    if (latestVersion == null || latestVersion.isEmpty) {
+      final updates = json['updates'] as Map<String, dynamic>?;
+      if (updates != null) {
+        // 优先取 stable，其次 dev
+        final stable = updates['stable'] as Map<String, dynamic>?;
+        final dev = updates['dev'] as Map<String, dynamic>?;
+        final preferred = stable ?? dev;
+        if (preferred != null) {
+          latestVersion ??= preferred['version'] as String?;
+          releaseNotes ??= preferred['release_notes'] as String?;
+        }
+      }
+    }
+
     return UpgradeCheck(
       hasUpdate: json['has_update'] as bool? ?? false,
-      latestVersion: json['latest_version'] as String?,
-      currentVersion: json['current_version'] as String?,
-      releaseNotes: json['release_notes'] as String?,
+      latestVersion: latestVersion,
+      currentVersion: currentVersion,
+      releaseNotes: releaseNotes,
     );
   }
 
