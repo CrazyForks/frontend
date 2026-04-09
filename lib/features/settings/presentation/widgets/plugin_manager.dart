@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/network/api_exceptions.dart';
 import '../../../../shared/utils/responsive_snackbar.dart';
@@ -35,6 +36,12 @@ class _PluginManagerState extends ConsumerState<PluginManager> {
                 onPressed: _showUploadDialog,
                 icon: const Icon(Icons.upload_file),
                 label: const Text('上传插件'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _openPluginDownloadPage,
+                icon: const Icon(Icons.download),
+                label: const Text('获取插件'),
               ),
               const SizedBox(width: 8),
               IconButton(
@@ -90,6 +97,17 @@ class _PluginManagerState extends ConsumerState<PluginManager> {
             pluginApi: ref.read(pluginApiProvider),
           ),
     );
+  }
+
+  static const _pluginDownloadUrl = 'https://mimusic.hanxi.cc/issues/4.html';
+
+  Future<void> _openPluginDownloadPage() async {
+    final uri = Uri.parse(_pluginDownloadUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ResponsiveSnackBar.show(context, message: '无法打开链接: $_pluginDownloadUrl');
+    }
   }
 
   Widget _buildPluginList(List<Plugin> plugins) {
