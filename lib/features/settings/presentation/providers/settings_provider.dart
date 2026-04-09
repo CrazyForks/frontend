@@ -218,9 +218,10 @@ class UpgradeProgressNotifier extends Notifier<UpgradeProgress> {
   }
 
   /// 开始升级
-  Future<void> startUpgrade() async {
+  /// [githubProxy] 为 GitHub 代理前缀，为空则直连
+  Future<void> startUpgrade({String? githubProxy}) async {
     try {
-      await _upgradeApi.startUpgrade();
+      await _upgradeApi.startUpgrade(githubProxy: githubProxy);
       _startPolling();
     } catch (e) {
       state = UpgradeProgress(

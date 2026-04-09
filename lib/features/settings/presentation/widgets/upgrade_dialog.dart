@@ -27,10 +27,34 @@ class UpgradeDialog extends ConsumerStatefulWidget {
 }
 
 class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
+  /// 预设的 GitHub 代理列表
+  static const List<_ProxyOption> _presetProxies = [
+    _ProxyOption(label: '直连 (不使用代理)', value: ''),
+    _ProxyOption(label: 'ghproxy.com', value: 'https://ghproxy.com/'),
+    _ProxyOption(label: 'ghfast.top', value: 'https://ghfast.top/'),
+    _ProxyOption(label: 'gh.con.sh', value: 'https://gh.con.sh/'),
+    _ProxyOption(label: 'mirror.ghproxy.com', value: 'https://mirror.ghproxy.com/'),
+  ];
+
   bool _isChecking = true;
   bool _isStarting = false;
   String? _error;
   UpgradeCheck? _checkResult;
+
+  /// 当前选中的代理索引，-1 表示自定义
+  int _selectedProxyIndex = 0;
+  final TextEditingController _customProxyController = TextEditingController();
+
+  /// 获取当前生效的代理地址
+  String get _effectiveProxy {
+    if (_selectedProxyIndex == -1) {
+      return _customProxyController.text.trim();
+    }
+    if (_selectedProxyIndex >= 0 && _selectedProxyIndex < _presetProxies.length) {
+      return _presetProxies[_selectedProxyIndex].value;
+    }
+    return '';
+  }
 
   @override
   void initState() {
@@ -41,6 +65,12 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     });
   }
 
+  @override
+  void dispose() {
+    _customProxyController.dispose();
+    super.dispose();
+  }
+
   Future<void> _checkUpgrade() async {
     setState(() {
       _isChecking = true;
@@ -49,16 +79,18 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     });
 
     try {
-      // 直接调用 API，避免 ref.invalidate + ref.read(.future) 的状态问题
+      final proxy = _effectiveProxy;
       final upgradeApi = ref.read(upgradeApiProvider);
-      final result = await upgradeApi.checkUpgrade().timeout(
-        const Duration(seconds: 10),
+      final result = await upgradeApi.checkUpgrade(
+        githubProxy: proxy.isNotEmpty ? proxy : null,
+      ).timeout(
+        const Duration(seconds: 15),
       );
       if (mounted) setState(() => _checkResult = result);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } on TimeoutException {
-      if (mounted) setState(() => _error = '检查更新超时，请稍后重试');
+      if (mounted) setState(() => _error = '检查更新超时，请尝试切换代理后重试');
     } catch (e) {
       if (mounted) setState(() => _error = '检查更新失败: $e');
     } finally {
@@ -73,7 +105,10 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     });
 
     try {
-      await ref.read(upgradeProgressProvider.notifier).startUpgrade();
+      final proxy = _effectiveProxy;
+      await ref.read(upgradeProgressProvider.notifier).startUpgrade(
+        githubProxy: proxy.isNotEmpty ? proxy : null,
+      );
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
@@ -130,6 +165,10 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
                   ),
                 ),
 
+              // GitHub 代理选择（升级过程中不显示）
+              if (!upgradeProgress.isUpgrading && !upgradeProgress.isCompleted)
+                _buildProxySelector(theme, colorScheme),
+
               // 正在检查
               if (_isChecking)
                 const Center(
@@ -161,6 +200,67 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
         ),
       ),
       actions: _buildActions(upgradeProgress),
+    );
+  }
+
+  Widget _buildProxySelector(ThemeData theme, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('GitHub 代理', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          // 预设代理选项
+          ...List.generate(_presetProxies.length, (index) {
+            final proxy = _presetProxies[index];
+            return RadioListTile<int>(
+              title: Text(proxy.label, style: theme.textTheme.bodyMedium),
+              value: index,
+              groupValue: _selectedProxyIndex,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              onChanged: (value) {
+                setState(() => _selectedProxyIndex = value!);
+              },
+            );
+          }),
+          // 自定义代理选项
+          RadioListTile<int>(
+            title: Text('自定义代理', style: theme.textTheme.bodyMedium),
+            value: -1,
+            groupValue: _selectedProxyIndex,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            onChanged: (value) {
+              setState(() => _selectedProxyIndex = value!);
+            },
+          ),
+          // 自定义代理输入框
+          if (_selectedProxyIndex == -1)
+            Padding(
+              padding: const EdgeInsets.only(left: 16, top: 4),
+              child: TextField(
+                controller: _customProxyController,
+                decoration: InputDecoration(
+                  hintText: 'https://your-proxy.com/',
+                  helperText: '输入代理地址，如 https://ghproxy.com/',
+                  helperMaxLines: 2,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          const Divider(height: 24),
+        ],
+      ),
     );
   }
 
@@ -404,4 +504,12 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
 
     return [];
   }
+}
+
+/// GitHub 代理选项
+class _ProxyOption {
+  final String label;
+  final String value;
+
+  const _ProxyOption({required this.label, required this.value});
 }

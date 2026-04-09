@@ -147,9 +147,17 @@ class UpgradeApi {
 
   /// 检查更新
   /// GET /api/v1/upgrade/check
-  Future<UpgradeCheck> checkUpgrade() async {
+  /// [githubProxy] 为 GitHub 代理前缀，为空则直连
+  Future<UpgradeCheck> checkUpgrade({String? githubProxy}) async {
     try {
-      final response = await dio.get('${AppConfig.apiPrefix}/upgrade/check');
+      final queryParams = <String, dynamic>{};
+      if (githubProxy != null && githubProxy.isNotEmpty) {
+        queryParams['github_proxy'] = githubProxy;
+      }
+      final response = await dio.get(
+        '${AppConfig.apiPrefix}/upgrade/check',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
       return UpgradeCheck.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -158,9 +166,17 @@ class UpgradeApi {
 
   /// 开始升级
   /// POST /api/v1/upgrade/start
-  Future<void> startUpgrade() async {
+  /// [githubProxy] 为 GitHub 代理前缀，为空则直连
+  Future<void> startUpgrade({String? githubProxy}) async {
     try {
-      await dio.post('${AppConfig.apiPrefix}/upgrade/start');
+      final data = <String, dynamic>{};
+      if (githubProxy != null && githubProxy.isNotEmpty) {
+        data['github_proxy'] = githubProxy;
+      }
+      await dio.post(
+        '${AppConfig.apiPrefix}/upgrade/start',
+        data: data.isNotEmpty ? data : null,
+      );
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
