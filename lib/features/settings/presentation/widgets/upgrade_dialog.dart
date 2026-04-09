@@ -41,6 +41,9 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
   String? _error;
   UpgradeCheck? _checkResult;
 
+  /// 当前选中的版本类型索引（在 availableUpdates 列表中的索引）
+  int _selectedVersionIndex = 0;
+
   /// 当前选中的代理索引，-1 表示自定义
   int _selectedProxyIndex = 0;
   final TextEditingController _customProxyController = TextEditingController();
@@ -98,7 +101,22 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     }
   }
 
+  /// 获取当前选中的版本信息
+  UpdateVersionInfo? get _selectedVersion {
+    if (_checkResult == null || _checkResult!.availableUpdates.isEmpty) {
+      return null;
+    }
+    if (_selectedVersionIndex >= 0 &&
+        _selectedVersionIndex < _checkResult!.availableUpdates.length) {
+      return _checkResult!.availableUpdates[_selectedVersionIndex];
+    }
+    return _checkResult!.availableUpdates.first;
+  }
+
   Future<void> _startUpgrade() async {
+    final version = _selectedVersion;
+    if (version == null) return;
+
     setState(() {
       _isStarting = true;
       _error = null;
@@ -107,6 +125,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     try {
       final proxy = _effectiveProxy;
       await ref.read(upgradeProgressProvider.notifier).startUpgrade(
+        versionType: version.type,
         githubProxy: proxy.isNotEmpty ? proxy : null,
       );
     } on ApiException catch (e) {
@@ -285,52 +304,89 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
       );
     }
 
+    final selectedVersion = _selectedVersion;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 版本信息
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.new_releases, color: colorScheme.primary),
-                  const SizedBox(width: 8),
-                  const Text('发现新版本'),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text('当前版本: ${check.currentVersion ?? '未知'}'),
-              Text('最新版本: ${check.latestVersion ?? '未知'}'),
-            ],
-          ),
+        // 当前版本
+        Text(
+          '当前版本: ${check.currentVersion ?? '未知'}',
+          style: theme.textTheme.bodyMedium,
         ),
+        const SizedBox(height: 12),
 
-        // 发布说明
-        if (check.releaseNotes != null) ...[
-          const SizedBox(height: 16),
-          Text('更新说明:', style: theme.textTheme.titleSmall),
+        // 版本选择（多个可用更新时显示）
+        if (check.availableUpdates.length > 1) ...[
+          Text('选择升级版本:', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
+          ...List.generate(check.availableUpdates.length, (index) {
+            final update = check.availableUpdates[index];
+            return RadioListTile<int>(
+              title: Text(
+                '${update.label} (${update.version})',
+                style: theme.textTheme.bodyMedium,
+              ),
+              subtitle: update.buildTime != null
+                  ? Text('构建时间: ${update.buildTime}',
+                      style: theme.textTheme.bodySmall)
+                  : null,
+              value: index,
+              groupValue: _selectedVersionIndex,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              onChanged: (value) {
+                setState(() => _selectedVersionIndex = value!);
+              },
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
+
+        // 选中版本的详细信息
+        if (selectedVersion != null) ...[
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
+              color: colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            constraints: const BoxConstraints(maxHeight: 150),
-            child: SingleChildScrollView(
-              child: Text(
-                check.releaseNotes!,
-                style: theme.textTheme.bodySmall,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.new_releases, color: colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text('${selectedVersion.label} ${selectedVersion.version}'),
+                  ],
+                ),
+              ],
             ),
           ),
+
+          // 发布说明
+          if (selectedVersion.releaseNotes != null &&
+              selectedVersion.releaseNotes!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('更新说明:', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              constraints: const BoxConstraints(maxHeight: 150),
+              child: SingleChildScrollView(
+                child: Text(
+                  selectedVersion.releaseNotes!,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ),
+          ],
         ],
       ],
     );

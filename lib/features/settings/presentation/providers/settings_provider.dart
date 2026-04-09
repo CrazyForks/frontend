@@ -218,10 +218,17 @@ class UpgradeProgressNotifier extends Notifier<UpgradeProgress> {
   }
 
   /// 开始升级
+  /// [versionType] 版本类型：'stable' 或 'dev'
   /// [githubProxy] 为 GitHub 代理前缀，为空则直连
-  Future<void> startUpgrade({String? githubProxy}) async {
+  Future<void> startUpgrade({
+    required String versionType,
+    String? githubProxy,
+  }) async {
     try {
-      await _upgradeApi.startUpgrade(githubProxy: githubProxy);
+      await _upgradeApi.startUpgrade(
+        versionType: versionType,
+        githubProxy: githubProxy,
+      );
       _startPolling();
     } catch (e) {
       state = UpgradeProgress(

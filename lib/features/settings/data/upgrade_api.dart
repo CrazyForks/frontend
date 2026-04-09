@@ -29,55 +29,83 @@ class VersionInfo {
   String toString() => 'VersionInfo(version: $version)';
 }
 
-/// 更新检查结果模型
-class UpgradeCheck {
-  final bool hasUpdate;
-  final String? latestVersion;
-  final String? currentVersion;
+/// 可用更新的版本信息
+class UpdateVersionInfo {
+  final String type; // 'stable' 或 'dev'
+  final String version;
+  final String? gitCommit;
+  final String? buildTime;
   final String? releaseNotes;
 
-  UpgradeCheck({
-    required this.hasUpdate,
-    this.latestVersion,
-    this.currentVersion,
+  UpdateVersionInfo({
+    required this.type,
+    required this.version,
+    this.gitCommit,
+    this.buildTime,
     this.releaseNotes,
   });
 
+  factory UpdateVersionInfo.fromJson(String type, Map<String, dynamic> json) {
+    return UpdateVersionInfo(
+      type: type,
+      version: json['version'] as String? ?? '',
+      gitCommit: json['git_commit'] as String?,
+      buildTime: json['build_time'] as String?,
+      releaseNotes: json['release_notes'] as String?,
+    );
+  }
+
+  /// 显示标签
+  String get label => type == 'stable' ? '稳定版' : '开发版';
+
+  @override
+  String toString() => 'UpdateVersionInfo(type: $type, version: $version)';
+}
+
+/// 更新检查结果模型
+class UpgradeCheck {
+  final bool hasUpdate;
+  final String? currentVersion;
+
+  /// 可用的更新版本列表（stable、dev）
+  final List<UpdateVersionInfo> availableUpdates;
+
+  UpgradeCheck({
+    required this.hasUpdate,
+    this.currentVersion,
+    this.availableUpdates = const [],
+  });
+
   factory UpgradeCheck.fromJson(Map<String, dynamic> json) {
-    // 优先读取扁平字段，fallback 到嵌套结构
+    // 解析当前版本
     String? currentVersion = json['current_version'] as String?;
     if (currentVersion == null || currentVersion.isEmpty) {
       final current = json['current'] as Map<String, dynamic>?;
       currentVersion = current?['version'] as String?;
     }
 
-    String? latestVersion = json['latest_version'] as String?;
-    String? releaseNotes = json['release_notes'] as String?;
-    if (latestVersion == null || latestVersion.isEmpty) {
-      final updates = json['updates'] as Map<String, dynamic>?;
-      if (updates != null) {
-        // 优先取 stable，其次 dev
-        final stable = updates['stable'] as Map<String, dynamic>?;
-        final dev = updates['dev'] as Map<String, dynamic>?;
-        final preferred = stable ?? dev;
-        if (preferred != null) {
-          latestVersion ??= preferred['version'] as String?;
-          releaseNotes ??= preferred['release_notes'] as String?;
+    // 解析可用更新列表
+    final availableUpdates = <UpdateVersionInfo>[];
+    final updates = json['updates'] as Map<String, dynamic>?;
+    if (updates != null) {
+      for (final type in ['stable', 'dev']) {
+        final versionData = updates[type] as Map<String, dynamic>?;
+        if (versionData != null) {
+          availableUpdates.add(UpdateVersionInfo.fromJson(type, versionData));
         }
       }
     }
 
     return UpgradeCheck(
       hasUpdate: json['has_update'] as bool? ?? false,
-      latestVersion: latestVersion,
       currentVersion: currentVersion,
-      releaseNotes: releaseNotes,
+      availableUpdates: availableUpdates,
     );
   }
 
   @override
   String toString() =>
-      'UpgradeCheck(hasUpdate: $hasUpdate, current: $currentVersion, latest: $latestVersion)';
+      'UpgradeCheck(hasUpdate: $hasUpdate, current: $currentVersion, updates: ${availableUpdates.length})';
 }
 
 /// 升级进度模型
@@ -189,16 +217,22 @@ class UpgradeApi {
 
   /// 开始升级
   /// POST /api/v1/upgrade/start
+  /// [versionType] 版本类型：'stable' 或 'dev'
   /// [githubProxy] 为 GitHub 代理前缀，为空则直连
-  Future<void> startUpgrade({String? githubProxy}) async {
+  Future<void> startUpgrade({
+    required String versionType,
+    String? githubProxy,
+  }) async {
     try {
-      final data = <String, dynamic>{};
+      final data = <String, dynamic>{
+        'version_type': versionType,
+      };
       if (githubProxy != null && githubProxy.isNotEmpty) {
         data['github_proxy'] = githubProxy;
       }
       await dio.post(
         '${AppConfig.apiPrefix}/upgrade/start',
-        data: data.isNotEmpty ? data : null,
+        data: data,
       );
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
