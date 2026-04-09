@@ -261,7 +261,8 @@ class UpgradeProgressNotifier extends Notifier<UpgradeProgress> {
 
   void _startPolling() {
     _stopPolling();
-    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    // 每 1 秒轮询一次（升级过程较快，需要更频繁的轮询）
+    _pollTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       refreshProgress();
     });
     refreshProgress();
