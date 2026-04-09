@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/app_config.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../storage/secure_storage.dart';
 import 'auth_interceptor.dart';
 
@@ -105,7 +107,13 @@ final publicDioProvider = Provider.family<Dio, String?>((ref, customBaseUrl) {
 /// 认证 Dio Provider
 final dioProvider = Provider<Dio>((ref) {
   final secureStorage = ref.watch(secureStorageProvider);
-  return createDio(secureStorage: secureStorage);
+  return createDio(
+    secureStorage: secureStorage,
+    onTokenExpired: () {
+      debugPrint('[DioProvider] Token expired, notifying AuthNotifier');
+      ref.read(authStateProvider.notifier).onTokenExpired();
+    },
+  );
 });
 
 /// API 客户端 Provider
