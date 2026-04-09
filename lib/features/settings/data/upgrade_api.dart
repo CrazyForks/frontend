@@ -9,19 +9,16 @@ class VersionInfo {
   final String? releaseNotes;
   final DateTime? releaseDate;
 
-  VersionInfo({
-    required this.version,
-    this.releaseNotes,
-    this.releaseDate,
-  });
+  VersionInfo({required this.version, this.releaseNotes, this.releaseDate});
 
   factory VersionInfo.fromJson(Map<String, dynamic> json) {
     return VersionInfo(
       version: json['version'] as String,
       releaseNotes: json['release_notes'] as String?,
-      releaseDate: json['release_date'] != null
-          ? DateTime.parse(json['release_date'] as String)
-          : null,
+      releaseDate:
+          json['release_date'] != null
+              ? DateTime.parse(json['release_date'] as String)
+              : null,
     );
   }
 
@@ -111,15 +108,11 @@ class UpgradeCheck {
 /// 升级进度模型
 class UpgradeProgress {
   final String
-      status; // 'idle', 'downloading', 'testing', 'replacing', 'restarting', 'completed', 'error'
+  status; // 'idle', 'downloading', 'testing', 'replacing', 'restarting', 'completed', 'error'
   final int progress; // 0-100
   final String? message;
 
-  UpgradeProgress({
-    required this.status,
-    required this.progress,
-    this.message,
-  });
+  UpgradeProgress({required this.status, required this.progress, this.message});
 
   factory UpgradeProgress.fromJson(Map<String, dynamic> json) {
     return UpgradeProgress(
@@ -130,20 +123,15 @@ class UpgradeProgress {
   }
 
   /// 默认空闲状态
-  static UpgradeProgress get idle => UpgradeProgress(
-        status: 'idle',
-        progress: 0,
-      );
+  static UpgradeProgress get idle =>
+      UpgradeProgress(status: 'idle', progress: 0);
 
   /// 是否正在升级
   bool get isUpgrading =>
-      status == 'downloading' ||
-      status == 'testing' ||
-      status == 'replacing' ||
-      status == 'restarting';
+      status == 'downloading' || status == 'testing' || status == 'replacing';
 
-  /// 是否完成
-  bool get isCompleted => status == 'completed';
+  /// 是否完成（包括 restarting 状态，因为后端升级成功后会发送 restarting 然后进程退出）
+  bool get isCompleted => status == 'completed' || status == 'restarting';
 
   /// 是否出错
   bool get isError => status == 'error';
@@ -172,8 +160,7 @@ class UpgradeProgress {
   }
 
   @override
-  String toString() =>
-      'UpgradeProgress(status: $status, progress: $progress%)';
+  String toString() => 'UpgradeProgress(status: $status, progress: $progress%)';
 }
 
 /// 升级 API 服务
@@ -224,16 +211,11 @@ class UpgradeApi {
     String? githubProxy,
   }) async {
     try {
-      final data = <String, dynamic>{
-        'version_type': versionType,
-      };
+      final data = <String, dynamic>{'version_type': versionType};
       if (githubProxy != null && githubProxy.isNotEmpty) {
         data['github_proxy'] = githubProxy;
       }
-      await dio.post(
-        '${AppConfig.apiPrefix}/upgrade/start',
-        data: data,
-      );
+      await dio.post('${AppConfig.apiPrefix}/upgrade/start', data: data);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
