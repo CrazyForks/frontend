@@ -374,14 +374,15 @@ jobs:
       - name: Create Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGELOG_BODY: ${{ steps.changelog.outputs.changes }}
         run: |
           TAG="${{ steps.release_info.outputs.tag }}"
           TITLE="${{ steps.release_info.outputs.name }}"
           IS_PRERELEASE="${{ steps.release_info.outputs.prerelease }}"
           MAKE_LATEST="${{ steps.release_info.outputs.make_latest }}"
 
-          # 构建 Release Notes
-          RELEASE_NOTES="${{ steps.changelog.outputs.changes }}"
+          # 通过环境变量获取 changelog，避免反引号等特殊字符被 shell 解释
+          RELEASE_NOTES="${CHANGELOG_BODY}"
 
           # 如果 changelog 为空，使用默认内容
           if [ -z "$RELEASE_NOTES" ] || [ "$RELEASE_NOTES" = "" ]; then
