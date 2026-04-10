@@ -240,6 +240,21 @@ class UpgradeProgressNotifier extends Notifier<UpgradeProgress> {
     }
   }
 
+  /// 回退到底包版本
+  Future<void> resetToBaseImage() async {
+    try {
+      await _upgradeApi.resetToBaseImage();
+      _startPolling();
+    } catch (e) {
+      state = UpgradeProgress(
+        status: 'error',
+        progress: 0,
+        message: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
   /// 刷新进度
   Future<void> refreshProgress() async {
     try {

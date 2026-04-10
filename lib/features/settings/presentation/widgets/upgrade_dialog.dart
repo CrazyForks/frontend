@@ -38,6 +38,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
 
   bool _isChecking = true;
   bool _isStarting = false;
+  bool _isResetting = false;
   String? _error;
   UpgradeCheck? _checkResult;
 
@@ -47,6 +48,9 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
   /// 当前选中的代理索引，-1 表示自定义
   int _selectedProxyIndex = 0;
   final TextEditingController _customProxyController = TextEditingController();
+
+  /// 上次检查时使用的代理地址，用于检测代理是否变化
+  String _lastCheckedProxy = '';
 
   /// 获取当前生效的代理地址
   String get _effectiveProxy {
@@ -74,15 +78,19 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     super.dispose();
   }
 
+  /// 代理是否在上次检查后发生了变化
+  bool get _proxyChanged => _effectiveProxy != _lastCheckedProxy;
+
   Future<void> _checkUpgrade() async {
+    final proxy = _effectiveProxy;
     setState(() {
       _isChecking = true;
       _error = null;
       _checkResult = null;
+      _lastCheckedProxy = proxy;
     });
 
     try {
-      final proxy = _effectiveProxy;
       final upgradeApi = ref.read(upgradeApiProvider);
       final result = await upgradeApi.checkUpgrade(
         githubProxy: proxy.isNotEmpty ? proxy : null,
@@ -134,6 +142,44 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
       setState(() => _error = '启动升级失败: $e');
     } finally {
       setState(() => _isStarting = false);
+    }
+  }
+
+  Future<void> _resetToBaseImage() async {
+    // 二次确认
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认回退'),
+        content: const Text('确定要回退到 Docker 镜像的底包版本吗？\n\n回退后服务将自动重启。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认回退'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isResetting = true;
+      _error = null;
+    });
+
+    try {
+      await ref.read(upgradeProgressProvider.notifier).resetToBaseImage();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = '回退失败: $e');
+    } finally {
+      if (mounted) setState(() => _isResetting = false);
     }
   }
 
@@ -299,6 +345,8 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
               '当前版本: ${check.currentVersion ?? '未知'}',
               style: theme.textTheme.bodySmall,
             ),
+            const SizedBox(height: 16),
+            _buildResetButton(theme),
           ],
         ),
       );
@@ -388,7 +436,31 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
             ),
           ],
         ],
+
+        // 回退到底包按钮
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+        Center(child: _buildResetButton(theme)),
       ],
+    );
+  }
+
+  Widget _buildResetButton(ThemeData theme) {
+    return OutlinedButton.icon(
+      onPressed: _isResetting ? null : _resetToBaseImage,
+      icon: _isResetting
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.restore, size: 18),
+      label: Text(_isResetting ? '正在回退...' : '回退到底包版本'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: theme.colorScheme.error,
+        side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
+      ),
     );
   }
 
@@ -496,6 +568,14 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           ),
           child: const Text('取消'),
         ),
+        if (_proxyChanged)
+          FilledButton(
+            onPressed: _checkUpgrade,
+            style: FilledButton.styleFrom(
+              minimumSize: context.responsiveButtonMinSize,
+            ),
+            child: const Text('重新检查'),
+          ),
       ];
     }
 
@@ -529,6 +609,14 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           ),
           child: const Text('稍后'),
         ),
+        if (_proxyChanged)
+          OutlinedButton(
+            onPressed: _checkUpgrade,
+            style: OutlinedButton.styleFrom(
+              minimumSize: context.responsiveButtonMinSize,
+            ),
+            child: const Text('重新检查'),
+          ),
         FilledButton(
           onPressed: _isStarting ? null : _startUpgrade,
           style: FilledButton.styleFrom(
@@ -548,13 +636,21 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
 
     if (_checkResult != null) {
       return [
-        FilledButton(
+        TextButton(
           onPressed: () => Navigator.pop(context),
-          style: FilledButton.styleFrom(
+          style: TextButton.styleFrom(
             minimumSize: context.responsiveButtonMinSize,
           ),
           child: const Text('关闭'),
         ),
+        if (_proxyChanged)
+          FilledButton(
+            onPressed: _checkUpgrade,
+            style: FilledButton.styleFrom(
+              minimumSize: context.responsiveButtonMinSize,
+            ),
+            child: const Text('重新检查'),
+          ),
       ];
     }
 

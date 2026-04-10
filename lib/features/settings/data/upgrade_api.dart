@@ -148,6 +148,8 @@ class UpgradeProgress {
         return '正在验证...';
       case 'replacing':
         return '正在替换...';
+      case 'resetting':
+        return '正在回退...';
       case 'restarting':
         return '正在重启...';
       case 'completed':
@@ -216,6 +218,16 @@ class UpgradeApi {
         data['github_proxy'] = githubProxy;
       }
       await dio.post('${AppConfig.apiPrefix}/upgrade/start', data: data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 回退到底包版本
+  /// POST /api/v1/upgrade/reset
+  Future<void> resetToBaseImage() async {
+    try {
+      await dio.post('${AppConfig.apiPrefix}/upgrade/reset');
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
