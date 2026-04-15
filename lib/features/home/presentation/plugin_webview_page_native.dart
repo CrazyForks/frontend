@@ -23,6 +23,7 @@ class PluginWebViewPage extends StatefulWidget {
 }
 
 class _PluginWebViewPageState extends State<PluginWebViewPage> {
+  InAppWebViewController? _webViewController;
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -44,35 +45,64 @@ class _PluginWebViewPageState extends State<PluginWebViewPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.pluginName),
-        actions: [
-          // 在外部浏览器中打开
-          IconButton(
-            icon: const Icon(Icons.open_in_browser),
-            tooltip: '在浏览器中打开',
-            onPressed: () {
-              // 附加 token 到 URL，auth-bridge 脚本会从 query parameter 读取
-              final token = SecureStorageService.cachedAccessToken ?? '';
-              final separator = widget.pluginUrl.contains('?') ? '&' : '?';
-              final url =
-                  token.isNotEmpty
-                      ? '${widget.pluginUrl}${separator}access_token=$token'
-                      : widget.pluginUrl;
-              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final controller = _webViewController;
+        if (controller != null && await controller.canGoBack()) {
+          await controller.goBack();
+        } else if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.pluginName),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              final controller = _webViewController;
+              if (controller != null && await controller.canGoBack()) {
+                await controller.goBack();
+              } else if (context.mounted) {
+                Navigator.of(context).pop();
+              }
             },
           ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          if (_errorMessage != null)
-            _buildErrorView(colorScheme)
-          else
-            _buildWebView(),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
-        ],
+          actions: [
+            // 关闭 WebView 页面
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: '关闭',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            // 在外部浏览器中打开
+            IconButton(
+              icon: const Icon(Icons.open_in_browser),
+              tooltip: '在浏览器中打开',
+              onPressed: () {
+                // 附加 token 到 URL，auth-bridge 脚本会从 query parameter 读取
+                final token = SecureStorageService.cachedAccessToken ?? '';
+                final separator = widget.pluginUrl.contains('?') ? '&' : '?';
+                final url =
+                    token.isNotEmpty
+                        ? '${widget.pluginUrl}${separator}access_token=$token'
+                        : widget.pluginUrl;
+                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+              },
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            if (_errorMessage != null)
+              _buildErrorView(colorScheme)
+            else
+              _buildWebView(),
+            if (_isLoading) const Center(child: CircularProgressIndicator()),
+          ],
+        ),
       ),
     );
   }
@@ -98,6 +128,9 @@ class _PluginWebViewPageState extends State<PluginWebViewPage> {
         allowUniversalAccessFromFileURLs: true,
         supportZoom: false,
       ),
+      onWebViewCreated: (controller) {
+        _webViewController = controller;
+      },
       onLoadStart: (controller, url) {
         if (mounted) {
           setState(() {
