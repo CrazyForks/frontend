@@ -11,6 +11,9 @@ class PlaylistCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onPlayAll;
+  final bool isSelectionMode;
+  final bool isSelected;
+  final VoidCallback? onSelect;
 
   const PlaylistCard({
     super.key,
@@ -19,6 +22,9 @@ class PlaylistCard extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onPlayAll,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+    this.onSelect,
   });
 
   @override
@@ -32,9 +38,15 @@ class PlaylistCard extends StatelessWidget {
 
     return Card(
       clipBehavior: Clip.antiAlias,
+      shape: isSelectionMode && isSelected
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: colorScheme.primary, width: 2),
+            )
+          : null,
       child: InkWell(
-        onTap: onTap,
-        onLongPress: _showContextMenu(context),
+        onTap: isSelectionMode ? onSelect : onTap,
+        onLongPress: isSelectionMode ? null : _showContextMenu(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -81,8 +93,24 @@ class PlaylistCard extends StatelessWidget {
                       ),
                     ),
 
+                  // 多选模式下显示 Checkbox（左上角）
+                  if (isSelectionMode)
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Checkbox(
+                          value: isSelected,
+                          onChanged: (_) => onSelect?.call(),
+                        ),
+                      ),
+                    )
                   // 类型标签（左上角）
-                  if (playlist.type == 'radio')
+                  else if (playlist.type == 'radio')
                     Positioned(
                       left: 8,
                       top: 8,

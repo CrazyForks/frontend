@@ -169,6 +169,25 @@ class PlaylistRepository {
     }
   }
 
+  /// 批量删除歌单
+  Future<int> batchDeletePlaylists(List<int> ids) async {
+    try {
+      final result = await playlistApi.batchDeletePlaylists(ids);
+      return result['deleted'] as int? ?? 0;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 删除所有自动创建的歌单
+  Future<void> deleteAutoCreatedPlaylists() async {
+    try {
+      await playlistApi.deleteAutoCreatedPlaylists();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// 处理 Dio 异常
   Exception _handleError(DioException e) {
     final response = e.response;

@@ -11,6 +11,9 @@ class PlaylistListItem extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onPlayAll;
+  final bool isSelectionMode;
+  final bool isSelected;
+  final VoidCallback? onSelect;
 
   const PlaylistListItem({
     super.key,
@@ -19,6 +22,9 @@ class PlaylistListItem extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onPlayAll,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+    this.onSelect,
   });
 
   @override
@@ -32,13 +38,28 @@ class PlaylistListItem extends StatelessWidget {
 
     return Card(
       clipBehavior: Clip.antiAlias,
+      shape: isSelectionMode && isSelected
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: colorScheme.primary, width: 2),
+            )
+          : null,
       child: InkWell(
-        onTap: onTap,
-        onLongPress: _showContextMenu(context),
+        onTap: isSelectionMode ? onSelect : onTap,
+        onLongPress: isSelectionMode ? null : _showContextMenu(context),
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
             children: [
+              // 多选模式下显示 Checkbox
+              if (isSelectionMode)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => onSelect?.call(),
+                  ),
+                ),
               // 左侧：方形封面 56x56
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -131,18 +152,20 @@ class PlaylistListItem extends StatelessWidget {
                 ),
               ),
 
-              // 右侧：操作按钮
-              if (onPlayAll != null)
+              // 右侧：操作按钮（多选模式下隐藏）
+              if (!isSelectionMode) ...[
+                if (onPlayAll != null)
+                  IconButton(
+                    onPressed: onPlayAll,
+                    icon: const Icon(Icons.play_arrow),
+                    tooltip: '播放全部',
+                  ),
                 IconButton(
-                  onPressed: onPlayAll,
-                  icon: const Icon(Icons.play_arrow),
-                  tooltip: '播放全部',
+                  onPressed: _showMoreMenu(context),
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: '更多操作',
                 ),
-              IconButton(
-                onPressed: _showMoreMenu(context),
-                icon: const Icon(Icons.more_vert),
-                tooltip: '更多操作',
-              ),
+              ],
             ],
           ),
         ),

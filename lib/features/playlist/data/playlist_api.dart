@@ -181,4 +181,20 @@ class PlaylistApi {
   Future<void> touchPlaylist(int id) async {
     await dio.post('${AppConfig.apiPrefix}/playlists/$id/touch');
   }
+
+  /// 批量删除歌单
+  /// POST /api/v1/playlists/batch-delete
+  Future<Map<String, dynamic>> batchDeletePlaylists(List<int> ids) async {
+    final response = await dio.post(
+      '${AppConfig.apiPrefix}/playlists/batch-delete',
+      data: {'ids': ids},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// 删除所有自动创建的歌单
+  /// DELETE /api/v1/playlists/auto-created
+  Future<void> deleteAutoCreatedPlaylists() async {
+    await dio.delete('${AppConfig.apiPrefix}/playlists/auto-created');
+  }
 }

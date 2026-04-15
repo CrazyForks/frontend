@@ -29,44 +29,52 @@ class PlaylistsPage extends ConsumerStatefulWidget {
 
 class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
   String? _selectedType;
+  bool _isSelectionMode = false;
+  final Set<int> _selectedPlaylistIds = {};
+
+  void _toggleSelectMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedPlaylistIds.clear();
+      }
+    });
+  }
+
+  void _togglePlaylistSelection(Playlist playlist) {
+    // 不允许选择内置歌单
+    if (playlist.isBuiltIn) return;
+    setState(() {
+      if (_selectedPlaylistIds.contains(playlist.id)) {
+        _selectedPlaylistIds.remove(playlist.id);
+      } else {
+        _selectedPlaylistIds.add(playlist.id);
+      }
+    });
+  }
+
+  void _selectAll(List<Playlist> playlists) {
+    setState(() {
+      final selectableIds = playlists
+          .where((p) => !p.isBuiltIn)
+          .map((p) => p.id)
+          .toSet();
+      if (_selectedPlaylistIds.containsAll(selectableIds)) {
+        _selectedPlaylistIds.clear();
+      } else {
+        _selectedPlaylistIds.addAll(selectableIds);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final playlistsAsync = ref.watch(playlistListProvider(_selectedType));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('歌单'),
-        actions: [
-          // 视图模式切换按钮
-          IconButton(
-            icon: Icon(
-              ref.watch(playlistViewModeProvider) == PlaylistViewMode.grid
-                  ? Icons.view_list
-                  : Icons.grid_view,
-            ),
-            tooltip:
-                ref.watch(playlistViewModeProvider) == PlaylistViewMode.grid
-                    ? '切换到列表视图'
-                    : '切换到卡片视图',
-            onPressed: () {
-              ref.read(playlistViewModeProvider.notifier).toggleViewMode();
-            },
-          ),
-          // 自动创建按钮
-          IconButton(
-            icon: const Icon(Icons.auto_fix_high),
-            tooltip: '自动创建歌单',
-            onPressed: _autoCreatePlaylists,
-          ),
-          // 创建歌单按钮
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: '创建歌单',
-            onPressed: () => _showCreateDialog(),
-          ),
-        ],
-      ),
+      appBar: _isSelectionMode
+          ? _buildSelectionAppBar(playlistsAsync)
+          : _buildNormalAppBar(),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(playlistListProvider(_selectedType));
@@ -135,6 +143,88 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
     );
   }
 
+  AppBar _buildNormalAppBar() {
+    return AppBar(
+      title: const Text('歌单'),
+      actions: [
+        // 多选模式按钮
+        IconButton(
+          icon: const Icon(Icons.checklist),
+          tooltip: '多选',
+          onPressed: _toggleSelectMode,
+        ),
+        // 视图模式切换按钮
+        IconButton(
+          icon: Icon(
+            ref.watch(playlistViewModeProvider) == PlaylistViewMode.grid
+                ? Icons.view_list
+                : Icons.grid_view,
+          ),
+          tooltip:
+              ref.watch(playlistViewModeProvider) == PlaylistViewMode.grid
+                  ? '切换到列表视图'
+                  : '切换到卡片视图',
+          onPressed: () {
+            ref.read(playlistViewModeProvider.notifier).toggleViewMode();
+          },
+        ),
+        // 自动创建按钮
+        IconButton(
+          icon: const Icon(Icons.auto_fix_high),
+          tooltip: '自动创建歌单',
+          onPressed: _autoCreatePlaylists,
+        ),
+        // 创建歌单按钮
+        IconButton(
+          icon: const Icon(Icons.add),
+          tooltip: '创建歌单',
+          onPressed: () => _showCreateDialog(),
+        ),
+      ],
+    );
+  }
+
+  AppBar _buildSelectionAppBar(AsyncValue<PlaylistListResponse> playlistsAsync) {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: _toggleSelectMode,
+      ),
+      title: Text('已选择 ${_selectedPlaylistIds.length} 个'),
+      actions: [
+        // 删除按钮
+        TextButton.icon(
+          icon: Icon(
+            Icons.delete,
+            color: _selectedPlaylistIds.isEmpty
+                ? null
+                : Theme.of(context).colorScheme.error,
+          ),
+          label: Text(
+            '删除(${_selectedPlaylistIds.length})',
+            style: TextStyle(
+              color: _selectedPlaylistIds.isEmpty
+                  ? null
+                  : Theme.of(context).colorScheme.error,
+            ),
+          ),
+          onPressed: _selectedPlaylistIds.isEmpty
+              ? null
+              : _confirmBatchDelete,
+        ),
+        // 全选按钮
+        TextButton(
+          onPressed: () {
+            playlistsAsync.whenData((response) {
+              _selectAll(response.playlists);
+            });
+          },
+          child: const Text('全选'),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPlaylistContent(BuildContext context, List<Playlist> playlists) {
     if (playlists.isEmpty) {
       return SliverToBoxAdapter(child: _buildEmptyContent());
@@ -175,6 +265,9 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
             onDelete:
                 playlist.isBuiltIn ? null : () => _confirmDelete(playlist),
             onPlayAll: () => _playAll(playlist),
+            isSelectionMode: _isSelectionMode,
+            isSelected: _selectedPlaylistIds.contains(playlist.id),
+            onSelect: () => _togglePlaylistSelection(playlist),
           );
         }, childCount: playlists.length),
       ),
@@ -194,6 +287,9 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
             onDelete:
                 playlist.isBuiltIn ? null : () => _confirmDelete(playlist),
             onPlayAll: () => _playAll(playlist),
+            isSelectionMode: _isSelectionMode,
+            isSelected: _selectedPlaylistIds.contains(playlist.id),
+            onSelect: () => _togglePlaylistSelection(playlist),
           );
         }, childCount: playlists.length),
       ),
@@ -382,6 +478,56 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
     }
   }
 
+  /// 批量删除确认弹窗
+  Future<void> _confirmBatchDelete() async {
+    final count = _selectedPlaylistIds.length;
+    if (count == 0) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('确认批量删除'),
+            content: Text('确定要删除选中的 $count 个歌单吗？此操作不可恢复。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true && mounted) {
+      final notifier = ref.read(playlistNotifierProvider.notifier);
+      final deleted = await notifier.batchDeletePlaylists(
+        _selectedPlaylistIds.toList(),
+      );
+
+      if (mounted) {
+        if (deleted > 0) {
+          ResponsiveSnackBar.showSuccess(
+            context,
+            message: '已删除 $deleted 个歌单',
+          );
+        } else {
+          ResponsiveSnackBar.showError(context, message: '删除失败');
+        }
+        setState(() {
+          _isSelectionMode = false;
+          _selectedPlaylistIds.clear();
+        });
+      }
+    }
+  }
+
   /// 确认删除歌单
   Future<void> _confirmDelete(Playlist playlist) async {
     final confirmed = await showDialog<bool>(
@@ -412,6 +558,49 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
 
       if (success && mounted) {
         ResponsiveSnackBar.showSuccess(context, message: '歌单已删除');
+      }
+    }
+  }
+
+  /// 确认删除所有自动创建的歌单
+  Future<void> _confirmDeleteAutoCreated() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('确认删除'),
+            content: const Text(
+              '确定要删除所有自动创建的歌单吗？此操作不可恢复。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true && mounted) {
+      final notifier = ref.read(playlistNotifierProvider.notifier);
+      final success = await notifier.deleteAutoCreatedPlaylists();
+
+      if (mounted) {
+        if (success) {
+          ResponsiveSnackBar.showSuccess(
+            context,
+            message: '已删除所有自动创建的歌单',
+          );
+        } else {
+          ResponsiveSnackBar.showError(context, message: '删除失败');
+        }
       }
     }
   }
@@ -522,6 +711,19 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
                     ),
                   ),
                   actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(false);
+                        _confirmDeleteAutoCreated();
+                      },
+                      child: Text(
+                        '删除所有自动创建的歌单',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(false),
                       child: const Text('取消'),

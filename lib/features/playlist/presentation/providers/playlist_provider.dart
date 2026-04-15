@@ -253,6 +253,36 @@ class PlaylistNotifier extends Notifier<AsyncValue<void>> {
     }
   }
 
+  /// 批量删除歌单
+  Future<int> batchDeletePlaylists(List<int> ids) async {
+    state = const AsyncValue.loading();
+    try {
+      final deleted = await _repository.batchDeletePlaylists(ids);
+      state = const AsyncValue.data(null);
+      // 刷新歌单列表
+      ref.invalidate(playlistListProvider);
+      return deleted;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return 0;
+    }
+  }
+
+  /// 删除所有自动创建的歌单
+  Future<bool> deleteAutoCreatedPlaylists() async {
+    state = const AsyncValue.loading();
+    try {
+      await _repository.deleteAutoCreatedPlaylists();
+      state = const AsyncValue.data(null);
+      // 刷新歌单列表
+      ref.invalidate(playlistListProvider);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
   /// 更新歌单最后访问时间
   Future<void> touchPlaylist(int id) async {
     try {
