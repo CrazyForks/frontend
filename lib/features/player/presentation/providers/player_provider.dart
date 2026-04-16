@@ -13,6 +13,8 @@ import '../../../../core/storage/secure_storage.dart';
 import '../../../../main.dart';
 import '../../../../shared/models/song.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../library/data/songs_api.dart';
+import '../../../library/presentation/providers/songs_provider.dart';
 import '../../../playlist/data/playlist_api.dart';
 import '../../../playlist/presentation/providers/playlist_provider.dart';
 import '../../domain/player_state.dart';
@@ -645,6 +647,154 @@ class PlayerNotifier extends Notifier<PlayerState> {
       debugPrint(
         '[Player] _loadRemainingSongsById: skip touchPlaylist'
         ' (generation: expected=$generation, current=$_loadGeneration)',
+      );
+    }
+  }
+
+  /// 播放全部歌曲（按筛选条件）
+  /// 策略：先取第一页（100首）立即开始播放，后台异步加载剩余歌曲
+  /// 使用 _loadGeneration 防止竞态：用户切换筛选或清空时自动取消旧的后台加载
+  /// [keyword] 搜索关键词（可选）
+  /// [type] 歌曲类型筛选（可选）
+  /// 返回总歌曲数（-1 表示失败）
+  Future<int> playAllSongs({String? keyword, String? type}) async {
+    final songsApi = ref.read(songsApiProvider);
+    const firstPageLimit = 100;
+
+    debugPrint(
+      '[Player] playAllSongs: start, keyword=$keyword, type=$type',
+    );
+    _consecutiveFailures = 0;
+    try {
+      final firstPageResponse = await songsApi.getSongs(
+        keyword: keyword,
+        type: type,
+        limit: firstPageLimit,
+        offset: 0,
+      );
+      final firstPageSongs = firstPageResponse.songs;
+      final total = firstPageResponse.total;
+
+      debugPrint(
+        '[Player] playAllSongs: firstPage=${firstPageSongs.length}, total=$total',
+      );
+
+      if (firstPageSongs.isEmpty) {
+        debugPrint('[Player] playAllSongs: no songs found');
+        return 0;
+      }
+
+      // playPlaylist 内部会递增 _loadGeneration，取消之前的后台加载
+      await playPlaylist(firstPageSongs);
+
+      if (total > firstPageSongs.length) {
+        // 记录当前代次，传给后台加载任务用于检测是否过期
+        final generation = _loadGeneration;
+        debugPrint(
+          '[Player] playAllSongs: starting background load, generation=$generation, offset=${firstPageSongs.length}',
+        );
+        _loadRemainingSongsByFilter(
+          songsApi,
+          keyword,
+          type,
+          firstPageSongs.length,
+          total,
+          generation,
+        );
+      } else {
+        debugPrint('[Player] playAllSongs: all songs loaded in first page');
+      }
+
+      return total;
+    } catch (e, st) {
+      debugPrint('[Player] playAllSongs error: $e\n$st');
+      return -1;
+    }
+  }
+
+  /// 后台异步加载剩余歌曲（按筛选条件）并追加到播放列表
+  /// [generation] 启动时的代次快照，每次 await 后检查是否过期
+  Future<void> _loadRemainingSongsByFilter(
+    SongsApi songsApi,
+    String? keyword,
+    String? type,
+    int startOffset,
+    int total,
+    int generation,
+  ) async {
+    const batchLimit = 100;
+    const maxRetries = 3;
+    int offset = startOffset;
+    try {
+      while (offset < total) {
+        // 每次网络请求前检查代次，若已过期则中止
+        if (_loadGeneration != generation) {
+          debugPrint(
+            '[Player] _loadRemainingSongsByFilter: cancelled before fetch'
+            ' (generation: expected=$generation, current=$_loadGeneration, offset=$offset)',
+          );
+          return;
+        }
+
+        // 带重试的批次加载，防止网络波动导致加载中断
+        SongListResponse? response;
+        for (int retry = 0; retry < maxRetries; retry++) {
+          try {
+            debugPrint(
+              '[Player] _loadRemainingSongsByFilter: fetching offset=$offset'
+              ' (retry=$retry, generation=$generation)',
+            );
+            response = await songsApi.getSongs(
+              keyword: keyword,
+              type: type,
+              limit: batchLimit,
+              offset: offset,
+            );
+            break; // 成功则跳出重试循环
+          } catch (e) {
+            debugPrint(
+              '[Player] _loadRemainingSongsByFilter: fetch failed at offset=$offset,'
+              ' retry=$retry/$maxRetries: $e',
+            );
+            if (retry == maxRetries - 1) rethrow; // 最后一次重试失败则抛出
+            // 指数退避重试：500ms / 1000ms
+            await Future<void>.delayed(
+              Duration(milliseconds: 500 * (retry + 1)),
+            );
+          }
+        }
+
+        // 网络请求返回后再次检查，防止期间用户切换了筛选条件
+        if (_loadGeneration != generation) {
+          debugPrint(
+            '[Player] _loadRemainingSongsByFilter: cancelled after fetch'
+            ' (generation: expected=$generation, current=$_loadGeneration, offset=$offset)',
+          );
+          return;
+        }
+
+        final batch = response!.songs;
+        debugPrint(
+          '[Player] _loadRemainingSongsByFilter: got ${batch.length} songs at offset=$offset,'
+          ' playlist size=${state.playlist.length + batch.length}',
+        );
+        if (batch.isEmpty) {
+          debugPrint(
+            '[Player] _loadRemainingSongsByFilter: empty batch at offset=$offset, stopping',
+          );
+          break;
+        }
+        addToPlaylist(batch);
+        offset += batchLimit;
+      }
+      debugPrint(
+        '[Player] _loadRemainingSongsByFilter: done,'
+        ' loaded=${state.playlist.length}, total=$total',
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[Player] _loadRemainingSongsByFilter: failed at offset=$offset/$total'
+        ' (generation=$generation): $e\n$st',
       );
     }
   }

@@ -147,12 +147,6 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
     return AppBar(
       title: const Text('歌单'),
       actions: [
-        // 多选模式按钮
-        IconButton(
-          icon: const Icon(Icons.checklist),
-          tooltip: '多选',
-          onPressed: _toggleSelectMode,
-        ),
         // 视图模式切换按钮
         IconButton(
           icon: Icon(
@@ -168,17 +162,43 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
             ref.read(playlistViewModeProvider.notifier).toggleViewMode();
           },
         ),
-        // 自动创建按钮
+        // 多选模式按钮
         IconButton(
-          icon: const Icon(Icons.auto_fix_high),
-          tooltip: '自动创建歌单',
-          onPressed: _autoCreatePlaylists,
+          icon: const Icon(Icons.checklist),
+          tooltip: '多选',
+          onPressed: _toggleSelectMode,
         ),
-        // 创建歌单按钮
-        IconButton(
-          icon: const Icon(Icons.add),
-          tooltip: '创建歌单',
-          onPressed: () => _showCreateDialog(),
+        // 更多菜单
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          tooltip: '更多',
+          onSelected: (value) {
+            switch (value) {
+              case 'create':
+                _showCreateDialog();
+              case 'auto_create':
+                _autoCreatePlaylists();
+            }
+          },
+          itemBuilder:
+              (context) => [
+                const PopupMenuItem(
+                  value: 'create',
+                  child: ListTile(
+                    leading: Icon(Icons.add),
+                    title: Text('创建歌单'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'auto_create',
+                  child: ListTile(
+                    leading: Icon(Icons.auto_fix_high),
+                    title: Text('自动创建歌单'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
         ),
       ],
     );

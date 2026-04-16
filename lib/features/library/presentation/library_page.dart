@@ -59,6 +59,20 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     });
   }
 
+  Future<void> _playAll(SongsListState state) async {
+    final total = await ref
+        .read(playerStateProvider.notifier)
+        .playAllSongs(keyword: state.keyword, type: state.type);
+    if (!mounted) return;
+    if (total < 0) {
+      ResponsiveSnackBar.showError(context, message: '播放失败');
+    } else if (total == 0) {
+      ResponsiveSnackBar.show(context, message: '没有可播放的歌曲');
+    } else {
+      ResponsiveSnackBar.show(context, message: '播放全部 $total 首歌曲');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(songsListProvider);
@@ -76,6 +90,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             onTypeChanged: (type) {
               ref.read(songsListProvider.notifier).setTypeFilter(type);
             },
+            songCount: state.total,
           ),
           // 错误提示
           if (state.error != null)
@@ -169,6 +184,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     return AppBar(
       title: const Text('歌曲库'),
       actions: [
+        // 播放全部
+        IconButton(
+          icon: const Icon(Icons.play_circle_outline),
+          tooltip: '播放全部',
+          onPressed: state.songs.isEmpty ? null : () => _playAll(state),
+        ),
         // 多选按钮
         IconButton(
           icon: const Icon(Icons.checklist),
@@ -177,21 +198,24 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             ref.read(songsListProvider.notifier).toggleSelectMode();
           },
         ),
-        // 添加歌曲
+        // 更多菜单
         PopupMenuButton<String>(
-          icon: const Icon(Icons.add),
-          tooltip: '添加歌曲',
+          icon: const Icon(Icons.more_vert),
+          tooltip: '更多',
           onSelected: (value) {
-            if (value == 'remote') {
-              _navigateToAddSong(context, AppConstants.songTypeRemote);
-            } else if (value == 'radio') {
-              _navigateToAddSong(context, AppConstants.songTypeRadio);
+            switch (value) {
+              case 'add_remote':
+                _navigateToAddSong(context, AppConstants.songTypeRemote);
+              case 'add_radio':
+                _navigateToAddSong(context, AppConstants.songTypeRadio);
+              case 'clean':
+                _showCleanConfirmDialog(context);
             }
           },
           itemBuilder:
               (context) => [
                 const PopupMenuItem(
-                  value: 'remote',
+                  value: 'add_remote',
                   child: ListTile(
                     leading: Icon(Icons.cloud),
                     title: Text('添加网络歌曲'),
@@ -199,20 +223,22 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   ),
                 ),
                 const PopupMenuItem(
-                  value: 'radio',
+                  value: 'add_radio',
                   child: ListTile(
                     leading: Icon(Icons.radio),
                     title: Text('添加电台'),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
+                const PopupMenuItem(
+                  value: 'clean',
+                  child: ListTile(
+                    leading: Icon(Icons.cleaning_services),
+                    title: Text('清理无效歌曲'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
               ],
-        ),
-        // 清理按钮
-        IconButton(
-          icon: const Icon(Icons.cleaning_services),
-          tooltip: '清理无效歌曲',
-          onPressed: () => _showCleanConfirmDialog(context),
         ),
       ],
     );

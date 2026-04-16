@@ -6,43 +6,68 @@ import '../../../../config/constants.dart';
 class SongFilterBar extends StatelessWidget {
   final String? currentType;
   final ValueChanged<String?> onTypeChanged;
+  final int songCount;
 
   const SongFilterBar({
     super.key,
     this.currentType,
     required this.onTypeChanged,
+    this.songCount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          _FilterChip(
-            label: '全部',
-            isSelected: currentType == null,
-            onTap: () => onTypeChanged(null),
+          // 筛选 Chips（可滚动）
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _FilterChip(
+                    label: '全部',
+                    isSelected: currentType == null,
+                    onTap: () => onTypeChanged(null),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterChip(
+                    label: '本地',
+                    isSelected: currentType == AppConstants.songTypeLocal,
+                    onTap: () => onTypeChanged(AppConstants.songTypeLocal),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterChip(
+                    label: '网络',
+                    isSelected: currentType == AppConstants.songTypeRemote,
+                    onTap: () => onTypeChanged(AppConstants.songTypeRemote),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterChip(
+                    label: '电台',
+                    isSelected: currentType == AppConstants.songTypeRadio,
+                    onTap: () => onTypeChanged(AppConstants.songTypeRadio),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: '本地',
-            isSelected: currentType == AppConstants.songTypeLocal,
-            onTap: () => onTypeChanged(AppConstants.songTypeLocal),
-          ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: '网络',
-            isSelected: currentType == AppConstants.songTypeRemote,
-            onTap: () => onTypeChanged(AppConstants.songTypeRemote),
-          ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: '电台',
-            isSelected: currentType == AppConstants.songTypeRadio,
-            onTap: () => onTypeChanged(AppConstants.songTypeRadio),
-          ),
+          // 歌曲总数
+          if (songCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(
+                '$songCount首',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
         ],
       ),
     );
