@@ -99,24 +99,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
           const SizedBox(height: 16),
 
-          // 分组3: 服务器配置（嵌入模式下隐藏，独立部署时显示）
-          if (!AppConfig.isEmbedded)
-            _buildSectionCard(
-              title: '服务器配置',
-              icon: Icons.dns_outlined,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.link),
-                  title: const Text('API 地址'),
-                  subtitle: _buildApiUrlSubtitle(),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _showApiUrlDialog,
-                ),
-              ],
-            ),
-
-          const SizedBox(height: 16),
-
           // 分组4: 插件管理
           _buildSectionCard(
             title: '扩展',

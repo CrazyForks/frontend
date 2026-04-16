@@ -723,7 +723,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
                         ),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 16),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(false),
                       child: const Text('取消'),
