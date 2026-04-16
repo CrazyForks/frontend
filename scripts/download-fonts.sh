@@ -3,7 +3,9 @@
 # 下载 CanvasKit 字体 fallback 所需的字体文件
 # 包括：
 # - NotoSansSC-Regular.otf：通过 pubspec.yaml 绑定的完整中文字体
-# - Noto Sans SC 分片 woff2：CanvasKit fallback 按需加载的中文字体分片（编号 4-119）
+# - Noto Sans SC 分片 woff2：CanvasKit fallback 按需加载的中文字体分片（v37，97 个分片）
+# - Noto Sans JP 分片 woff2：CanvasKit fallback 按需加载的日文字体分片（v53，编号 0-119）
+# - Noto Sans KR 分片 woff2：CanvasKit fallback 按需加载的韩文字体分片（v36，编号 0-119）
 # - Roboto：英文字体（CanvasKit fallback 机制使用）
 #
 # CanvasKit 渲染引擎在遇到绑定字体未覆盖的字符时，会从 fontFallbackBaseUrl 按需加载
@@ -30,12 +32,14 @@ echo -e "${BLUE}========================================${NC}"
 # 创建目录结构
 mkdir -p "$FONTS_DIR/roboto/v32"
 mkdir -p "$FONTS_DIR/notosanssc/v37"
+mkdir -p "$FONTS_DIR/notosansjp/v53"
+mkdir -p "$FONTS_DIR/notosanskr/v36"
 mkdir -p "$PUBSPEC_FONTS_DIR"
 
 # ========================================
 # 下载 NotoSansSC-Regular.otf（pubspec.yaml 绑定字体）
 # ========================================
-echo -e "${BLUE}[1/3] 下载 NotoSansSC-Regular.otf...${NC}"
+echo -e "${BLUE}[1/5] 下载 NotoSansSC-Regular.otf...${NC}"
 
 NOTO_OTF_FILE="$PUBSPEC_FONTS_DIR/NotoSansSC-Regular.otf"
 if [ -f "$NOTO_OTF_FILE" ]; then
@@ -54,21 +58,20 @@ fi
 # ========================================
 # 下载 Noto Sans SC 分片 woff2（CanvasKit fallback 字体）
 # ========================================
-echo -e "${BLUE}[2/3] 下载 Noto Sans SC 分片 woff2 (CanvasKit fallback)...${NC}"
+echo -e "${BLUE}[2/5] 下载 Noto Sans SC 分片 woff2 (CanvasKit fallback - 中文)...${NC}"
 
 # CanvasKit 使用 Google Fonts 的分片 woff2 文件，按 Unicode 范围分片
-# Noto Sans SC v37 共有编号 4-119 的分片文件
+# Noto Sans SC v37 分片编号不连续（与 Flutter CanvasKit 引擎 font_fallback_data.dart 一致）
 NOTO_SC_BASE_URL="https://fonts.gstatic.com/s/notosanssc/v37"
 NOTO_SC_FILENAME_PREFIX="k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYkldv7JjxkkgFsFSSOPMOkySAZ73y9ViAt3acb8NexQ2w"
-NOTO_SC_SHARD_START=4
-NOTO_SC_SHARD_END=119
+NOTO_SC_SHARDS=(4 5 6 $(seq 21 91) $(seq 97 119))
 NOTO_SC_OUTPUT_DIR="$FONTS_DIR/notosanssc/v37"
 
 noto_sc_downloaded=0
 noto_sc_skipped=0
 noto_sc_failed=0
 
-for i in $(seq $NOTO_SC_SHARD_START $NOTO_SC_SHARD_END); do
+for i in "${NOTO_SC_SHARDS[@]}"; do
     filename="${NOTO_SC_FILENAME_PREFIX}.${i}.woff2"
     OUTPUT_FILE="$NOTO_SC_OUTPUT_DIR/$filename"
     if [ -f "$OUTPUT_FILE" ]; then
@@ -84,16 +87,92 @@ for i in $(seq $NOTO_SC_SHARD_START $NOTO_SC_SHARD_END); do
     fi
 done
 
-noto_sc_total=$((NOTO_SC_SHARD_END - NOTO_SC_SHARD_START + 1))
+noto_sc_total=${#NOTO_SC_SHARDS[@]}
 echo -e "  ${GREEN}✓${NC} Noto Sans SC 分片: 共 ${noto_sc_total} 个, 新下载 ${noto_sc_downloaded}, 已存在 ${noto_sc_skipped}, 失败 ${noto_sc_failed}"
 if [ "$noto_sc_failed" -gt 0 ]; then
     echo -e "  ${YELLOW}⚠${NC} 部分分片下载失败，大屏模式下可能仍有中文显示为方框"
 fi
 
 # ========================================
+# 下载 Noto Sans JP 分片 woff2（CanvasKit fallback 字体 - 日文）
+# ========================================
+echo -e "${BLUE}[3/5] 下载 Noto Sans JP 分片 woff2 (CanvasKit fallback - 日文)...${NC}"
+
+# Noto Sans JP v53 共有编号 0-119 的分片文件（版本号与 CanvasKit 内置 fallback 列表一致）
+NOTO_JP_BASE_URL="https://fonts.gstatic.com/s/notosansjp/v53"
+NOTO_JP_FILENAME_PREFIX="-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEj756wwr4v0qHnANADNsISRDl2PRkiiWsg"
+NOTO_JP_SHARD_START=0
+NOTO_JP_SHARD_END=119
+NOTO_JP_OUTPUT_DIR="$FONTS_DIR/notosansjp/v53"
+
+noto_jp_downloaded=0
+noto_jp_skipped=0
+noto_jp_failed=0
+
+for i in $(seq $NOTO_JP_SHARD_START $NOTO_JP_SHARD_END); do
+    filename="${NOTO_JP_FILENAME_PREFIX}.${i}.woff2"
+    OUTPUT_FILE="$NOTO_JP_OUTPUT_DIR/$filename"
+    if [ -f "$OUTPUT_FILE" ]; then
+        noto_jp_skipped=$((noto_jp_skipped + 1))
+    else
+        URL="${NOTO_JP_BASE_URL}/${filename}"
+        if curl -s -f -o "$OUTPUT_FILE" "$URL" 2>/dev/null; then
+            noto_jp_downloaded=$((noto_jp_downloaded + 1))
+        else
+            rm -f "$OUTPUT_FILE"
+            noto_jp_failed=$((noto_jp_failed + 1))
+        fi
+    fi
+done
+
+noto_jp_total=$((NOTO_JP_SHARD_END - NOTO_JP_SHARD_START + 1))
+echo -e "  ${GREEN}✓${NC} Noto Sans JP 分片: 共 ${noto_jp_total} 个, 新下载 ${noto_jp_downloaded}, 已存在 ${noto_jp_skipped}, 失败 ${noto_jp_failed}"
+if [ "$noto_jp_failed" -gt 0 ]; then
+    echo -e "  ${YELLOW}⚠${NC} 部分分片下载失败，日文字符可能显示为方框"
+fi
+
+# ========================================
+# 下载 Noto Sans KR 分片 woff2（CanvasKit fallback 字体 - 韩文）
+# ========================================
+echo -e "${BLUE}[4/5] 下载 Noto Sans KR 分片 woff2 (CanvasKit fallback - 韩文)...${NC}"
+
+# Noto Sans KR v36 共有编号 0-119 的分片文件（版本号与 CanvasKit 内置 fallback 列表一致）
+NOTO_KR_BASE_URL="https://fonts.gstatic.com/s/notosanskr/v36"
+NOTO_KR_FILENAME_PREFIX="PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLGC5nwuDo-KBTUm6CryotyJROlrnQ"
+NOTO_KR_SHARD_START=0
+NOTO_KR_SHARD_END=119
+NOTO_KR_OUTPUT_DIR="$FONTS_DIR/notosanskr/v36"
+
+noto_kr_downloaded=0
+noto_kr_skipped=0
+noto_kr_failed=0
+
+for i in $(seq $NOTO_KR_SHARD_START $NOTO_KR_SHARD_END); do
+    filename="${NOTO_KR_FILENAME_PREFIX}.${i}.woff2"
+    OUTPUT_FILE="$NOTO_KR_OUTPUT_DIR/$filename"
+    if [ -f "$OUTPUT_FILE" ]; then
+        noto_kr_skipped=$((noto_kr_skipped + 1))
+    else
+        URL="${NOTO_KR_BASE_URL}/${filename}"
+        if curl -s -f -o "$OUTPUT_FILE" "$URL" 2>/dev/null; then
+            noto_kr_downloaded=$((noto_kr_downloaded + 1))
+        else
+            rm -f "$OUTPUT_FILE"
+            noto_kr_failed=$((noto_kr_failed + 1))
+        fi
+    fi
+done
+
+noto_kr_total=$((NOTO_KR_SHARD_END - NOTO_KR_SHARD_START + 1))
+echo -e "  ${GREEN}✓${NC} Noto Sans KR 分片: 共 ${noto_kr_total} 个, 新下载 ${noto_kr_downloaded}, 已存在 ${noto_kr_skipped}, 失败 ${noto_kr_failed}"
+if [ "$noto_kr_failed" -gt 0 ]; then
+    echo -e "  ${YELLOW}⚠${NC} 部分分片下载失败，韩文字符可能显示为方框"
+fi
+
+# ========================================
 # 下载 Roboto 字体
 # ========================================
-echo -e "${BLUE}[3/3] 下载 Roboto 字体...${NC}"
+echo -e "${BLUE}[5/5] 下载 Roboto 字体...${NC}"
 
 ROBOTO_FILES=(
     "KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2"
