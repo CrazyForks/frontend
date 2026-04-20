@@ -325,6 +325,8 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
         SliverAppBar(
           expandedHeight: isWide ? 300 : 250,
           pinned: true,
+          // 根据封面亮度动态设置前景色，确保按钮在任何封面上都清晰可见
+          foregroundColor: palette?.onImageColor ?? Colors.white,
           // 返回按钮
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -342,8 +344,9 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
           flexibleSpace: FlexibleSpaceBar(
             title: Text(
               playlist.name,
-              style: const TextStyle(
-                shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
+              style: TextStyle(
+                color: palette?.onImageColor ?? Colors.white,
+                shadows: const [Shadow(blurRadius: 4, color: Colors.black54)],
               ),
             ),
             background: _buildHeaderBackground(context, playlist, palette),
@@ -353,6 +356,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
             playlist,
             songsAsync,
             colorScheme,
+            palette,
           ),
         ),
 
@@ -449,6 +453,19 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
             ),
           ),
         ),
+        // 顶部渐变遮罩 - 为 AppBar 按钮区域提供额外对比度
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.center,
+              colors: [
+                Color.fromRGBO(0, 0, 0, 0.3),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -504,15 +521,26 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     Playlist playlist,
     AsyncValue<SongListResponse> songsAsync,
     ColorScheme colorScheme,
+    CoverPalette? palette,
   ) {
     final songs = songsAsync.value?.songs ?? [];
     final isBuiltIn = playlist.isBuiltIn;
+    // 适配封面的按钮前景色
+    final btnColor = palette?.onImageColor ?? Colors.white;
 
     // 排序模式
     if (_isSortMode) {
       return [
-        TextButton(onPressed: _cancelSortMode, child: const Text('取消')),
-        TextButton(onPressed: _exitSortMode, child: const Text('完成')),
+        TextButton(
+          onPressed: _cancelSortMode,
+          style: TextButton.styleFrom(foregroundColor: btnColor),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: _exitSortMode,
+          style: TextButton.styleFrom(foregroundColor: btnColor),
+          child: const Text('完成'),
+        ),
       ];
     }
 
@@ -521,19 +549,23 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
       return [
         TextButton(
           onPressed: () => _toggleSelectAll(songs),
+          style: TextButton.styleFrom(foregroundColor: btnColor),
           child: Text(_selectedSongIds.length == songs.length ? '取消全选' : '全选'),
         ),
         TextButton(
           onPressed:
               _selectedSongIds.isEmpty ? null : _batchRemoveSelectedSongs,
-          child: Text(
-            '删除(${_selectedSongIds.length})',
-            style: TextStyle(
-              color: _selectedSongIds.isEmpty ? null : colorScheme.error,
-            ),
+          style: TextButton.styleFrom(
+            foregroundColor:
+                _selectedSongIds.isEmpty ? btnColor : colorScheme.error,
           ),
+          child: Text('删除(${_selectedSongIds.length})'),
         ),
-        TextButton(onPressed: _exitSelectMode, child: const Text('取消')),
+        TextButton(
+          onPressed: _exitSelectMode,
+          style: TextButton.styleFrom(foregroundColor: btnColor),
+          child: const Text('取消'),
+        ),
       ];
     }
 

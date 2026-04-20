@@ -20,12 +20,17 @@ class CoverPalette {
   /// 柔和色
   final Color? mutedColor;
 
+  /// 适合在封面图片上显示的前景色（图标、文本）
+  /// 根据封面遮罩色（darkMutedColor）亮度自动计算：深色 → 白色，浅色 → 黑色
+  final Color onImageColor;
+
   const CoverPalette({
     required this.dominantColor,
     this.vibrantColor,
     this.lightVibrantColor,
     this.darkMutedColor,
     this.mutedColor,
+    required this.onImageColor,
   });
 }
 
@@ -86,12 +91,20 @@ final coverColorsProvider = FutureProvider.family<CoverPalette?, String?>((
       maximumColorCount: 16,
     );
 
+    // 基于 darkMutedColor（遮罩色）的亮度决定前景色
+    // 与歌单详情页 _buildHeaderBackground 中的 overlayColor 逻辑保持一致
+    final overlayColor =
+        paletteGenerator.darkMutedColor?.color ?? Colors.black;
+    final onImageColor =
+        overlayColor.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+
     final palette = CoverPalette(
       dominantColor: paletteGenerator.dominantColor?.color ?? Colors.grey,
       vibrantColor: paletteGenerator.vibrantColor?.color,
       lightVibrantColor: paletteGenerator.lightVibrantColor?.color,
       darkMutedColor: paletteGenerator.darkMutedColor?.color,
       mutedColor: paletteGenerator.mutedColor?.color,
+      onImageColor: onImageColor,
     );
 
     // 写入缓存
