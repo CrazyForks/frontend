@@ -227,4 +227,64 @@ class PluginApi {
       throw ApiException.fromDioException(e);
     }
   }
+
+  /// 检查插件更新
+  /// GET /api/v1/plugins/{id}/check-update
+  Future<PluginUpdateCheck> checkPluginUpdate(int id, {String? githubProxy}) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (githubProxy != null && githubProxy.isNotEmpty) {
+        queryParams['github_proxy'] = githubProxy;
+      }
+      final response = await dio.get(
+        '${AppConfig.apiPrefix}/plugins/$id/check-update',
+        queryParameters: queryParams,
+      );
+      return PluginUpdateCheck.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 执行插件更新
+  /// POST /api/v1/plugins/{id}/update
+  Future<Map<String, dynamic>> updatePlugin(int id, {String? githubProxy}) async {
+    try {
+      final body = <String, dynamic>{};
+      if (githubProxy != null && githubProxy.isNotEmpty) {
+        body['github_proxy'] = githubProxy;
+      }
+      final response = await dio.post(
+        '${AppConfig.apiPrefix}/plugins/$id/update',
+        data: body,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+}
+
+/// 插件更新检查结果
+class PluginUpdateCheck {
+  final bool hasUpdate;
+  final String currentVersion;
+  final String remoteVersion;
+  final String downloadUrl;
+
+  PluginUpdateCheck({
+    required this.hasUpdate,
+    required this.currentVersion,
+    required this.remoteVersion,
+    required this.downloadUrl,
+  });
+
+  factory PluginUpdateCheck.fromJson(Map<String, dynamic> json) {
+    return PluginUpdateCheck(
+      hasUpdate: json['has_update'] as bool? ?? false,
+      currentVersion: json['current_version'] as String? ?? '',
+      remoteVersion: json['remote_version'] as String? ?? '',
+      downloadUrl: json['download_url'] as String? ?? '',
+    );
+  }
 }
