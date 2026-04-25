@@ -765,22 +765,22 @@ class _PluginItemState extends ConsumerState<_PluginItem> {
           itemBuilder:
               (context) => [
                 if (plugin.homepage != null && plugin.homepage!.isNotEmpty) ...[
-                  PopupMenuItem<String>(
+                  const PopupMenuItem<String>(
                     value: 'homepage',
                     child: ListTile(
-                      leading: const Icon(Icons.open_in_new),
-                      title: const Text('打开主页'),
+                      leading: Icon(Icons.open_in_new),
+                      title: Text('打开主页'),
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
                   const PopupMenuDivider(),
                 ],
-                PopupMenuItem<String>(
+                const PopupMenuItem<String>(
                   value: 'update',
                   child: ListTile(
-                    leading: const Icon(Icons.system_update_alt),
-                    title: const Text('检查更新'),
+                    leading: Icon(Icons.system_update_alt),
+                    title: Text('检查更新'),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
