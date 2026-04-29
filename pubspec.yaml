@@ -58,6 +58,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/app_icon.png
+    - assets/images/donate_qrcode.png
   fonts:
     - family: NotoSansSC
       fonts:

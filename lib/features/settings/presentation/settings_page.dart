@@ -581,6 +581,45 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+        const Text(
+          '支持项目',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        const SizedBox(height: 8),
+        const Text('如果本应用对您有帮助，欢迎通过以下方式支持开发者：'),
+        const SizedBox(height: 12),
+        Center(
+          child: Image.asset(
+            'assets/images/donate_qrcode.png',
+            width: 200,
+            height: 200,
+          ),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => _launchUrl('https://afdian.com/a/mimusic'),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.favorite,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '爱发电: mimusic',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
