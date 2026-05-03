@@ -31,6 +31,63 @@ class AddToPlaylistModal extends ConsumerStatefulWidget {
 class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
   bool _isAdding = false;
 
+  /// 触底加载预留距离
+  static const double _loadMoreThreshold = 200.0;
+
+  /// 处理滚动通知，到底部时触发分页加载
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification.metrics.pixels >=
+        notification.metrics.maxScrollExtent - _loadMoreThreshold) {
+      ref.read(playlistListProvider(null).notifier).loadMore();
+    }
+    return false;
+  }
+
+  /// 底部加载更多指示器
+  Widget _buildLoadMoreFooter(PaginatedPlaylistsState state) {
+    final theme = Theme.of(context);
+    if (state.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (state.loadMoreError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: TextButton.icon(
+            onPressed:
+                () => ref.read(playlistListProvider(null).notifier).loadMore(),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('加载失败，点击重试'),
+          ),
+        ),
+      );
+    }
+    if (!state.hasMore && state.items.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: Text(
+            '— 已加载全部 —',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   /// 添加歌曲到指定歌单
   Future<void> _addToPlaylist(Playlist playlist) async {
     setState(() => _isAdding = true);
@@ -204,8 +261,8 @@ class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
               // 歌单列表
               Expanded(
                 child: playlistsAsync.when(
-                  data: (response) {
-                    final playlists = response.playlists;
+                  data: (state) {
+                    final playlists = state.items;
                     if (playlists.isEmpty) {
                       return Center(
                         child: Text(
@@ -216,26 +273,35 @@ class _AddToPlaylistModalState extends ConsumerState<AddToPlaylistModal> {
                         ),
                       );
                     }
-                    return ListView.builder(
-                      controller: scrollController,
-                      itemCount: playlists.length,
-                      itemBuilder: (context, index) {
-                        final playlist = playlists[index];
-                        return ListTile(
-                          leading: CoverImage(
-                            coverUrl: playlist.coverUrl,
-                            coverPath: playlist.coverPath,
-                            size: 48,
-                            placeholderIcon: Icons.playlist_play,
-                          ),
-                          title: Text(playlist.name),
-                          subtitle: Text(
-                            playlist.type == 'radio' ? '电台' : '歌单',
-                          ),
-                          onTap:
-                              _isAdding ? null : () => _addToPlaylist(playlist),
-                        );
-                      },
+                    return NotificationListener<ScrollNotification>(
+                      onNotification: _handleScrollNotification,
+                      child: ListView.builder(
+                        controller: scrollController,
+                        // +1 用于底部加载更多指示器
+                        itemCount: playlists.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == playlists.length) {
+                            return _buildLoadMoreFooter(state);
+                          }
+                          final playlist = playlists[index];
+                          return ListTile(
+                            leading: CoverImage(
+                              coverUrl: playlist.coverUrl,
+                              coverPath: playlist.coverPath,
+                              size: 48,
+                              placeholderIcon: Icons.playlist_play,
+                            ),
+                            title: Text(playlist.name),
+                            subtitle: Text(
+                              playlist.type == 'radio' ? '电台' : '歌单',
+                            ),
+                            onTap:
+                                _isAdding
+                                    ? null
+                                    : () => _addToPlaylist(playlist),
+                          );
+                        },
+                      ),
                     );
                   },
                   loading:

@@ -61,16 +61,16 @@ class SongCoverPickerModal extends ConsumerWidget {
           // 歌曲封面网格
           Expanded(
             child: songsAsync.when(
-              data: (response) {
+              data: (state) {
                 // 过滤有封面的歌曲
                 final songsWithCover =
-                    response.songs.where((song) {
+                    state.items.where((song) {
                       return (song.coverPath != null &&
                               song.coverPath!.isNotEmpty) ||
                           (song.coverUrl != null && song.coverUrl!.isNotEmpty);
                     }).toList();
 
-                if (songsWithCover.isEmpty) {
+                if (songsWithCover.isEmpty && !state.hasMore) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -90,27 +90,58 @@ class SongCoverPickerModal extends ConsumerWidget {
                   );
                 }
 
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.8,
-                  ),
-                  itemCount: songsWithCover.length,
-                  itemBuilder: (context, index) {
-                    final song = songsWithCover[index];
-                    return _CoverGridItem(
-                      song: song,
-                      onTap: () {
-                        Navigator.of(context).pop({
-                          'coverPath': song.coverPath,
-                          'coverUrl': song.coverUrl,
-                        });
-                      },
-                    );
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification.metrics.axis != Axis.vertical) {
+                      return false;
+                    }
+                    if (notification.metrics.pixels >=
+                        notification.metrics.maxScrollExtent - 200.0) {
+                      ref
+                          .read(playlistSongsProvider(playlistId).notifier)
+                          .loadMore();
+                    }
+                    return false;
                   },
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.all(16),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 0.8,
+                              ),
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final song = songsWithCover[index];
+                            return _CoverGridItem(
+                              song: song,
+                              onTap: () {
+                                Navigator.of(context).pop({
+                                  'coverPath': song.coverPath,
+                                  'coverUrl': song.coverUrl,
+                                });
+                              },
+                            );
+                          }, childCount: songsWithCover.length),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _buildLoadMoreFooter(
+                          context,
+                          ref,
+                          state,
+                          songsWithCover.isEmpty,
+                        ),
+                      ),
+                    ],
+                  ),
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -137,6 +168,78 @@ class SongCoverPickerModal extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// 底部加载更多指示器
+  Widget _buildLoadMoreFooter(
+    BuildContext context,
+    WidgetRef ref,
+    PaginatedSongsState state,
+    bool noCoverYet,
+  ) {
+    final theme = Theme.of(context);
+    if (state.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (state.loadMoreError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: TextButton.icon(
+            onPressed:
+                () =>
+                    ref
+                        .read(playlistSongsProvider(playlistId).notifier)
+                        .loadMore(),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('加载失败，点击重试'),
+          ),
+        ),
+      );
+    }
+    if (state.hasMore) {
+      // 当前页全是无封面歌曲时，给一个"继续加载"提示
+      if (noCoverYet) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: TextButton.icon(
+              onPressed:
+                  () =>
+                      ref
+                          .read(playlistSongsProvider(playlistId).notifier)
+                          .loadMore(),
+              icon: const Icon(Icons.expand_more, size: 16),
+              label: const Text('当前页无带封面歌曲，加载更多'),
+            ),
+          ),
+        );
+      }
+      return const SizedBox(height: 8);
+    }
+    if (state.items.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: Text(
+            '— 已加载全部 —',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
 

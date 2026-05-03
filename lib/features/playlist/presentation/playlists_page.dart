@@ -32,6 +32,33 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
   bool _isSelectionMode = false;
   final Set<int> _selectedPlaylistIds = {};
 
+  /// 触底加载预留距离（提前 300px 触发下一页加载）
+  static const double _loadMoreThreshold = 300.0;
+
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// 滚动监听：接近底部时触发分页加载
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - _loadMoreThreshold) {
+      ref.read(playlistListProvider(_selectedType).notifier).loadMore();
+    }
+  }
+
   void _toggleSelectMode() {
     setState(() {
       _isSelectionMode = !_isSelectionMode;
@@ -55,10 +82,8 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
 
   void _selectAll(List<Playlist> playlists) {
     setState(() {
-      final selectableIds = playlists
-          .where((p) => !p.isBuiltIn)
-          .map((p) => p.id)
-          .toSet();
+      final selectableIds =
+          playlists.where((p) => !p.isBuiltIn).map((p) => p.id).toSet();
       if (_selectedPlaylistIds.containsAll(selectableIds)) {
         _selectedPlaylistIds.clear();
       } else {
@@ -72,14 +97,16 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
     final playlistsAsync = ref.watch(playlistListProvider(_selectedType));
 
     return Scaffold(
-      appBar: _isSelectionMode
-          ? _buildSelectionAppBar(playlistsAsync)
-          : _buildNormalAppBar(),
+      appBar:
+          _isSelectionMode
+              ? _buildSelectionAppBar(playlistsAsync)
+              : _buildNormalAppBar(),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(playlistListProvider(_selectedType));
         },
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             // 类型筛选
             SliverToBoxAdapter(
@@ -115,9 +142,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
 
             // 歌单列表
             playlistsAsync.when(
-              data:
-                  (response) =>
-                      _buildPlaylistContent(context, response.playlists),
+              data: (state) => _buildPlaylistContent(context, state.items),
               loading:
                   () => const SliverToBoxAdapter(
                     child: Padding(
@@ -131,6 +156,12 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
                   ),
             ),
 
+            // 加载更多指示器（仅在 hasMore 或 isLoadingMore 时显示）
+            if (playlistsAsync.value != null)
+              SliverToBoxAdapter(
+                child: _buildLoadMoreIndicator(playlistsAsync.value!),
+              ),
+
             // 底部安全区域
             SliverToBoxAdapter(
               child: SizedBox(
@@ -141,6 +172,46 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
         ),
       ),
     );
+  }
+
+  /// 构建加载更多指示器（含错误重试）
+  Widget _buildLoadMoreIndicator(PaginatedPlaylistsState state) {
+    if (state.loadMoreError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: TextButton.icon(
+            onPressed:
+                () =>
+                    ref
+                        .read(playlistListProvider(_selectedType).notifier)
+                        .loadMore(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('加载更多失败，点击重试'),
+          ),
+        ),
+      );
+    }
+    if (state.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (!state.hasMore && state.items.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: Text(
+            '— 已全部加载（${state.items.length}） —',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   AppBar _buildNormalAppBar() {
@@ -204,7 +275,9 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
     );
   }
 
-  AppBar _buildSelectionAppBar(AsyncValue<PlaylistListResponse> playlistsAsync) {
+  AppBar _buildSelectionAppBar(
+    AsyncValue<PaginatedPlaylistsState> playlistsAsync,
+  ) {
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.close),
@@ -216,28 +289,33 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
         TextButton.icon(
           icon: Icon(
             Icons.delete,
-            color: _selectedPlaylistIds.isEmpty
-                ? null
-                : Theme.of(context).colorScheme.error,
+            color:
+                _selectedPlaylistIds.isEmpty
+                    ? null
+                    : Theme.of(context).colorScheme.error,
           ),
           label: Text(
             '删除(${_selectedPlaylistIds.length})',
             style: TextStyle(
-              color: _selectedPlaylistIds.isEmpty
-                  ? null
-                  : Theme.of(context).colorScheme.error,
+              color:
+                  _selectedPlaylistIds.isEmpty
+                      ? null
+                      : Theme.of(context).colorScheme.error,
             ),
           ),
-          onPressed: _selectedPlaylistIds.isEmpty
-              ? null
-              : _confirmBatchDelete,
+          onPressed: _selectedPlaylistIds.isEmpty ? null : _confirmBatchDelete,
         ),
-        // 全选按钮
+        // 全选按钮（先确保全部歌单已加载，再全选）
         TextButton(
-          onPressed: () {
-            playlistsAsync.whenData((response) {
-              _selectAll(response.playlists);
-            });
+          onPressed: () async {
+            await ref
+                .read(playlistListProvider(_selectedType).notifier)
+                .loadAll();
+            final state =
+                ref.read(playlistListProvider(_selectedType)).value;
+            if (state != null) {
+              _selectAll(state.items);
+            }
           },
           child: const Text('全选'),
         ),
@@ -533,10 +611,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
 
       if (mounted) {
         if (deleted > 0) {
-          ResponsiveSnackBar.showSuccess(
-            context,
-            message: '已删除 $deleted 个歌单',
-          );
+          ResponsiveSnackBar.showSuccess(context, message: '已删除 $deleted 个歌单');
         } else {
           ResponsiveSnackBar.showError(context, message: '删除失败');
         }
@@ -589,9 +664,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       builder:
           (context) => AlertDialog(
             title: const Text('确认删除'),
-            content: const Text(
-              '确定要删除所有自动创建的歌单吗？此操作不可恢复。',
-            ),
+            content: const Text('确定要删除所有自动创建的歌单吗？此操作不可恢复。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -614,10 +687,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
 
       if (mounted) {
         if (success) {
-          ResponsiveSnackBar.showSuccess(
-            context,
-            message: '已删除所有自动创建的歌单',
-          );
+          ResponsiveSnackBar.showSuccess(context, message: '已删除所有自动创建的歌单');
         } else {
           ResponsiveSnackBar.showError(context, message: '删除失败');
         }

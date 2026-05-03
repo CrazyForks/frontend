@@ -20,12 +20,171 @@ final playlistRepositoryProvider = Provider<PlaylistRepository>((ref) {
   return PlaylistRepository(playlistApi);
 });
 
-/// 获取歌单列表 Provider（带类型筛选）
-final playlistListProvider =
-    FutureProvider.family<PlaylistListResponse, String?>((ref, type) async {
-      final repository = ref.watch(playlistRepositoryProvider);
-      return repository.getPlaylists(type: type, limit: 100);
-    });
+// ============================================================
+// 分页状态
+// ============================================================
+
+/// 歌单列表分页状态
+class PaginatedPlaylistsState {
+  /// 已加载的全部歌单（按加载顺序拼接）
+  final List<Playlist> items;
+
+  /// 是否还有更多页可加载
+  final bool hasMore;
+
+  /// 是否正在加载下一页
+  final bool isLoadingMore;
+
+  /// 加载下一页时发生的错误（仅追加加载阶段，初次加载错误走 AsyncValue.error）
+  final Object? loadMoreError;
+
+  const PaginatedPlaylistsState({
+    this.items = const [],
+    this.hasMore = false,
+    this.isLoadingMore = false,
+    this.loadMoreError,
+  });
+
+  PaginatedPlaylistsState copyWith({
+    List<Playlist>? items,
+    bool? hasMore,
+    bool? isLoadingMore,
+    Object? loadMoreError,
+    bool clearError = false,
+  }) {
+    return PaginatedPlaylistsState(
+      items: items ?? this.items,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreError: clearError ? null : (loadMoreError ?? this.loadMoreError),
+    );
+  }
+}
+
+/// 歌单内歌曲分页状态
+class PaginatedSongsState {
+  final List<Song> items;
+  final int total;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final Object? loadMoreError;
+
+  const PaginatedSongsState({
+    this.items = const [],
+    this.total = 0,
+    this.hasMore = false,
+    this.isLoadingMore = false,
+    this.loadMoreError,
+  });
+
+  PaginatedSongsState copyWith({
+    List<Song>? items,
+    int? total,
+    bool? hasMore,
+    bool? isLoadingMore,
+    Object? loadMoreError,
+    bool clearError = false,
+  }) {
+    return PaginatedSongsState(
+      items: items ?? this.items,
+      total: total ?? this.total,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreError: clearError ? null : (loadMoreError ?? this.loadMoreError),
+    );
+  }
+}
+
+// ============================================================
+// 歌单列表 Provider（滚动分页）
+// ============================================================
+
+/// 歌单列表分页 Notifier。
+///
+/// - 初次进入加载首页（pageLimit 条），状态由 `AsyncValue.loading` 切换为 `AsyncValue.data`。
+/// - 滚动到列表底部时调用 [loadMore] 加载下一页。
+/// - 需要拿到全部歌单的场景（如全选）调用 [loadAll]。
+/// - 后端 ListPlaylists 响应不返回 total，使用"页数据小于 pageLimit"判断末页。
+class PaginatedPlaylistsNotifier
+    extends AsyncNotifier<PaginatedPlaylistsState> {
+  PaginatedPlaylistsNotifier(this._typeArg);
+
+  /// family 参数：歌单类型过滤（null 表示全部）
+  final String? _typeArg;
+
+  /// 每页大小
+  static const int pageLimit = 30;
+
+  @override
+  Future<PaginatedPlaylistsState> build() async {
+    final repository = ref.watch(playlistRepositoryProvider);
+    final response = await repository.getPlaylists(
+      type: _typeArg,
+      limit: pageLimit,
+      offset: 0,
+    );
+    return PaginatedPlaylistsState(
+      items: response.playlists,
+      hasMore: response.playlists.length >= pageLimit,
+      isLoadingMore: false,
+    );
+  }
+
+  /// 触底加载下一页
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null) return;
+    if (!current.hasMore || current.isLoadingMore) return;
+
+    state = AsyncValue.data(
+      current.copyWith(isLoadingMore: true, clearError: true),
+    );
+
+    try {
+      final repository = ref.read(playlistRepositoryProvider);
+      final response = await repository.getPlaylists(
+        type: _typeArg,
+        limit: pageLimit,
+        offset: current.items.length,
+      );
+      final merged = [...current.items, ...response.playlists];
+      state = AsyncValue.data(
+        current.copyWith(
+          items: merged,
+          hasMore: response.playlists.length >= pageLimit,
+          isLoadingMore: false,
+          clearError: true,
+        ),
+      );
+    } catch (e) {
+      state = AsyncValue.data(
+        current.copyWith(isLoadingMore: false, loadMoreError: e),
+      );
+    }
+  }
+
+  /// 串行加载剩余全部页（供需要全量数据的场景调用，如全选）
+  Future<void> loadAll() async {
+    while (true) {
+      final s = state.value;
+      if (s == null || !s.hasMore || s.isLoadingMore) break;
+      await loadMore();
+      // loadMore 失败时停止以避免死循环
+      if (state.value?.loadMoreError != null) break;
+    }
+  }
+}
+
+/// 歌单列表 Provider（family 参数为 type 过滤）
+final playlistListProvider = AsyncNotifierProvider.family<
+  PaginatedPlaylistsNotifier,
+  PaginatedPlaylistsState,
+  String?
+>(PaginatedPlaylistsNotifier.new);
+
+// ============================================================
+// 歌单详情 Provider
+// ============================================================
 
 /// 获取歌单详情 Provider
 final playlistDetailProvider = FutureProvider.family<Playlist, int>((
@@ -36,41 +195,105 @@ final playlistDetailProvider = FutureProvider.family<Playlist, int>((
   return repository.getPlaylist(id);
 });
 
-/// 获取歌单歌曲 Provider（自动分页，确保加载全部歌曲）
-final playlistSongsProvider = FutureProvider.family<SongListResponse, int>((
-  ref,
-  id,
-) async {
-  final repository = ref.watch(playlistRepositoryProvider);
-  const pageLimit = 500;
+// ============================================================
+// 歌单内歌曲 Provider（滚动分页）
+// ============================================================
 
-  // 第一页
-  final firstPage = await repository.getPlaylistSongs(
-    id,
-    limit: pageLimit,
-    offset: 0,
-  );
-  final total = firstPage.total;
+/// 歌单内歌曲分页 Notifier。
+///
+/// - 初次加载首页（pageLimit 条）。
+/// - 列表滚动到底部时 [loadMore] 加载下一页。
+/// - 需要全部歌曲的场景（手动排序、获取已存在歌曲 ID 用于去重等）调用 [loadAll]。
+/// - 后端响应包含 total 字段，因此通过 `items.length < total` 判断是否还有更多。
+class PaginatedSongsNotifier extends AsyncNotifier<PaginatedSongsState> {
+  PaginatedSongsNotifier(this._playlistId);
 
-  // 第一页已包含全部歌曲，直接返回
-  if (firstPage.songs.length >= total) return firstPage;
+  /// family 参数：歌单 ID
+  final int _playlistId;
 
-  // 继续加载剩余页
-  final allSongs = List<Song>.from(firstPage.songs);
-  int offset = firstPage.songs.length;
-  while (offset < total) {
-    final page = await repository.getPlaylistSongs(
-      id,
+  /// 每页大小
+  static const int pageLimit = 100;
+
+  @override
+  Future<PaginatedSongsState> build() async {
+    final repository = ref.watch(playlistRepositoryProvider);
+    final response = await repository.getPlaylistSongs(
+      _playlistId,
       limit: pageLimit,
-      offset: offset,
+      offset: 0,
     );
-    if (page.songs.isEmpty) break;
-    allSongs.addAll(page.songs);
-    offset += page.songs.length;
+    return PaginatedSongsState(
+      items: response.songs,
+      total: response.total,
+      hasMore: response.songs.length < response.total,
+      isLoadingMore: false,
+    );
   }
 
-  return SongListResponse(songs: allSongs, total: total);
-});
+  /// 触底加载下一页
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null) return;
+    if (!current.hasMore || current.isLoadingMore) return;
+
+    state = AsyncValue.data(
+      current.copyWith(isLoadingMore: true, clearError: true),
+    );
+
+    try {
+      final repository = ref.read(playlistRepositoryProvider);
+      final response = await repository.getPlaylistSongs(
+        _playlistId,
+        limit: pageLimit,
+        offset: current.items.length,
+      );
+      if (response.songs.isEmpty) {
+        state = AsyncValue.data(
+          current.copyWith(
+            hasMore: false,
+            isLoadingMore: false,
+            clearError: true,
+          ),
+        );
+        return;
+      }
+      final merged = [...current.items, ...response.songs];
+      state = AsyncValue.data(
+        current.copyWith(
+          items: merged,
+          hasMore: merged.length < current.total,
+          isLoadingMore: false,
+          clearError: true,
+        ),
+      );
+    } catch (e) {
+      state = AsyncValue.data(
+        current.copyWith(isLoadingMore: false, loadMoreError: e),
+      );
+    }
+  }
+
+  /// 串行加载剩余全部页
+  Future<void> loadAll() async {
+    while (true) {
+      final s = state.value;
+      if (s == null || !s.hasMore || s.isLoadingMore) break;
+      await loadMore();
+      if (state.value?.loadMoreError != null) break;
+    }
+  }
+}
+
+/// 歌单内歌曲 Provider（family 参数为 playlistId）
+final playlistSongsProvider = AsyncNotifierProvider.family<
+  PaginatedSongsNotifier,
+  PaginatedSongsState,
+  int
+>(PaginatedSongsNotifier.new);
+
+// ============================================================
+// 歌单操作 Notifier
+// ============================================================
 
 /// 歌单操作 Notifier
 class PlaylistNotifier extends Notifier<AsyncValue<void>> {

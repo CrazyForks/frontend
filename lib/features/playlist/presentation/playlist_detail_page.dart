@@ -35,6 +35,11 @@ class PlaylistDetailPage extends ConsumerStatefulWidget {
 class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   int get _playlistIdInt => int.tryParse(widget.playlistId) ?? 0;
 
+  /// 触底加载预留距离
+  static const double _loadMoreThreshold = 300.0;
+
+  late final ScrollController _scrollController;
+
   /// 排序模式
   bool _isSortMode = false;
 
@@ -47,13 +52,41 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   /// 排序模式下的可排序歌曲列表（本地副本）
   List<Song> _sortableSongs = [];
 
-  /// 进入排序模式
-  void _enterSortMode(List<Song> songs) {
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// 滚动监听：接近底部时触发分页加载
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - _loadMoreThreshold) {
+      ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadMore();
+    }
+  }
+
+  /// 进入排序模式（确保所有歌曲已加载）
+  Future<void> _enterSortMode(List<Song> songs) async {
+    // 手动排序需要全部歌曲在内存中
+    await ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadAll();
+    if (!mounted) return;
+    final fullSongs =
+        ref.read(playlistSongsProvider(_playlistIdInt)).value?.items ??
+        songs;
     setState(() {
       _isSortMode = true;
       _isSelectMode = false;
       _selectedSongIds.clear();
-      _sortableSongs = List.from(songs);
+      _sortableSongs = List.from(fullSongs);
     });
   }
 
@@ -78,8 +111,18 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   }
 
   /// 自动按名称排序
-  Future<void> _autoSortByName(List<Song> songs, {bool ascending = true}) async {
-    final sorted = List<Song>.from(songs);
+  Future<void> _autoSortByName(
+    List<Song> songs, {
+    bool ascending = true,
+  }) async {
+    // 排序需要全部歌曲在内存中
+    await ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadAll();
+    if (!mounted) return;
+    final fullSongs =
+        ref.read(playlistSongsProvider(_playlistIdInt)).value?.items ??
+        songs;
+
+    final sorted = List<Song>.from(fullSongs);
     sorted.sort((a, b) {
       final result = a.title.toLowerCase().compareTo(b.title.toLowerCase());
       return ascending ? result : -result;
@@ -88,7 +131,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     final songIds = sorted.map((s) => s.id).toList();
 
     // 检查排序前后是否有变化，避免无意义的 API 调用
-    final originalIds = songs.map((s) => s.id).toList();
+    final originalIds = fullSongs.map((s) => s.id).toList();
     if (_listEquals(songIds, originalIds)) {
       if (mounted) {
         ResponsiveSnackBar.show(context, message: '歌曲已是该排序顺序');
@@ -125,7 +168,14 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
 
   /// 自动按数字前缀排序
   Future<void> _autoSortByNumberPrefix(List<Song> songs) async {
-    final sorted = List<Song>.from(songs);
+    // 排序需要全部歌曲在内存中
+    await ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadAll();
+    if (!mounted) return;
+    final fullSongs =
+        ref.read(playlistSongsProvider(_playlistIdInt)).value?.items ??
+        songs;
+
+    final sorted = List<Song>.from(fullSongs);
     sorted.sort((a, b) {
       final numA = _extractFirstNumber(a.title);
       final numB = _extractFirstNumber(b.title);
@@ -147,7 +197,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     final songIds = sorted.map((s) => s.id).toList();
 
     // 检查排序前后是否有变化
-    final originalIds = songs.map((s) => s.id).toList();
+    final originalIds = fullSongs.map((s) => s.id).toList();
     if (_listEquals(songIds, originalIds)) {
       if (mounted) {
         ResponsiveSnackBar.show(context, message: '歌曲已是该排序顺序');
@@ -306,7 +356,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   Widget _buildContent(
     BuildContext context,
     Playlist playlist,
-    AsyncValue<SongListResponse> songsAsync,
+    AsyncValue<PaginatedSongsState> songsAsync,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final isWide = context.isWideScreen;
@@ -320,6 +370,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     final palette = paletteAsync.value;
 
     return CustomScrollView(
+      controller: _scrollController,
       slivers: [
         // 顶部大图
         SliverAppBar(
@@ -372,7 +423,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
 
         // 歌曲列表
         songsAsync.when(
-          data: (response) => _buildSongList(context, playlist, response.songs),
+          data: (state) => _buildSongList(context, playlist, state.items),
           loading:
               () => SliverToBoxAdapter(
                 child: Column(
@@ -386,12 +437,61 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
                   SliverToBoxAdapter(child: _buildError(error.toString())),
         ),
 
+        // 加载更多指示器
+        if (songsAsync.value != null)
+          SliverToBoxAdapter(
+            child: _buildSongsLoadMoreIndicator(songsAsync.value!),
+          ),
+
         // 底部安全区域
         SliverToBoxAdapter(
           child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
         ),
       ],
     );
+  }
+
+  /// 构建歌曲分页加载更多指示器
+  Widget _buildSongsLoadMoreIndicator(PaginatedSongsState state) {
+    // 排序模式 / 多选模式下不显示加载更多（避免影响交互）
+    if (_isSortMode || _isSelectMode) return const SizedBox.shrink();
+
+    if (state.loadMoreError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: TextButton.icon(
+            onPressed:
+                () =>
+                    ref
+                        .read(playlistSongsProvider(_playlistIdInt).notifier)
+                        .loadMore(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('加载更多失败，点击重试'),
+          ),
+        ),
+      );
+    }
+    if (state.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (!state.hasMore && state.items.isNotEmpty && state.total > 0) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: Text(
+            '— 已全部加载（${state.total}） —',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildHeaderBackground(
@@ -459,10 +559,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.center,
-              colors: [
-                Color.fromRGBO(0, 0, 0, 0.3),
-                Colors.transparent,
-              ],
+              colors: [Color.fromRGBO(0, 0, 0, 0.3), Colors.transparent],
             ),
           ),
         ),
@@ -473,7 +570,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   Widget _buildPlaylistInfo(
     BuildContext context,
     Playlist playlist,
-    AsyncValue<SongListResponse> songsAsync,
+    AsyncValue<PaginatedSongsState> songsAsync,
   ) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
@@ -519,11 +616,12 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   List<Widget> _buildAppBarActions(
     BuildContext context,
     Playlist playlist,
-    AsyncValue<SongListResponse> songsAsync,
+    AsyncValue<PaginatedSongsState> songsAsync,
     ColorScheme colorScheme,
     CoverPalette? palette,
   ) {
-    final songs = songsAsync.value?.songs ?? [];
+    final songs = songsAsync.value?.items ?? [];
+    final totalSongs = songsAsync.value?.total ?? songs.length;
     final isBuiltIn = playlist.isBuiltIn;
     // 适配封面的按钮前景色
     final btnColor = palette?.onImageColor ?? Colors.white;
@@ -548,9 +646,22 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     if (_isSelectMode) {
       return [
         TextButton(
-          onPressed: () => _toggleSelectAll(songs),
+          onPressed: () async {
+            // 全选前确保全部歌曲已加载
+            await ref
+                .read(playlistSongsProvider(_playlistIdInt).notifier)
+                .loadAll();
+            if (!mounted) return;
+            final fullSongs =
+                ref
+                    .read(playlistSongsProvider(_playlistIdInt))
+                    .value
+                    ?.items ??
+                songs;
+            _toggleSelectAll(fullSongs);
+          },
           style: TextButton.styleFrom(foregroundColor: btnColor),
-          child: Text(_selectedSongIds.length == songs.length ? '取消全选' : '全选'),
+          child: Text(_selectedSongIds.length == totalSongs ? '取消全选' : '全选'),
         ),
         TextButton(
           onPressed:
@@ -572,7 +683,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     // 正常模式
     return [
       // 排序按钮（歌曲数 > 1 时显示）
-      if (songs.length > 1)
+      if (totalSongs > 1)
         PopupMenuButton<String>(
           icon: const Icon(Icons.sort),
           tooltip: '排序',
@@ -592,44 +703,45 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
                 break;
             }
           },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'name_asc',
-              child: ListTile(
-                leading: Icon(Icons.sort_by_alpha),
-                title: Text('按名称排序 A→Z'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'name_desc',
-              child: ListTile(
-                leading: Icon(Icons.sort_by_alpha),
-                title: Text('按名称排序 Z→A'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'number_asc',
-              child: ListTile(
-                leading: Icon(Icons.format_list_numbered),
-                title: Text('按数字前缀排序'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'manual',
-              child: ListTile(
-                leading: Icon(Icons.drag_handle),
-                title: Text('手动排序'),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
+          itemBuilder:
+              (context) => [
+                const PopupMenuItem(
+                  value: 'name_asc',
+                  child: ListTile(
+                    leading: Icon(Icons.sort_by_alpha),
+                    title: Text('按名称排序 A→Z'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'name_desc',
+                  child: ListTile(
+                    leading: Icon(Icons.sort_by_alpha),
+                    title: Text('按名称排序 Z→A'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'number_asc',
+                  child: ListTile(
+                    leading: Icon(Icons.format_list_numbered),
+                    title: Text('按数字前缀排序'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'manual',
+                  child: ListTile(
+                    leading: Icon(Icons.drag_handle),
+                    title: Text('手动排序'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
         ),
       // 多选按钮（有歌曲时显示）
       if (songs.isNotEmpty)
@@ -690,9 +802,9 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   Widget _buildActionButtons(
     BuildContext context,
     Playlist playlist,
-    AsyncValue<SongListResponse> songsAsync,
+    AsyncValue<PaginatedSongsState> songsAsync,
   ) {
-    final songs = songsAsync.value?.songs ?? [];
+    final songs = songsAsync.value?.items ?? [];
 
     // 排序模式和多选模式下隐藏操作按钮
     if (_isSortMode || _isSelectMode) {
@@ -889,10 +1001,12 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
 
   /// 添加歌曲
   Future<void> _addSongs() async {
-    // 获取当前歌单中已有的歌曲 ID，用于排除
+    // 先确保已加载全部歌曲，得到完整的 excludeIds 防止重复添加
+    await ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadAll();
+    if (!mounted) return;
     final currentSongs = ref.read(playlistSongsProvider(_playlistIdInt));
     final excludeIds =
-        currentSongs.value?.songs.map((s) => s.id).toSet() ?? <int>{};
+        currentSongs.value?.items.map((s) => s.id).toSet() ?? <int>{};
 
     // 获取歌单类型，决定歌曲过滤：
     // - 电台歌单：只显示 radio 类型歌曲

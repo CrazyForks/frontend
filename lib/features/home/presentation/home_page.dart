@@ -62,10 +62,10 @@ class HomePage extends ConsumerWidget {
             SliverToBoxAdapter(
               child: playlistsAsync.when(
                 data:
-                    (response) => _buildContent(
+                    (state) => _buildContent(
                       context,
                       ref,
-                      response.playlists,
+                      state.items,
                       pluginsAsync.value ?? [],
                     ),
                 loading: () => const _LoadingContent(),
