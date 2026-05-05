@@ -422,6 +422,16 @@ class PlayerNotifier extends Notifier<PlayerState> {
     } catch (e) {
       debugPrint('[Player] Failed to save playMode: $e');
     }
+
+    // 如果当前正在播放，重新预选下一首并预加载
+    if (state.playlist.isNotEmpty &&
+        state.currentIndex >= 0 &&
+        state.isPlaying) {
+      _prefetchCancelToken?.cancel('play mode changed');
+      _preSelectNextIndex();
+      final token = await _secureStorage.getAccessToken();
+      _prefetchNextSong(token);
+    }
   }
 
   /// 从播放列表删除
