@@ -21,6 +21,9 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // 启用 core library desugaring，因为 minSdk 23 < 26，
+        // 某些 Java 8+ API（如 java.time）需要 desugaring 支持
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -53,7 +56,10 @@ android {
     defaultConfig {
         applicationId = "com.mimusic.mimusic_flutter"
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion // Android Automotive 建议 API 28+，当前使用 Flutter 默认值(21)
+        // 显式设置为 23 以支持 Android 6.0+ 的旧版 TV 设备（如小米 4A）
+        // Flutter 3.29 默认值为 24，这里降低以兼容更多设备
+        // Android Automotive 建议 API 28+，但非强制
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -67,6 +73,10 @@ android {
                             else signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {
