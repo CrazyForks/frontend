@@ -218,30 +218,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final serverVersion = ref.watch(serverVersionProvider);
 
     return serverVersion.when(
-      data: (version) => ListTile(
-        leading: const Icon(Icons.dns),
-        title: const Text('检查服务端更新 (仅 Docker 可升级)'),
-        subtitle: Text('当前版本: $version'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => UpgradeDialog.show(context),
-      ),
-      loading: () => const ListTile(
-        leading: Icon(Icons.dns),
-        title: Text('检查服务端更新 (仅 Docker 可升级)'),
-        subtitle: Text('正在获取版本信息...'),
-        trailing: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-      error: (_, _) => ListTile(
-        leading: const Icon(Icons.dns),
-        title: const Text('检查服务端更新 (仅 Docker 可升级)'),
-        subtitle: const Text('获取版本信息失败'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => UpgradeDialog.show(context),
-      ),
+      data:
+          (version) => ListTile(
+            leading: const Icon(Icons.dns),
+            title: const Text('检查服务端更新 (仅 Docker 可升级)'),
+            subtitle: Text('当前版本: $version'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => UpgradeDialog.show(context),
+          ),
+      loading:
+          () => const ListTile(
+            leading: Icon(Icons.dns),
+            title: Text('检查服务端更新 (仅 Docker 可升级)'),
+            subtitle: Text('正在获取版本信息...'),
+            trailing: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+      error:
+          (_, _) => ListTile(
+            leading: const Icon(Icons.dns),
+            title: const Text('检查服务端更新 (仅 Docker 可升级)'),
+            subtitle: const Text('获取版本信息失败'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => UpgradeDialog.show(context),
+          ),
     );
   }
 
@@ -252,26 +255,31 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return frontendCheck.when(
       data: (check) {
-        final subtitle = check.hasUpdate
-            ? '发现新版本: v${check.latestVersion}'
-            : '当前版本: $versionDisplay (已是最新)';
+        final subtitle =
+            check.hasUpdate
+                ? '发现新版本: v${check.latestVersion}'
+                : '当前版本: $versionDisplay (已是最新)';
 
         return ListTile(
           leading: const Icon(Icons.phone_android),
           title: const Text('检查客户端更新'),
           subtitle: Text(
             subtitle,
-            style: check.hasUpdate
-                ? TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  )
-                : null,
+            style:
+                check.hasUpdate
+                    ? TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    )
+                    : null,
           ),
-          trailing: check.hasUpdate
-              ? Icon(Icons.chevron_right,
-                  color: Theme.of(context).colorScheme.primary)
-              : const Icon(Icons.chevron_right),
+          trailing:
+              check.hasUpdate
+                  ? Icon(
+                    Icons.chevron_right,
+                    color: Theme.of(context).colorScheme.primary,
+                  )
+                  : const Icon(Icons.chevron_right),
           onTap: () {
             if (check.hasUpdate) {
               FrontendUpgradeDialog.show(context, versionCheck: check);
@@ -284,23 +292,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           },
         );
       },
-      loading: () => ListTile(
-        leading: const Icon(Icons.phone_android),
-        title: const Text('检查客户端更新'),
-        subtitle: Text('当前版本: $versionDisplay'),
-        trailing: const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-      error: (_, _) => ListTile(
-        leading: const Icon(Icons.phone_android),
-        title: const Text('检查客户端更新'),
-        subtitle: Text('当前版本: $versionDisplay'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => ref.invalidate(frontendVersionCheckProvider),
-      ),
+      loading:
+          () => ListTile(
+            leading: const Icon(Icons.phone_android),
+            title: const Text('检查客户端更新'),
+            subtitle: Text('当前版本: $versionDisplay'),
+            trailing: const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+      error:
+          (_, _) => ListTile(
+            leading: const Icon(Icons.phone_android),
+            title: const Text('检查客户端更新'),
+            subtitle: Text('当前版本: $versionDisplay'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => ref.invalidate(frontendVersionCheckProvider),
+          ),
     );
   }
 
@@ -540,11 +550,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       applicationVersion: version,
       applicationIcon: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.asset(
-          'assets/icons/app_icon.png',
-          width: 48,
-          height: 48,
-        ),
+        child: Image.asset('assets/icons/app_icon.png', width: 48, height: 48),
       ),
       applicationLegalese: '© 2024-2026 MiMusic. All rights reserved.',
       children: [
@@ -600,7 +606,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         const SizedBox(height: 12),
         InkWell(
-          onTap: () => _launchUrl('https://afdian.com/a/mimusic'),
+          onTap: () => _launchUrl('https://afdian.com/a/imhanxi'),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
