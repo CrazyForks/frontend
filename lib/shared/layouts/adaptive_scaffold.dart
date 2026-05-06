@@ -273,7 +273,10 @@ class AdaptiveScaffold extends StatelessWidget {
               decoration: BoxDecoration(
                 color: colorScheme.surface,
                 border: Border(
-                  bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
+                  bottom: BorderSide(
+                    color: colorScheme.outlineVariant,
+                    width: 1,
+                  ),
                 ),
               ),
               child: Row(
@@ -305,7 +308,9 @@ class AdaptiveScaffold extends StatelessWidget {
                                 ),
                                 child: _TvNavButton(
                                   icon:
-                                      isSelected ? dest.selectedIcon : dest.icon,
+                                      isSelected
+                                          ? dest.selectedIcon
+                                          : dest.icon,
                                   label: dest.label,
                                   isSelected: isSelected,
                                   onPressed: () => onDestinationSelected(index),
@@ -424,20 +429,23 @@ class _TvNavButtonState extends State<_TvNavButton> {
                         width: TvTheme.focusBorderWidth,
                       )
                       : null,
-              boxShadow: _hasFocus
-                  ? [
-                      BoxShadow(
-                        color: colorScheme.primary.withValues(alpha: TvTheme.focusGlowOpacity),
-                        blurRadius: TvTheme.focusShadowBlurRadius,
-                        spreadRadius: TvTheme.focusGlowSpreadRadius,
-                      ),
-                      BoxShadow(
-                        color: colorScheme.primary.withValues(alpha: 0.2),
-                        blurRadius: TvTheme.focusShadowBlurRadius * 2,
-                        spreadRadius: 0,
-                      ),
-                    ]
-                  : null,
+              boxShadow:
+                  _hasFocus
+                      ? [
+                        BoxShadow(
+                          color: colorScheme.primary.withValues(
+                            alpha: TvTheme.focusGlowOpacity,
+                          ),
+                          blurRadius: TvTheme.focusShadowBlurRadius,
+                          spreadRadius: TvTheme.focusGlowSpreadRadius,
+                        ),
+                        BoxShadow(
+                          color: colorScheme.primary.withValues(alpha: 0.2),
+                          blurRadius: TvTheme.focusShadowBlurRadius * 2,
+                          spreadRadius: 0,
+                        ),
+                      ]
+                      : null,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -463,7 +471,9 @@ class _TvNavButtonState extends State<_TvNavButton> {
                                 ? colorScheme.primary
                                 : colorScheme.onSurfaceVariant,
                         fontWeight:
-                            widget.isSelected ? FontWeight.w600 : FontWeight.normal,
+                            widget.isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                       ),
                     ),
                   ],

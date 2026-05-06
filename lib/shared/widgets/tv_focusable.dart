@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/tv_theme.dart';
 
 /// TV 焦点组件包装器
-/// 
+///
 /// 用于在 TV 端提供 D-Pad 焦点导航支持，包含：
 /// - 焦点状态的视觉反馈（缩放、边框、阴影）
 /// - Enter/Select 按键处理
@@ -12,34 +12,34 @@ import '../../core/theme/tv_theme.dart';
 class TvFocusable extends StatefulWidget {
   /// 子组件
   final Widget child;
-  
+
   /// Enter/Select 按下时触发
   final VoidCallback? onSelect;
-  
+
   /// 是否自动获取焦点
   final bool autofocus;
-  
+
   /// 自定义焦点节点
   final FocusNode? focusNode;
-  
+
   /// 获焦时的缩放比例，默认 1.05
   final double focusedScale;
-  
+
   /// 焦点边框宽度，默认 3
   final double focusBorderWidth;
-  
+
   /// 焦点边框颜色，默认使用主题色
   final Color? focusBorderColor;
-  
+
   /// 是否显示焦点阴影
   final bool showShadow;
-  
+
   /// 边框圆角，默认 12
   final double borderRadius;
-  
+
   /// 动画时长
   final Duration animationDuration;
-  
+
   /// 是否启用焦点
   final bool enabled;
 
@@ -121,7 +121,8 @@ class _TvFocusableState extends State<TvFocusable> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final focusBorderColor = widget.focusBorderColor ?? theme.colorScheme.primary;
+    final focusBorderColor =
+        widget.focusBorderColor ?? theme.colorScheme.primary;
 
     return Focus(
       focusNode: _focusNode,
@@ -145,31 +146,33 @@ class _TvFocusableState extends State<TvFocusable> {
             curve: TvTheme.focusAnimationCurve,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(widget.borderRadius),
-              border: _hasFocus
-                  ? Border.all(
-                      color: focusBorderColor,
-                      width: widget.focusBorderWidth,
-                    )
-                  : Border.all(
-                      color: Colors.transparent,
-                      width: widget.focusBorderWidth,
-                    ),
-              boxShadow: _hasFocus && widget.showShadow
-                  ? [
-                      // 外层柔和光晕
-                      BoxShadow(
-                        color: focusBorderColor.withValues(alpha: 0.3),
-                        blurRadius: TvTheme.focusShadowBlurRadius,
-                        spreadRadius: TvTheme.focusGlowSpreadRadius,
+              border:
+                  _hasFocus
+                      ? Border.all(
+                        color: focusBorderColor,
+                        width: widget.focusBorderWidth,
+                      )
+                      : Border.all(
+                        color: Colors.transparent,
+                        width: widget.focusBorderWidth,
                       ),
-                      // 内层锐利边框光
-                      BoxShadow(
-                        color: focusBorderColor.withValues(alpha: 0.6),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
+              boxShadow:
+                  _hasFocus && widget.showShadow
+                      ? [
+                        // 外层柔和光晕
+                        BoxShadow(
+                          color: focusBorderColor.withValues(alpha: 0.3),
+                          blurRadius: TvTheme.focusShadowBlurRadius,
+                          spreadRadius: TvTheme.focusGlowSpreadRadius,
+                        ),
+                        // 内层锐利边框光
+                        BoxShadow(
+                          color: focusBorderColor.withValues(alpha: 0.6),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                      : null,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(
@@ -185,30 +188,30 @@ class _TvFocusableState extends State<TvFocusable> {
 }
 
 /// TV 焦点按钮
-/// 
+///
 /// 专为 TV 设计的大尺寸按钮，支持 D-Pad 焦点导航
 class TvButton extends StatefulWidget {
   /// 按钮文字
   final String? label;
-  
+
   /// 按钮图标
   final IconData? icon;
-  
+
   /// 点击回调
   final VoidCallback? onPressed;
-  
+
   /// 是否自动获取焦点
   final bool autofocus;
-  
+
   /// 自定义焦点节点
   final FocusNode? focusNode;
-  
+
   /// 按钮最小尺寸
   final double minSize;
-  
+
   /// 图标大小
   final double iconSize;
-  
+
   /// 是否启用
   final bool enabled;
 
@@ -235,9 +238,9 @@ class _TvButtonState extends State<TvButton> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final focusColor = _hasFocus ? theme.colorScheme.primary : null;
-    
+
     Widget content;
-    
+
     if (widget.icon != null && widget.label != null) {
       // 图标 + 文字
       content = Column(
@@ -293,43 +296,40 @@ class _TvButtonState extends State<TvButton> {
           borderRadius: BorderRadius.circular(16),
         ),
         alignment: Alignment.center,
-        child: Opacity(
-          opacity: widget.enabled ? 1.0 : 0.5,
-          child: content,
-        ),
+        child: Opacity(opacity: widget.enabled ? 1.0 : 0.5, child: content),
       ),
     );
   }
 }
 
 /// TV 图标按钮
-/// 
+///
 /// 简化版的 TV 按钮，仅包含图标
 class TvIconButton extends StatefulWidget {
   /// 按钮图标
   final IconData icon;
-  
+
   /// 点击回调
   final VoidCallback? onPressed;
-  
+
   /// 是否自动获取焦点
   final bool autofocus;
-  
+
   /// 自定义焦点节点
   final FocusNode? focusNode;
-  
+
   /// 按钮尺寸
   final double size;
-  
+
   /// 图标大小
   final double iconSize;
-  
+
   /// 是否启用
   final bool enabled;
-  
+
   /// 背景颜色
   final Color? backgroundColor;
-  
+
   /// 图标颜色
   final Color? iconColor;
 
@@ -360,10 +360,11 @@ class _TvIconButtonState extends State<TvIconButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor = _hasFocus
-        ? theme.colorScheme.primary
-        : (widget.iconColor ?? theme.colorScheme.onSurface);
-    
+    final effectiveIconColor =
+        _hasFocus
+            ? theme.colorScheme.primary
+            : (widget.iconColor ?? theme.colorScheme.onSurface);
+
     return TvFocusable(
       onSelect: widget.enabled ? widget.onPressed : null,
       autofocus: widget.autofocus,
@@ -380,7 +381,9 @@ class _TvIconButtonState extends State<TvIconButton> {
         width: widget.size,
         height: widget.size,
         decoration: BoxDecoration(
-          color: widget.backgroundColor ?? theme.colorScheme.surfaceContainerHighest,
+          color:
+              widget.backgroundColor ??
+              theme.colorScheme.surfaceContainerHighest,
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -494,31 +497,31 @@ class _TvFocusableContainerState extends State<TvFocusableContainer> {
           padding: widget.padding,
           decoration: BoxDecoration(
             borderRadius: borderRadius,
-            color: _hasFocus
-                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
-                : null,
+            color:
+                _hasFocus
+                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
+                    : null,
             border: Border.all(
-              color: _hasFocus
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
+              color: _hasFocus ? theme.colorScheme.primary : Colors.transparent,
               width: TvTheme.focusBorderWidth,
             ),
-            boxShadow: _hasFocus
-                ? [
-                    // 外层柔和光晕
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                      blurRadius: TvTheme.focusShadowBlurRadius,
-                      spreadRadius: TvTheme.focusGlowSpreadRadius,
-                    ),
-                    // 内层锐利边框光
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.6),
-                      blurRadius: 4,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : null,
+            boxShadow:
+                _hasFocus
+                    ? [
+                      // 外层柔和光晕
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        blurRadius: TvTheme.focusShadowBlurRadius,
+                        spreadRadius: TvTheme.focusGlowSpreadRadius,
+                      ),
+                      // 内层锐利边框光
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.6),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                    : null,
           ),
           child: widget.child,
         ),

@@ -264,22 +264,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           children: [
                             // 步骤指示器和标题行
                             Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       '登录',
                                       style: theme.textTheme.headlineLarge
                                           ?.copyWith(
-                                        fontSize: 36,
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.onSurface,
-                                      ),
+                                            fontSize: 36,
+                                            fontWeight: FontWeight.bold,
+                                            color: colorScheme.onSurface,
+                                          ),
                                     ),
                                     const SizedBox(
                                       height: TvTheme.spacingSmall,
@@ -295,8 +293,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   '$_currentStep / $_totalSteps',
                                   style: TextStyle(
                                     fontSize: TvTheme.fontSizeCaption,
-                                    color: colorScheme.onSurface
-                                        .withValues(alpha: 0.5),
+                                    color: colorScheme.onSurface.withValues(
+                                      alpha: 0.5,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -586,9 +585,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             color: colorScheme.onPrimary,
                           ),
                         )
-                        : Text(
-                          hasFocus ? '按确认键登录' : '登录',
-                        ),
+                        : Text(hasFocus ? '按确认键登录' : '登录'),
               ),
             ),
           );
@@ -868,9 +865,9 @@ class _TvFocusableTextFieldState extends State<_TvFocusableTextField> {
                   ]
                   : null,
         ),
-          child: TextFormField(
+        child: TextFormField(
           controller: widget.controller,
-            autofocus: widget.autofocus,
+          autofocus: widget.autofocus,
           obscureText: widget.obscureText,
           autofillHints: widget.autofillHints,
           keyboardType: widget.keyboardType,
