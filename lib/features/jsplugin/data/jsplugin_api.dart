@@ -278,11 +278,11 @@ class JSPluginApi {
 
   /// 检查 JS 插件更新
   /// GET /api/v1/jsplugins/{id}/check-update
-  Future<JSPluginUpdateCheck> checkUpdate(int id, {String? proxy}) async {
+  Future<JSPluginUpdateCheck> checkUpdate(int id, {String? githubProxy}) async {
     try {
       final queryParams = <String, dynamic>{};
-      if (proxy != null && proxy.isNotEmpty) {
-        queryParams['proxy'] = proxy;
+      if (githubProxy != null && githubProxy.isNotEmpty) {
+        queryParams['github_proxy'] = githubProxy;
       }
       final response = await dio.get(
         '${AppConfig.apiPrefix}/jsplugins/$id/check-update',
@@ -298,11 +298,11 @@ class JSPluginApi {
 
   /// 执行 JS 插件更新
   /// POST /api/v1/jsplugins/{id}/update
-  Future<void> updatePlugin(int id, {String? proxy}) async {
+  Future<void> updatePlugin(int id, {String? githubProxy}) async {
     try {
       final body = <String, dynamic>{};
-      if (proxy != null && proxy.isNotEmpty) {
-        body['proxy'] = proxy;
+      if (githubProxy != null && githubProxy.isNotEmpty) {
+        body['github_proxy'] = githubProxy;
       }
       await dio.post('${AppConfig.apiPrefix}/jsplugins/$id/update', data: body);
     } on DioException catch (e) {

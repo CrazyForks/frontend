@@ -13,6 +13,14 @@ import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../data/jsplugin_api.dart';
 import '../providers/jsplugin_provider.dart';
 
+/// JS 插件远程更新的预设 GitHub 代理选项
+class _JSProxyOption {
+  final String label;
+  final String value;
+
+  const _JSProxyOption({required this.label, required this.value});
+}
+
 /// JS 插件管理组件
 class JSPluginManager extends ConsumerStatefulWidget {
   const JSPluginManager({super.key});
@@ -323,7 +331,7 @@ class _JSPluginUploadDialogState extends State<_JSPluginUploadDialog> {
                     Text('点击选择文件', style: theme.textTheme.bodyMedium),
                     const SizedBox(height: 4),
                     Text(
-                      '支持 .zip 格式（ZIP 可批量导入多个插件）',
+                      '支持 .jsplugin.zip 格式；上传同名插件将覆盖现有版本（手动更新）',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -430,7 +438,6 @@ class _JSPluginItem extends ConsumerStatefulWidget {
 class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
   bool _isToggling = false;
   bool _isDeleting = false;
-  bool _isCheckingUpdate = false;
 
   Future<void> _togglePlugin() async {
     setState(() => _isToggling = true);
@@ -467,42 +474,15 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
     }
   }
 
-  Future<void> _checkUpdate() async {
-    setState(() => _isCheckingUpdate = true);
-
-    try {
-      final api = ref.read(jsPluginApiProvider);
-      final result = await api
-          .checkUpdate(widget.plugin.id)
-          .timeout(const Duration(seconds: 20));
-      if (mounted) {
-        if (result.hasUpdate) {
-          ResponsiveSnackBar.showSuccess(
-            context,
-            message:
-                '发现新版本: v${result.currentVersion} → v${result.remoteVersion}',
-          );
-        } else {
-          ResponsiveSnackBar.show(context, message: '已是最新版本');
-        }
-      }
-    } on ApiException catch (e) {
-      if (mounted) {
-        ResponsiveSnackBar.showError(context, message: '检查更新失败: ${e.message}');
-      }
-    } on TimeoutException {
-      if (mounted) {
-        ResponsiveSnackBar.showError(context, message: '检查更新超时，请稍后重试');
-      }
-    } catch (e) {
-      if (mounted) {
-        ResponsiveSnackBar.showError(context, message: '检查更新失败: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isCheckingUpdate = false);
-      }
-    }
+  void _showUpdateDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _JSPluginUpdateDialog(
+        plugin: widget.plugin,
+        pluginApi: ref.read(jsPluginApiProvider),
+        onUpdateComplete: () => ref.invalidate(jsPluginsProvider),
+      ),
+    );
   }
 
   Future<void> _deletePlugin() async {
@@ -739,7 +719,7 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
               case 'homepage':
                 _openHomepage(plugin.homepage!);
               case 'update':
-                _checkUpdate();
+                _showUpdateDialog();
               case 'delete':
                 _deletePlugin();
             }
@@ -758,19 +738,11 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
                   ),
                   const PopupMenuDivider(),
                 ],
-                PopupMenuItem<String>(
+                const PopupMenuItem<String>(
                   value: 'update',
-                  enabled: !_isCheckingUpdate,
                   child: ListTile(
-                    leading:
-                        _isCheckingUpdate
-                            ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : const Icon(Icons.system_update_alt),
-                    title: const Text('检查更新'),
+                    leading: Icon(Icons.system_update_alt),
+                    title: Text('检查更新'),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -807,15 +779,8 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
     return [
       switchOrLoader,
       IconButton(
-        icon:
-            _isCheckingUpdate
-                ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                : const Icon(Icons.system_update_alt),
-        onPressed: _isCheckingUpdate ? null : _checkUpdate,
+        icon: const Icon(Icons.system_update_alt),
+        onPressed: _showUpdateDialog,
         tooltip: '检查更新',
       ),
       IconButton(
@@ -829,6 +794,413 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
                 : const Icon(Icons.delete_outline),
         onPressed: _isDeleting ? null : _deletePlugin,
         tooltip: '删除',
+      ),
+    ];
+  }
+}
+
+/// JS 插件远程更新对话框：支持代理选择 + 检查更新 + 立即更新
+class _JSPluginUpdateDialog extends StatefulWidget {
+  final JSPlugin plugin;
+  final JSPluginApi pluginApi;
+  final VoidCallback onUpdateComplete;
+
+  const _JSPluginUpdateDialog({
+    required this.plugin,
+    required this.pluginApi,
+    required this.onUpdateComplete,
+  });
+
+  @override
+  State<_JSPluginUpdateDialog> createState() => _JSPluginUpdateDialogState();
+}
+
+class _JSPluginUpdateDialogState extends State<_JSPluginUpdateDialog> {
+  static const List<_JSProxyOption> _presetProxies = [
+    _JSProxyOption(label: '直连 (不使用代理)', value: ''),
+    _JSProxyOption(label: 'ghproxy.com', value: 'https://ghproxy.com/'),
+    _JSProxyOption(label: 'ghfast.top', value: 'https://ghfast.top/'),
+    _JSProxyOption(label: 'gh.con.sh', value: 'https://gh.con.sh/'),
+    _JSProxyOption(
+      label: 'mirror.ghproxy.com',
+      value: 'https://mirror.ghproxy.com/',
+    ),
+  ];
+
+  bool _isChecking = false;
+  bool _isUpdating = false;
+  String? _error;
+  JSPluginUpdateCheck? _checkResult;
+
+  /// 当前选中的代理索引，-1 表示自定义
+  int _selectedProxyIndex = 0;
+  final TextEditingController _customProxyController = TextEditingController();
+
+  String get _effectiveProxy {
+    if (_selectedProxyIndex == -1) {
+      return _customProxyController.text.trim();
+    }
+    if (_selectedProxyIndex >= 0 &&
+        _selectedProxyIndex < _presetProxies.length) {
+      return _presetProxies[_selectedProxyIndex].value;
+    }
+    return '';
+  }
+
+  @override
+  void dispose() {
+    _customProxyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkUpdate() async {
+    final proxy = _effectiveProxy;
+    setState(() {
+      _isChecking = true;
+      _error = null;
+      _checkResult = null;
+    });
+
+    try {
+      final result = await widget.pluginApi
+          .checkUpdate(
+            widget.plugin.id,
+            githubProxy: proxy.isNotEmpty ? proxy : null,
+          )
+          .timeout(const Duration(seconds: 20));
+      if (mounted) setState(() => _checkResult = result);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } on TimeoutException {
+      if (mounted) setState(() => _error = '检查更新超时，请尝试切换代理后重试');
+    } catch (e) {
+      if (mounted) setState(() => _error = '检查更新失败: $e');
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
+
+  Future<void> _executeUpdate() async {
+    final proxy = _effectiveProxy;
+    setState(() {
+      _isUpdating = true;
+      _error = null;
+    });
+
+    try {
+      await widget.pluginApi
+          .updatePlugin(
+            widget.plugin.id,
+            githubProxy: proxy.isNotEmpty ? proxy : null,
+          )
+          .timeout(const Duration(seconds: 120));
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onUpdateComplete();
+        ResponsiveSnackBar.showSuccess(context, message: '插件更新成功');
+      }
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = '更新失败: ${e.message}');
+    } on TimeoutException {
+      if (mounted) setState(() => _error = '更新超时，请重试');
+    } catch (e) {
+      if (mounted) setState(() => _error = '更新失败: $e');
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.system_update_alt),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '更新插件 - ${widget.plugin.displayName}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: context.responsiveDialogMaxWidth,
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_error != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: colorScheme.error,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(color: colorScheme.onErrorContainer),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              if (!_isUpdating) _buildProxySelector(theme),
+
+              if (_isChecking)
+                const Center(
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('正在检查更新...'),
+                    ],
+                  ),
+                )
+              else if (_isUpdating)
+                const Center(
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('正在下载并更新插件...'),
+                      SizedBox(height: 8),
+                      Text('请勿关闭此对话框', style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                )
+              else if (_checkResult != null)
+                _buildCheckResult(_checkResult!),
+            ],
+          ),
+        ),
+      ),
+      actions: _buildActions(),
+    );
+  }
+
+  Widget _buildProxySelector(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('GitHub 代理', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          RadioGroup<int>(
+            groupValue: _selectedProxyIndex,
+            onChanged: (value) {
+              if (value != null) setState(() => _selectedProxyIndex = value);
+            },
+            child: Column(
+              children: [
+                ...List.generate(_presetProxies.length, (index) {
+                  final proxy = _presetProxies[index];
+                  return RadioListTile<int>(
+                    title: Text(proxy.label, style: theme.textTheme.bodyMedium),
+                    value: index,
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  );
+                }),
+                RadioListTile<int>(
+                  title: Text('自定义代理', style: theme.textTheme.bodyMedium),
+                  value: -1,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+          if (_selectedProxyIndex == -1)
+            Padding(
+              padding: const EdgeInsets.only(left: 16, top: 4),
+              child: TextField(
+                controller: _customProxyController,
+                decoration: const InputDecoration(
+                  hintText: 'https://your-proxy.com/',
+                  helperText: '输入代理地址，如 https://ghproxy.com/',
+                  helperMaxLines: 2,
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          const Divider(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckResult(JSPluginUpdateCheck check) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    if (!check.hasUpdate) {
+      return Center(
+        child: Column(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 48),
+            const SizedBox(height: 16),
+            const Text('已是最新版本'),
+            const SizedBox(height: 8),
+            Text(
+              '当前版本: ${check.currentVersion}',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.new_releases, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('发现新版本')),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                'v${check.currentVersion}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward,
+                size: 16,
+                color: colorScheme.onPrimaryContainer,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'v${check.remoteVersion}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildActions() {
+    if (_isUpdating) {
+      return [];
+    }
+
+    if (_isChecking) {
+      return [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('取消'),
+        ),
+      ];
+    }
+
+    if (_checkResult != null && _checkResult!.hasUpdate) {
+      return [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('取消'),
+        ),
+        OutlinedButton(
+          onPressed: _checkUpdate,
+          style: OutlinedButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('重新检查'),
+        ),
+        FilledButton(
+          onPressed: _executeUpdate,
+          style: FilledButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('立即更新'),
+        ),
+      ];
+    }
+
+    if (_checkResult != null || _error != null) {
+      return [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('关闭'),
+        ),
+        FilledButton(
+          onPressed: _checkUpdate,
+          style: FilledButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          child: const Text('重新检查'),
+        ),
+      ];
+    }
+
+    return [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        style: TextButton.styleFrom(
+          minimumSize: context.responsiveButtonMinSize,
+        ),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: _checkUpdate,
+        style: FilledButton.styleFrom(
+          minimumSize: context.responsiveButtonMinSize,
+        ),
+        child: const Text('检查更新'),
       ),
     ];
   }
