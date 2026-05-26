@@ -4,9 +4,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../config/app_config.dart';
 import '../../../../core/storage/lyric_cache_service.dart';
-import '../../../../core/storage/secure_storage.dart';
+import '../../../../core/utils/url_helper.dart';
 import '../../domain/lyric_parser.dart';
 
 /// 歌词显示组件
@@ -147,19 +146,8 @@ class _LyricsViewState extends State<LyricsView> {
     });
 
     try {
-      // 构建完整的绝对 URL
-      String fullUrl;
-      if (lyricUrl.startsWith('/')) {
-        // 本服务相对路径：拼接 baseUrl + access_token
-        final token = SecureStorageService.cachedAccessToken ?? '';
-        final separator = lyricUrl.contains('?') ? '&' : '?';
-        fullUrl =
-            '${AppConfig.baseUrl}$lyricUrl${separator}access_token=$token';
-      } else {
-        // 外部绝对 URL：直接使用
-        fullUrl = lyricUrl;
-      }
-
+      // UrlHelper 自动处理：相对路径拼 baseUrl + access_token，外链原样返回
+      final fullUrl = UrlHelper.buildLyricUrl(lyricUrl);
       final response = await Dio().get(fullUrl);
 
       if (!mounted) return;

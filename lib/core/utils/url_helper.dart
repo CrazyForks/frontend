@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../config/app_config.dart';
+import '../../config/app_config.dart';
 import '../storage/secure_storage.dart';
 
 /// URL 构建工具类

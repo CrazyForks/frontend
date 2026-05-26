@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/responsive.dart';
 import '../../../../core/utils/color_extraction.dart';
+import '../../../../core/utils/url_helper.dart';
 import '../../../../shared/widgets/favorite_button.dart';
 import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
@@ -133,7 +134,7 @@ class _DesktopFullPlayerState extends ConsumerState<DesktopFullPlayer>
               child: ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
                 child: Image.network(
-                  coverUrl,
+                  UrlHelper.buildCoverUrl(coverUrl),
                   fit: BoxFit.cover,
                   errorBuilder:
                       (_, _, _) => Container(
@@ -323,7 +324,7 @@ class _DesktopFullPlayerState extends ConsumerState<DesktopFullPlayer>
       child:
           coverUrl != null
               ? Image.network(
-                coverUrl,
+                UrlHelper.buildCoverUrl(coverUrl),
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => _buildPlaceholder(theme, size),
               )

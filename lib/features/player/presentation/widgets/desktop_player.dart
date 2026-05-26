@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/url_helper.dart';
 import '../../../../shared/widgets/favorite_button.dart';
 import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
@@ -119,7 +120,7 @@ class DesktopPlayer extends ConsumerWidget {
                   child:
                       coverUrl != null
                           ? Image.network(
-                            coverUrl,
+                            UrlHelper.buildCoverUrl(coverUrl),
                             fit: BoxFit.cover,
                             errorBuilder:
                                 (_, _, _) => Icon(

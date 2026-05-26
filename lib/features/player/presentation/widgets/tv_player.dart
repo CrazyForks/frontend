@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/tv_theme.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/url_helper.dart';
 import '../../../../shared/widgets/tv_focusable.dart';
 import '../../domain/player_state.dart';
 import '../providers/player_provider.dart';
@@ -176,7 +177,7 @@ class _TvPlayerState extends ConsumerState<TvPlayer> {
       child:
           coverUrl != null
               ? Image.network(
-                coverUrl,
+                UrlHelper.buildCoverUrl(coverUrl),
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => _buildPlaceholderIcon(context),
               )
@@ -1002,7 +1003,10 @@ class TvMiniPlayer extends ConsumerWidget {
                 clipBehavior: Clip.antiAlias,
                 child:
                     coverUrl != null
-                        ? Image.network(coverUrl, fit: BoxFit.cover)
+                        ? Image.network(
+                          UrlHelper.buildCoverUrl(coverUrl),
+                          fit: BoxFit.cover,
+                        )
                         : Icon(
                           Icons.music_note_rounded,
                           color: theme.colorScheme.onSurfaceVariant,

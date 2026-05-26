@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/utils/url_helper.dart';
 
 import '../providers/player_provider.dart';
 import 'mobile_player.dart';
@@ -125,7 +126,7 @@ class MiniPlayer extends ConsumerWidget {
       child:
           coverUrl != null && coverUrl.isNotEmpty
               ? Image.network(
-                coverUrl,
+                UrlHelper.buildCoverUrl(coverUrl),
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => _buildPlaceholder(theme),
               )

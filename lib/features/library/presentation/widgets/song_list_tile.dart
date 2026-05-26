@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../config/constants.dart';
 import '../../../../core/theme/responsive.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/url_helper.dart';
 import '../../../../shared/models/song.dart';
 import '../../../../shared/widgets/favorite_button.dart';
 
@@ -160,7 +161,7 @@ class SongListTile extends ConsumerWidget {
       child:
           coverUrl != null
               ? Image.network(
-                coverUrl,
+                UrlHelper.buildCoverUrl(coverUrl),
                 width: size,
                 height: size,
                 fit: BoxFit.cover,

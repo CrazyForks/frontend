@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/constants.dart';
+import '../../../core/utils/url_helper.dart';
 import '../../../shared/models/song.dart';
 import '../../../shared/utils/responsive_snackbar.dart';
 import 'providers/songs_provider.dart';
@@ -206,7 +207,7 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
-                      _coverUrlController.text,
+                      UrlHelper.buildCoverUrl(_coverUrlController.text),
                       width: 150,
                       height: 150,
                       fit: BoxFit.cover,

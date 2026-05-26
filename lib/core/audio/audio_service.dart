@@ -9,9 +9,8 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart' as ja;
 
-import '../../config/app_config.dart';
 import '../../shared/models/song.dart';
-import '../storage/secure_storage.dart';
+import '../utils/url_helper.dart';
 
 /// MiMusic 音频处理器 - 集成 audio_service 实现通知栏控制
 /// 严格遵循 audio_service 官方示例模式：使用 .pipe() 绑定 playbackState
@@ -186,7 +185,8 @@ class MiMusicAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 所有 type(local/remote/radio)统一使用 song.url —— 后端 marshal Song 时
   /// 自动把 url 填成 /api/v1/songs/{id}/play,按 type 分发到 ServeFile / Orchestrator /
   /// 直链下载 / 电台 302,客户端无需关心 type。
-  Future<void> playSong(Song song, String? accessToken) async {
+  /// URL 拼接（baseUrl + access_token）统一走 UrlHelper。
+  Future<void> playSong(Song song) async {
     // 确保 stream listeners 已建立
     await _initFuture;
 
@@ -201,19 +201,8 @@ class MiMusicAudioHandler extends BaseAudioHandler with SeekHandler {
         throw Exception('无法播放：歌曲没有有效的播放源');
       }
 
-      String songUrl = song.url!;
-      // 处理相对路径（本服务器的 API 路径,如 /api/v1/songs/{id}/play）
-      // 原生平台无法携带 Authorization Header,需拼接 baseUrl 并附加 access_token
-      if (songUrl.startsWith('/')) {
-        final token =
-            accessToken ?? SecureStorageService.cachedAccessToken ?? '';
-        final separator = songUrl.contains('?') ? '&' : '?';
-        songUrl = '${AppConfig.baseUrl}$songUrl${separator}access_token=$token';
-        debugPrint(
-          '[Player] MiMusicAudioHandler: server-relative url with token: $songUrl',
-        );
-      }
-      // 所有 URL 都由后端统一处理（本地/远程/代理）
+      // 原生平台无法携带 Authorization Header,UrlHelper 会自动拼接 baseUrl + access_token
+      final songUrl = UrlHelper.buildSongUrl(song.url!);
 
       debugPrint('[Player] MiMusicAudioHandler: song url: $songUrl');
       // Web 平台使用 AudioSource.uri,其他平台使用 LockCachingAudioSource 实现边播边缓存
@@ -259,11 +248,11 @@ class MiMusicAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// 更新通知栏元数据
   void _updateNowPlaying(Song song) {
-    // 使用 CoverUrl 工具类构建封面 URL，同时支持 coverUrl 和 coverPath
+    // artUri 由 Android 系统直接拉取，必须是带 baseUrl + access_token 的完整 URL
     Uri? artUri;
     final coverUrl = song.coverUrl;
-    if (coverUrl != null) {
-      artUri = Uri.parse(coverUrl);
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      artUri = Uri.parse(UrlHelper.buildCoverUrl(coverUrl));
     }
 
     final item = MediaItem(

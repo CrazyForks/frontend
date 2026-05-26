@@ -7,10 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart' as ja;
 import 'package:volume_controller/volume_controller.dart';
 
-import '../../../../config/app_config.dart';
 import '../../../../core/audio/audio_service.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage.dart';
+import '../../../../core/utils/url_helper.dart';
 import '../../../../main.dart';
 import '../../../../shared/models/song.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -457,8 +457,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
         state.isPlaying) {
       _prefetchCancelToken?.cancel('play mode changed');
       _preSelectNextIndex();
-      final token = await _secureStorage.getAccessToken();
-      _prefetchNextSong(token);
+      // 副作用：刷新 SecureStorageService.cachedAccessToken,供 UrlHelper 使用
+      await _secureStorage.getAccessToken();
+      _prefetchNextSong();
     }
   }
 
@@ -947,9 +948,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
         }
 
         state = state.copyWith(isBuffering: true, clearErrorMessage: true);
-        final token = await _secureStorage.getAccessToken();
+        // 副作用：刷新 SecureStorageService.cachedAccessToken,供 UrlHelper 使用
+        await _secureStorage.getAccessToken();
         debugPrint('[Player] _playCurrent: calling audioHandler.playSong');
-        await _audioHandler.playSong(song, token);
+        await _audioHandler.playSong(song);
         // 固定 just_audio 播放器音量为最大（音量由系统控制）
         if (kIsWeb) {
           await _audioHandler.setVolume(state.volume / 100);
@@ -964,7 +966,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
         // 预选下一首并预加载
         _preSelectNextIndex();
-        _prefetchNextSong(token);
+        _prefetchNextSong();
         return; // 成功退出
       } catch (e) {
         debugPrint(
@@ -1058,7 +1060,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   }
 
   /// 预加载下一首歌曲
-  void _prefetchNextSong(String? token) async {
+  void _prefetchNextSong() async {
     final nextIndex = _preSelectedNextIndex;
     if (nextIndex == null) return;
     if (nextIndex < 0 || nextIndex >= state.playlist.length) return;
@@ -1075,12 +1077,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _prefetchCancelToken = CancelToken();
 
     try {
-      // 构造预加载 URL：baseUrl + songUrl + access_token + prefetch=true
-      final songUrl = nextSong.url!;
-      final accessToken = token ?? '';
+      // 构造预加载 URL：UrlHelper 已拼好 baseUrl + access_token，再附加 prefetch=true
+      final songUrl = UrlHelper.buildSongUrl(nextSong.url!);
       final separator = songUrl.contains('?') ? '&' : '?';
-      final prefetchUrl =
-          '${AppConfig.baseUrl}$songUrl${separator}access_token=$accessToken&prefetch=true';
+      final prefetchUrl = '$songUrl${separator}prefetch=true';
 
       debugPrint('[Player] Prefetching next song: ${nextSong.title}');
 
