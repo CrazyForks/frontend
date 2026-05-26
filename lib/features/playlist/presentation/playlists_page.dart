@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/constants.dart';
 import '../../../core/theme/responsive.dart';
+import '../../../core/utils/url_helper.dart';
 import '../../../shared/utils/responsive_snackbar.dart';
 import '../../player/presentation/providers/player_provider.dart';
 import '../domain/playlist.dart';
@@ -559,7 +560,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
                     child:
                         coverUrl != null
                             ? CachedNetworkImage(
-                              imageUrl: coverUrl,
+                              imageUrl: UrlHelper.buildCoverUrl(coverUrl),
                               fit: BoxFit.cover,
                               placeholder:
                                   (context, url) => Container(
@@ -1482,7 +1483,7 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
     final previewUrl = _previewCoverUrl;
     if (previewUrl != null) {
       return CachedNetworkImage(
-        imageUrl: previewUrl,
+        imageUrl: UrlHelper.buildCoverUrl(previewUrl),
         fit: BoxFit.cover,
         placeholder:
             (context, url) =>

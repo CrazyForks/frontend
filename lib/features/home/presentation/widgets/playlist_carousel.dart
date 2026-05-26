@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/responsive.dart';
+import '../../../../core/utils/url_helper.dart';
 import '../../../playlist/domain/playlist.dart';
 
 /// 横向歌单轮播组件
@@ -88,7 +89,7 @@ class _PlaylistCarouselItem extends StatelessWidget {
                 child:
                     coverUrl != null
                         ? CachedNetworkImage(
-                          imageUrl: coverUrl,
+                          imageUrl: UrlHelper.buildCoverUrl(coverUrl),
                           fit: BoxFit.cover,
                           placeholder:
                               (context, url) => _buildPlaceholder(colorScheme),

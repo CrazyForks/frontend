@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:palette_generator/palette_generator.dart';
 
+import 'url_helper.dart';
+
 /// 封面颜色调色板
 class CoverPalette {
   /// 主色调
@@ -85,16 +87,17 @@ final coverColorsProvider = FutureProvider.family<CoverPalette?, String?>((
   if (cached != null) return cached;
 
   try {
+    // 使用 UrlHelper 处理封面 URL（自动拼接 baseUrl + access_token）
+    final displayUrl = UrlHelper.buildCoverUrl(coverUrl);
     final paletteGenerator = await PaletteGenerator.fromImageProvider(
-      NetworkImage(coverUrl),
+      NetworkImage(displayUrl),
       size: const Size(100, 100), // 缩小尺寸加速提取
       maximumColorCount: 16,
     );
 
     // 基于 darkMutedColor（遮罩色）的亮度决定前景色
     // 与歌单详情页 _buildHeaderBackground 中的 overlayColor 逻辑保持一致
-    final overlayColor =
-        paletteGenerator.darkMutedColor?.color ?? Colors.black;
+    final overlayColor = paletteGenerator.darkMutedColor?.color ?? Colors.black;
     final onImageColor =
         overlayColor.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 

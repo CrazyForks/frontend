@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/url_helper.dart';
 import '../../../../shared/models/song.dart';
 import '../providers/playlist_provider.dart';
 
@@ -264,7 +265,7 @@ class _CoverGridItem extends StatelessWidget {
               child:
                   coverUrl != null
                       ? CachedNetworkImage(
-                        imageUrl: coverUrl,
+                        imageUrl: UrlHelper.buildCoverUrl(coverUrl),
                         fit: BoxFit.cover,
                         placeholder:
                             (context, url) => Container(

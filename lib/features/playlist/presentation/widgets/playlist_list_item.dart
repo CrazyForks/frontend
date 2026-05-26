@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/url_helper.dart';
 import '../../domain/playlist.dart';
 
 /// 歌单列表项组件（列表视图）
@@ -34,12 +35,13 @@ class PlaylistListItem extends StatelessWidget {
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      shape: isSelectionMode && isSelected
-          ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: colorScheme.primary, width: 2),
-            )
-          : null,
+      shape:
+          isSelectionMode && isSelected
+              ? RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: colorScheme.primary, width: 2),
+              )
+              : null,
       child: InkWell(
         onTap: isSelectionMode ? onSelect : onTap,
         onLongPress: isSelectionMode ? null : _showContextMenu(context),
@@ -65,7 +67,7 @@ class PlaylistListItem extends StatelessWidget {
                   child:
                       coverUrl != null
                           ? CachedNetworkImage(
-                            imageUrl: coverUrl,
+                            imageUrl: UrlHelper.buildCoverUrl(coverUrl),
                             fit: BoxFit.cover,
                             placeholder:
                                 (context, url) =>

@@ -13,6 +13,7 @@ import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/responsive.dart';
 import '../../../core/utils/color_extraction.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/url_helper.dart';
 import '../../../shared/models/song.dart';
 import '../../../shared/utils/responsive_snackbar.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -532,7 +533,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
         // 背景图
         if (coverUrl != null)
           CachedNetworkImage(
-            imageUrl: coverUrl,
+            imageUrl: UrlHelper.buildCoverUrl(coverUrl),
             fit: BoxFit.cover,
             placeholder:
                 (context, url) =>
@@ -1402,7 +1403,7 @@ class _SongListTile extends StatelessWidget {
               child:
                   coverUrl != null
                       ? CachedNetworkImage(
-                        imageUrl: coverUrl,
+                        imageUrl: UrlHelper.buildCoverUrl(coverUrl),
                         fit: BoxFit.cover,
                         placeholder:
                             (context, url) =>

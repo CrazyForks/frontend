@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/utils/url_helper.dart';
+
 /// 统一封面图组件
 /// 所有页面的封面图都使用此组件，支持缓存和占位符
 class CoverImage extends StatelessWidget {
@@ -30,15 +32,21 @@ class CoverImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 使用 UrlHelper 处理封面 URL（自动拼接 baseUrl + access_token）
+    final displayUrl =
+        coverUrl != null && coverUrl!.isNotEmpty
+            ? UrlHelper.buildCoverUrl(coverUrl!)
+            : null;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: SizedBox(
         width: size,
         height: size,
         child:
-            coverUrl != null
+            displayUrl != null
                 ? CachedNetworkImage(
-                  imageUrl: coverUrl!,
+                  imageUrl: displayUrl,
                   fit: fit,
                   placeholder: (context, url) => _buildPlaceholder(context),
                   errorWidget:
