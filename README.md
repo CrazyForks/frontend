@@ -1,9 +1,9 @@
 # MiMusic Flutter
 
-[![Build and Release](https://github.com/mimusic-org/frontend/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/mimusic-org/frontend/actions/workflows/build-and-release.yml)
-[![GitHub License](https://img.shields.io/github/license/mimusic-org/frontend)](https://github.com/mimusic-org/frontend)
-[![GitHub Release](https://img.shields.io/github/v/release/mimusic-org/frontend)](https://github.com/mimusic-org/frontend/releases)
-[![Stars](https://img.shields.io/github/stars/mimusic-org/frontend)](https://github.com/mimusic-org/frontend/stargazers)
+[![Build and Release](https://github.com/mimusic-org/mimusic-player/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/mimusic-org/mimusic-player/actions/workflows/build-and-release.yml)
+[![GitHub License](https://img.shields.io/github/license/mimusic-org/mimusic-player)](https://github.com/mimusic-org/mimusic-player)
+[![GitHub Release](https://img.shields.io/github/v/release/mimusic-org/mimusic-player)](https://github.com/mimusic-org/mimusic-player/releases)
+[![Stars](https://img.shields.io/github/stars/mimusic-org/mimusic-player)](https://github.com/mimusic-org/mimusic-player/stargazers)
 
 <p align="center">
   <strong>🎵 MiMusic 跨平台音乐播放器 — 基于 Flutter 构建</strong>
@@ -12,9 +12,9 @@
 MiMusic 跨平台音乐播放器，基于 Flutter 构建，支持 iOS、Android、macOS、Windows、Linux、Web 六端。
 
 <p align="center">
-  <a href="https://github.com/mimusic-org/frontend">🏠 GitHub</a> •
-  <a href="https://github.com/mimusic-org/frontend/releases">📥 下载</a> •
-  <a href="https://github.com/mimusic-org/frontend/issues">💬 问题反馈</a>
+  <a href="https://github.com/mimusic-org/mimusic-player">🏠 GitHub</a> •
+  <a href="https://github.com/mimusic-org/mimusic-player/releases">📥 下载</a> •
+  <a href="https://github.com/mimusic-org/mimusic-player/issues">💬 问题反馈</a>
 </p>
 
 ## 截图
@@ -23,26 +23,26 @@ https://github.com/mimusic-org/mimusic/issues/6
 
 ## 下载安装
 
-从 [GitHub Releases](https://github.com/mimusic-org/frontend/releases/latest) 下载最新版本：
+从 [GitHub Releases](https://github.com/mimusic-org/mimusic-player/releases/latest) 下载最新版本：
 
 | 平台 | 下载链接 | 说明 |
 |------|----------|------|
-| 🌐 **Web (standalone)** | [mimusic-web-standalone.tar.gz](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-web-standalone.tar.gz) | 独立部署版，支持配置后端地址 |
-| 🌐 **Web (embedded)** | [mimusic-web-embedded.tar.gz](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-web-embedded.tar.gz) | 嵌入 Go 后端同域部署 |
-| 🐧 **Linux** | [mimusic-linux-x64.tar.gz](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-linux-x64.tar.gz) | x64 桌面版 |
-| | [mimusic-linux-x64.deb](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-linux-x64.deb) | Debian/Ubuntu x64 |
-| | [mimusic-linux-x64.rpm](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-linux-x64.rpm) | Fedora/RHEL/CentOS x64 |
-| | [mimusic-linux-x64.AppImage](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-linux-x64.AppImage) | 免安装可执行文件 |
-| 🪟 **Windows** | [mimusic-windows-x64.zip](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-windows-x64.zip) | x64 便携版 |
-| | [mimusic-windows-x64.msix](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-windows-x64.msix) | x64 安装版 |
-| 🍎 **macOS** | [mimusic-macos.dmg](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-macos.dmg) | Universal DMG (Intel/Apple Silicon) |
-| | [mimusic-macos.zip](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-macos.zip) | Universal App 压缩包 |
-| 🤖 **Android** | [mimusic-arm64-v8a.apk](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-arm64-v8a.apk) | ARM64 设备（推荐） |
-| | [mimusic-armeabi-v7a.apk](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-armeabi-v7a.apk) | ARMv7 设备 |
-| | [mimusic-x86_64.apk](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-x86_64.apk) | x86_64 模拟器/设备 |
-| 📱 **iOS** | [mimusic-ios-nosign.ipa](https://github.com/mimusic-org/frontend/releases/latest/download/mimusic-ios-nosign.ipa) | 未签名 IPA，可通过 AltStore/Sideloadly 安装 |
+| 🌐 **Web (standalone)** | [mimusic-web-standalone.tar.gz](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-web-standalone.tar.gz) | 独立部署版，支持配置后端地址 |
+| 🌐 **Web (embedded)** | [mimusic-web-embedded.tar.gz](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-web-embedded.tar.gz) | 嵌入 Go 后端同域部署 |
+| 🐧 **Linux** | [mimusic-linux-x64.tar.gz](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-linux-x64.tar.gz) | x64 桌面版 |
+| | [mimusic-linux-x64.deb](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-linux-x64.deb) | Debian/Ubuntu x64 |
+| | [mimusic-linux-x64.rpm](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-linux-x64.rpm) | Fedora/RHEL/CentOS x64 |
+| | [mimusic-linux-x64.AppImage](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-linux-x64.AppImage) | 免安装可执行文件 |
+| 🪟 **Windows** | [mimusic-windows-x64.zip](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-windows-x64.zip) | x64 便携版 |
+| | [mimusic-windows-x64.msix](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-windows-x64.msix) | x64 安装版 |
+| 🍎 **macOS** | [mimusic-macos.dmg](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-macos.dmg) | Universal DMG (Intel/Apple Silicon) |
+| | [mimusic-macos.zip](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-macos.zip) | Universal App 压缩包 |
+| 🤖 **Android** | [mimusic-arm64-v8a.apk](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-arm64-v8a.apk) | ARM64 设备（推荐） |
+| | [mimusic-armeabi-v7a.apk](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-armeabi-v7a.apk) | ARMv7 设备 |
+| | [mimusic-x86_64.apk](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-x86_64.apk) | x86_64 模拟器/设备 |
+| 📱 **iOS** | [mimusic-ios-nosign.ipa](https://github.com/mimusic-org/mimusic-player/releases/latest/download/mimusic-ios-nosign.ipa) | 未签名 IPA，可通过 AltStore/Sideloadly 安装 |
 
-> 开发版可在 [main 分支 Release](https://github.com/mimusic-org/frontend/releases/tag/main) 获取。
+> 开发版可在 [main 分支 Release](https://github.com/mimusic-org/mimusic-player/releases/tag/main) 获取。
 
 ## 功能特性
 
@@ -187,26 +187,3 @@ scripts/
 ## 许可证
 
 [Apache-2.0 license](LICENSE)
-
-## 💖 支持项目
-
-如果这个项目对你有帮助，欢迎通过以下方式支持：
-
-### ⭐ Star 项目
-
-点击右上角的 ⭐ Star 按钮，让更多人发现这个项目
-
-### 💰 赞赏支持
-
-- [💝 爱发电](https://afdian.com/a/imhanxi) - 持续支持项目发展
-- 扫码请作者喝杯奶茶 ☕
-
-<p align="center">
-  <img src="https://i.v2ex.co/7Q03axO5l.png" alt="赞赏码" width="300">
-</p>
-
-### 🎁 其他支持方式
-
-- 📢 分享给更多需要的朋友
-- 🐛 提交 Bug 报告和功能建议
-- 📝 贡献代码

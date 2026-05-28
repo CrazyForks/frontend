@@ -25,7 +25,11 @@ PROJECT_ROOT="$(dirname "$FRONTEND_DIR")"
 
 # 参数解析
 PLATFORM="${1:-}"
-OUTPUT_DIR="${2:-$(pwd)/frontend-build}"
+OUTPUT_DIR="${2:-$(dirname "$FRONTEND_DIR")/mimusic-player-build}"
+case "$OUTPUT_DIR" in
+    /*) ;;
+    *) OUTPUT_DIR="$(pwd)/$OUTPUT_DIR" ;;
+esac
 
 # 帮助信息
 show_help() {
