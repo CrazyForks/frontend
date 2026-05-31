@@ -9,6 +9,7 @@ import 'package:volume_controller/volume_controller.dart';
 
 import '../../../../core/audio/audio_service.dart';
 import '../../../../core/storage/app_preferences.dart';
+import '../../../../core/utils/audio_format_helper.dart';
 import '../../../../core/utils/platform_utils.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/playback_state_storage.dart';
@@ -41,6 +42,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   Timer? _sleepTimer;
   Timer? _sleepTimerCountdown;
   CancelToken? _prefetchCancelToken;
+  bool _lateStagePrefetchFired = false; // 剩余30s保险预拉取是否已触发
 
   final Random _random = Random();
   final Set<int> _playedIndices = {}; // 随机模式下已播放的索引
@@ -198,6 +200,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
     // 监听播放位置
     _positionSubscription = _audioHandler.positionStream.listen((position) {
       state = state.copyWith(currentTime: position);
+      // 剩余≤30s 时保险再触发一次预拉取（防止首次触发太早使转码未完成）
+      _maybeFireLateStagePrefetch(position);
     });
 
     // 监听总时长
@@ -554,6 +558,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         state.currentIndex >= 0 &&
         state.isPlaying) {
       _prefetchCancelToken?.cancel('play mode changed');
+      _lateStagePrefetchFired = false;
       _preSelectNextIndex();
       // 副作用：刷新 SecureStorageService.cachedAccessToken,供 UrlHelper 使用
       await _secureStorage.getAccessToken();
@@ -818,9 +823,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         '[Player] _loadRemainingMultiplePlaylists: done, total=${state.playlist.length}',
       );
     } catch (e, st) {
-      debugPrint(
-        '[Player] _loadRemainingMultiplePlaylists: failed: $e\n$st',
-      );
+      debugPrint('[Player] _loadRemainingMultiplePlaylists: failed: $e\n$st');
     }
     if (_loadGeneration == generation) {
       _savePlaybackState();
@@ -837,9 +840,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         return await fetch();
       } catch (e) {
         if (retry == maxRetries - 1) rethrow;
-        await Future<void>.delayed(
-          Duration(milliseconds: 500 * (retry + 1)),
-        );
+        await Future<void>.delayed(Duration(milliseconds: 500 * (retry + 1)));
       }
     }
     throw StateError('unreachable');
@@ -1220,6 +1221,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         _startPositionSaveTimer();
 
         // 预选下一首并预加载
+        _lateStagePrefetchFired = false;
         _preSelectNextIndex();
         _prefetchNextSong();
         return; // 成功退出
@@ -1314,46 +1316,59 @@ class PlayerNotifier extends Notifier<PlayerState> {
     await _playAtIndex(nextIndex);
   }
 
-  /// 预加载下一首歌曲
+  /// 预拉取下一首歌曲
   void _prefetchNextSong() async {
     final nextIndex = _preSelectedNextIndex;
     if (nextIndex == null) return;
     if (nextIndex < 0 || nextIndex >= state.playlist.length) return;
 
     final nextSong = state.playlist[nextIndex];
-
-    // 只预加载有相对路径 URL 的网络歌曲（插件歌曲）
-    if (nextSong.type == 'local') return;
     if (nextSong.url == null || nextSong.url!.isEmpty) return;
-    if (!nextSong.url!.startsWith('/')) return; // 外部 URL 无需预加载
+    // 外部完整 URL 无法预热（不走后端缓存）
+    if (!nextSong.url!.startsWith('/')) return;
+
+    // 平台感知的转码目标：当前平台不能原生解码该格式时返回 'mp3'，否则 null。
+    final targetFormat = AudioFormatHelper.getTranscodeFormat(nextSong.format);
+    final isLocal = nextSong.type == 'local';
+
+    // 本地歌曲且无需转码 → 无意义预热（本地文件随时可读）
+    if (isLocal && targetFormat == null) return;
 
     // 取消之前的预加载
     _prefetchCancelToken?.cancel('new prefetch');
     _prefetchCancelToken = CancelToken();
 
     try {
-      // 构造预加载 URL：UrlHelper 已拼好 baseUrl + access_token，再附加 prefetch=true
-      final songUrl = UrlHelper.buildSongUrl(nextSong.url!, songFormat: nextSong.format);
+      // UrlHelper.buildSongUrl 会根据平台自动追加 format= 参数（需转码时）
+      final songUrl = UrlHelper.buildSongUrl(
+        nextSong.url!,
+        songFormat: nextSong.format,
+      );
       final separator = songUrl.contains('?') ? '&' : '?';
-      final prefetchUrl = '$songUrl${separator}prefetch=true';
+      final prefetchUrl = '$songUrl${separator}prefetch=1';
 
-      debugPrint('[Player] Prefetching next song: ${nextSong.title}');
+      debugPrint(
+        '[Player] Prefetching next song: ${nextSong.title} '
+        '(type=${nextSong.type}, format=${nextSong.format}, target=$targetFormat)',
+      );
 
-      // 使用简单的 Dio 实例发起 GET 请求
-      // 后端会 302 → 缓存接口检测 prefetch=true → 启动后台下载 → 202
+      // 后端 ?prefetch=1 会同步返回 202，异步跳起缓存/转码。
+      // 客户端不需要下载 body，超时设得短一点即可。
       final dio = Dio();
-      await dio.get(
+      final resp = await dio.get<void>(
         prefetchUrl,
         cancelToken: _prefetchCancelToken,
         options: Options(
-          receiveTimeout: const Duration(seconds: 15),
-          sendTimeout: const Duration(seconds: 10),
-          // 允许 2xx 和 3xx 状态码
+          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 5),
+          // 202 为预期响应，其他 2xx/3xx 也允许（兼容老后端）
           validateStatus: (status) => status != null && status < 400,
         ),
       );
 
-      debugPrint('[Player] Prefetch completed for: ${nextSong.title}');
+      debugPrint(
+        '[Player] Prefetch ack ${resp.statusCode} for: ${nextSong.title}',
+      );
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) {
         debugPrint('[Player] Prefetch cancelled for: ${nextSong.title}');
@@ -1363,6 +1378,19 @@ class PlayerNotifier extends Notifier<PlayerState> {
     } catch (e) {
       debugPrint('[Player] Prefetch error: $e');
     }
+  }
+
+  /// 当前歌曲剩余时间 ≤ 30s 时保险触发一次下一首预拉取。
+  /// PrefetchToCache + ffmpeg inflight 都自带去重，重复调用是安全的。
+  void _maybeFireLateStagePrefetch(Duration position) {
+    if (_lateStagePrefetchFired) return;
+    if (_preSelectedNextIndex == null) return;
+    final dur = state.duration;
+    if (dur <= Duration.zero) return;
+    if (dur - position > const Duration(seconds: 30)) return;
+    _lateStagePrefetchFired = true;
+    debugPrint('[Player] late-stage prefetch trigger');
+    _prefetchNextSong();
   }
 
   /// 预选下一首歌曲索引（用于预加载和随机模式播放）
