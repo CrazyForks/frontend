@@ -232,6 +232,85 @@ class JSPluginUpdateCheck {
   }
 }
 
+/// 插件注册表中的插件条目
+class RegistryPluginEntry {
+  final String name;
+  final String entryPath;
+  final String version;
+  final String? description;
+  final String? author;
+  final String? homepage;
+  final String? icon;
+  final String downloadUrl;
+  final bool installed;
+  final String? installedVersion;
+  final bool hasUpdate;
+
+  RegistryPluginEntry({
+    required this.name,
+    required this.entryPath,
+    required this.version,
+    this.description,
+    this.author,
+    this.homepage,
+    this.icon,
+    required this.downloadUrl,
+    this.installed = false,
+    this.installedVersion,
+    this.hasUpdate = false,
+  });
+
+  factory RegistryPluginEntry.fromJson(Map<String, dynamic> json) {
+    return RegistryPluginEntry(
+      name: json['name'] as String? ?? '',
+      entryPath: json['entry_path'] as String? ?? '',
+      version: json['version'] as String? ?? '',
+      description: json['description'] as String?,
+      author: json['author'] as String?,
+      homepage: json['homepage'] as String?,
+      icon: json['icon'] as String?,
+      downloadUrl: json['download_url'] as String? ?? '',
+      installed: json['installed'] as bool? ?? false,
+      installedVersion: json['installed_version'] as String?,
+      hasUpdate: json['has_update'] as bool? ?? false,
+    );
+  }
+}
+
+/// 注册表刷新响应
+class RegistryRefreshResponse {
+  final List<RegistryPluginEntry> plugins;
+  final int total;
+  final int page;
+  final int pageSize;
+  final List<String> warnings;
+
+  RegistryRefreshResponse({
+    required this.plugins,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+    this.warnings = const [],
+  });
+
+  factory RegistryRefreshResponse.fromJson(Map<String, dynamic> json) {
+    return RegistryRefreshResponse(
+      plugins: (json['plugins'] as List<dynamic>?)
+              ?.map((e) =>
+                  RegistryPluginEntry.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      total: json['total'] as int? ?? 0,
+      page: json['page'] as int? ?? 1,
+      pageSize: json['page_size'] as int? ?? 20,
+      warnings: (json['warnings'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+    );
+  }
+}
+
 /// JS 插件 API 服务
 class JSPluginApi {
   final Dio dio;
@@ -395,6 +474,62 @@ class JSPluginApi {
         data: body,
       );
       return JSPluginBatchUpdateResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 刷新插件注册表
+  /// POST /api/v1/jsplugins/registry/refresh
+  Future<RegistryRefreshResponse> refreshRegistry({
+    required String registryUrl,
+    int page = 1,
+    int pageSize = 20,
+    String? search,
+    String? githubProxy,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'registry_url': registryUrl,
+        'page': page,
+        'page_size': pageSize,
+      };
+      if (search != null && search.isNotEmpty) {
+        body['search'] = search;
+      }
+      if (githubProxy != null && githubProxy.isNotEmpty) {
+        body['github_proxy'] = githubProxy;
+      }
+      final response = await dio.post(
+        '${AppConfig.apiPrefix}/jsplugins/registry/refresh',
+        data: body,
+      );
+      return RegistryRefreshResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 从注册表安装插件
+  /// POST /api/v1/jsplugins/registry/install
+  Future<JSPluginUploadResponse> installFromRegistry({
+    required String downloadUrl,
+    String? githubProxy,
+  }) async {
+    try {
+      final body = <String, dynamic>{'download_url': downloadUrl};
+      if (githubProxy != null && githubProxy.isNotEmpty) {
+        body['github_proxy'] = githubProxy;
+      }
+      final response = await dio.post(
+        '${AppConfig.apiPrefix}/jsplugins/registry/install',
+        data: body,
+      );
+      return JSPluginUploadResponse.fromJson(
         response.data as Map<String, dynamic>,
       );
     } on DioException catch (e) {

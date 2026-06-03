@@ -12,6 +12,7 @@ import '../../../../core/theme/responsive.dart';
 import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../data/jsplugin_api.dart';
 import '../providers/jsplugin_provider.dart';
+import 'plugin_registry.dart';
 
 /// JS 插件远程更新的预设 GitHub 代理选项
 class _JSProxyOption {
@@ -69,9 +70,9 @@ class _JSPluginManagerState extends ConsumerState<JSPluginManager> {
                         label: const Text('上传插件'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _openPluginDownloadPage,
-                        icon: const Icon(Icons.download),
-                        label: const Text('获取插件'),
+                        onPressed: () => showPluginRegistryDialog(context),
+                        icon: const Icon(Icons.store),
+                        label: const Text('插件商店'),
                       ),
                       OutlinedButton.icon(
                         onPressed: _showBatchUpdateDialog,
@@ -89,9 +90,9 @@ class _JSPluginManagerState extends ConsumerState<JSPluginManager> {
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
-                        onPressed: _openPluginDownloadPage,
-                        icon: const Icon(Icons.download),
-                        label: const Text('获取插件'),
+                        onPressed: () => showPluginRegistryDialog(context),
+                        icon: const Icon(Icons.store),
+                        label: const Text('插件商店'),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
@@ -147,17 +148,6 @@ class _JSPluginManagerState extends ConsumerState<JSPluginManager> {
             pluginApi: ref.read(jsPluginApiProvider),
           ),
     );
-  }
-
-  static const _pluginDownloadUrl = 'https://songloft.hanxi.cc/issues/4.html';
-
-  Future<void> _openPluginDownloadPage() async {
-    final uri = Uri.parse(_pluginDownloadUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (mounted) {
-      ResponsiveSnackBar.show(context, message: '无法打开链接: $_pluginDownloadUrl');
-    }
   }
 
   void _showBatchUpdateDialog() {

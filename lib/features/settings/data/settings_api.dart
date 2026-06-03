@@ -45,6 +45,40 @@ class MusicPathSetting {
       );
 }
 
+/// 插件订阅源配置
+class PluginRegistryConfig {
+  final String url;
+  final String name;
+  final bool enabled;
+
+  PluginRegistryConfig({
+    required this.url,
+    required this.name,
+    this.enabled = true,
+  });
+
+  factory PluginRegistryConfig.fromJson(Map<String, dynamic> json) {
+    return PluginRegistryConfig(
+      url: json['url'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      enabled: json['enabled'] as bool? ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'name': name,
+        'enabled': enabled,
+      };
+
+  PluginRegistryConfig copyWith({String? url, String? name, bool? enabled}) =>
+      PluginRegistryConfig(
+        url: url ?? this.url,
+        name: name ?? this.name,
+        enabled: enabled ?? this.enabled,
+      );
+}
+
 /// 业务化设置 API 集合（/api/v1/settings/*）
 ///
 /// 用户可见的功能开关一律走这里；通用 KV 配置仍走 ConfigApi（admin 入口）。
@@ -148,6 +182,43 @@ class SettingsApi {
         '${AppConfig.apiPrefix}/settings/log-level',
         data: {'level': level},
       );
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  // ---------- 插件订阅源 ----------
+
+  Future<List<PluginRegistryConfig>> getPluginRegistries() async {
+    try {
+      final response = await dio.get(
+        '${AppConfig.apiPrefix}/settings/plugin-registries',
+      );
+      final data = response.data as Map<String, dynamic>;
+      final list = data['registries'] as List<dynamic>? ?? [];
+      return list
+          .map((e) =>
+              PluginRegistryConfig.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  Future<List<PluginRegistryConfig>> updatePluginRegistries(
+    List<PluginRegistryConfig> registries,
+  ) async {
+    try {
+      final response = await dio.put(
+        '${AppConfig.apiPrefix}/settings/plugin-registries',
+        data: {'registries': registries.map((r) => r.toJson()).toList()},
+      );
+      final data = response.data as Map<String, dynamic>;
+      final list = data['registries'] as List<dynamic>? ?? [];
+      return list
+          .map((e) =>
+              PluginRegistryConfig.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
