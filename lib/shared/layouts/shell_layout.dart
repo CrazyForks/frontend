@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/responsive.dart';
+import '../../features/home/presentation/plugin_tab_page.dart';
 import '../../features/library/presentation/providers/favorite_provider.dart';
 import '../../features/player/domain/player_state.dart';
 import '../../features/player/presentation/providers/player_provider.dart';
@@ -17,10 +18,17 @@ import 'adaptive_scaffold.dart';
 
 /// ShellRoute 的布局组件
 /// 整合 AdaptiveScaffold 和路由导航
-class ShellLayout extends ConsumerWidget {
+class ShellLayout extends ConsumerStatefulWidget {
   final Widget child;
 
   const ShellLayout({super.key, required this.child});
+
+  @override
+  ConsumerState<ShellLayout> createState() => _ShellLayoutState();
+}
+
+class _ShellLayoutState extends ConsumerState<ShellLayout> {
+  final _visitedPluginTabs = <String>{};
 
   /// 根据当前路由路径计算导航索引
   int _getCurrentIndex(String location, ActiveDestinations activeDest) {
@@ -52,7 +60,7 @@ class ShellLayout extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final activeDest = ref.watch(activeDestinationsProvider);
 
     // 获取当前路由位置
@@ -78,8 +86,45 @@ class ShellLayout extends ConsumerWidget {
     final isPluginTab = location.startsWith('/plugin-tab/');
     final isSettings = location.startsWith('/settings');
 
+    // 追踪已访问的插件 tab（首次访问时创建，之后通过 Offstage 保持存活）
+    final currentEntryPath =
+        isPluginTab ? location.replaceFirst('/plugin-tab/', '') : null;
+    if (currentEntryPath != null) {
+      _visitedPluginTabs.add(currentEntryPath);
+    }
+
+    // 清理已移除/禁用的插件
+    final validPaths = activeDest.indexToRoute
+        .where((r) => r.startsWith('/plugin-tab/'))
+        .map((r) => r.replaceFirst('/plugin-tab/', ''))
+        .toSet();
+    _visitedPluginTabs.retainAll(validPaths);
+
+    // 构建 body：插件 tab 通过 Offstage 持久化，避免 iframe 反复销毁/重建
+    Widget body;
+    if (_visitedPluginTabs.isEmpty) {
+      body = widget.child;
+    } else {
+      body = Stack(
+        children: [
+          Offstage(
+            offstage: isPluginTab,
+            child: widget.child,
+          ),
+          for (final ep in _visitedPluginTabs)
+            Offstage(
+              offstage: currentEntryPath != ep,
+              child: PluginTabPage(
+                key: ValueKey('plugin-keep-$ep'),
+                entryPath: ep,
+              ),
+            ),
+        ],
+      );
+    }
+
     return AdaptiveScaffold(
-      body: child,
+      body: body,
       currentIndex: currentIndex,
       destinations: activeDest.destinations,
       onDestinationSelected: (index) {

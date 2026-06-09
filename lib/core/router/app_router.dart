@@ -6,7 +6,6 @@ import '../../features/auth/domain/auth_state.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/home/presentation/home_page.dart';
-import '../../features/home/presentation/plugin_tab_page.dart';
 import '../../features/home/presentation/plugin_webview_page.dart';
 import '../../features/library/presentation/library_page.dart';
 import '../../features/playlist/presentation/playlists_page.dart';
@@ -169,14 +168,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const PluginRegistryPage(),
           ),
 
-          // 插件 Tab 页面
+          // 插件 Tab 页面（实际渲染由 ShellLayout 管理，此处仅作路由占位）
           GoRoute(
             path: AppRoutes.pluginTab,
             pageBuilder: (context, state) {
               final entryPath = state.pathParameters['entryPath'] ?? '';
               return NoTransitionPage(
                 key: ValueKey('plugin-tab-$entryPath'),
-                child: PluginTabPage(entryPath: entryPath),
+                child: const SizedBox.shrink(),
               );
             },
           ),

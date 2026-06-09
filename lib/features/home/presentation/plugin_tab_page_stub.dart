@@ -22,6 +22,9 @@ class PluginTabPage extends ConsumerStatefulWidget {
 }
 
 class _PluginTabPageState extends ConsumerState<PluginTabPage> {
+  static final _registeredTypes = <String>{};
+  static final _activeStates = <String, _PluginTabPageState>{};
+
   late final String _viewType;
   web.HTMLIFrameElement? _iframe;
   String? _lastTheme;
@@ -47,7 +50,34 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
   @override
   void initState() {
     super.initState();
-    _viewType = 'plugin-tab-${widget.entryPath}-$hashCode';
+    _viewType = 'plugin-tab-${widget.entryPath}';
+    _activeStates[widget.entryPath] = this;
+
+    if (!_registeredTypes.contains(_viewType)) {
+      _registeredTypes.add(_viewType);
+      final entryPath = widget.entryPath;
+      ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
+        final state = _activeStates[entryPath]!;
+        final theme = state._lastTheme ?? 'light';
+        final iframe = web.HTMLIFrameElement()
+          ..src = state._buildPluginUrl(theme)
+          ..style.border = 'none'
+          ..style.width = '100%'
+          ..style.height = '100%';
+        state._iframe = iframe;
+        return iframe;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_activeStates[widget.entryPath] == this) {
+      _activeStates.remove(widget.entryPath);
+    }
+    _iframe?.src = 'about:blank';
+    _iframe = null;
+    super.dispose();
   }
 
   @override
@@ -58,14 +88,6 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
 
     if (_lastTheme == null) {
       _lastTheme = theme;
-      ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
-        _iframe = web.HTMLIFrameElement()
-          ..src = _buildPluginUrl(theme)
-          ..style.border = 'none'
-          ..style.width = '100%'
-          ..style.height = '100%';
-        return _iframe!;
-      });
     } else if (_lastTheme != theme) {
       _lastTheme = theme;
       _sendThemeToPlugin(theme);
