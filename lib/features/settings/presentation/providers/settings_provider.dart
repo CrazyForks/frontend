@@ -72,16 +72,6 @@ final serverCacheConfigProvider = FutureProvider<CacheConfig>((ref) async {
   return cacheApi.getCacheConfig();
 });
 
-/// 网络歌曲自动转本地开关
-final autoConvertEnabledProvider = FutureProvider<bool>((ref) async {
-  final dio = ref.watch(dioProvider);
-  final response = await dio.get(
-    '${AppConfig.apiPrefix}/settings/auto-convert',
-  );
-  final data = response.data as Map<String, dynamic>;
-  return data['enabled'] as bool? ?? false;
-});
-
 // ============================================================================
 // Data Providers
 // ============================================================================

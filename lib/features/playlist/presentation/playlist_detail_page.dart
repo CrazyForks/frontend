@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -55,39 +53,14 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   /// 排序模式下的可排序歌曲列表（本地副本）
   List<Song> _sortableSongs = [];
 
-  /// 网络歌曲→本地歌曲转换进度
-  ConvertProgress? _convertProgress;
-  Timer? _convertTimer;
-
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
-    // 进入页面时主动检查是否有正在进行的转换任务,有则恢复进度轮询
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _resumeConvertProgressIfRunning();
-    });
-  }
-
-  /// 进入页面时检查后端是否有正在进行的转换,有则恢复轮询和 banner 显示
-  Future<void> _resumeConvertProgressIfRunning() async {
-    if (!mounted) return;
-    try {
-      final api = ref.read(playlistApiProvider);
-      final progress = await api.getConvertProgress(_playlistIdInt);
-      if (!mounted) return;
-      if (progress.isRunning) {
-        setState(() => _convertProgress = progress);
-        _pollConvertProgress(api);
-      }
-    } catch (_) {
-      // 查询失败静默忽略,不影响页面其他功能
-    }
   }
 
   @override
   void dispose() {
-    _convertTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -604,81 +577,6 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
               color: colorScheme.onSurfaceVariant,
             ),
           ),
-          // 转换进度 banner（仅在转换中或刚结束未关闭时显示）
-          if (_convertProgress != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            _buildConvertBanner(context, _convertProgress!),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// 转换进度 banner
-  Widget _buildConvertBanner(BuildContext context, ConvertProgress progress) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final total = progress.totalSongs;
-    final processed = progress.processedSongs;
-    final ratio = total > 0 ? processed / total : 0.0;
-    final isRunning = progress.isRunning;
-
-    String title;
-    if (isRunning) {
-      if (progress.waiting) {
-        title = '等待中（防风控限速）...  $processed / $total';
-      } else {
-        title = '正在转换  $processed / $total: ${progress.currentSong}';
-      }
-    } else if (progress.status == 'completed') {
-      title =
-          '转换完成: 成功 ${progress.convertedSongs}, 跳过 ${progress.skippedSongs}, 失败 ${progress.failedSongs}';
-    } else if (progress.status == 'cancelled') {
-      title = '已取消（已处理 $processed / $total）';
-    } else if (progress.status == 'failed') {
-      title = '转换失败: ${progress.error ?? '未知错误'}';
-    } else {
-      title = '转换 $processed / $total';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: textTheme.bodySmall,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                LinearProgressIndicator(
-                  value: isRunning && total > 0 ? ratio : null,
-                  minHeight: 4,
-                ),
-              ],
-            ),
-          ),
-          if (isRunning)
-            IconButton(
-              tooltip: '取消转换',
-              icon: const Icon(Icons.close),
-              onPressed: _cancelConvertToLocal,
-            )
-          else
-            IconButton(
-              tooltip: '关闭',
-              icon: const Icon(Icons.check),
-              onPressed: () => setState(() => _convertProgress = null),
-            ),
         ],
       ),
     );
@@ -821,9 +719,6 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
             case 'add_songs':
               _addSongs();
               break;
-            case 'convert_to_local':
-              _startConvertToLocal();
-              break;
             case 'delete':
               _confirmDelete(playlist);
               break;
@@ -840,16 +735,6 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              if (playlist.type != 'radio')
-                const PopupMenuItem(
-                  value: 'convert_to_local',
-                  child: ListTile(
-                    leading: Icon(Icons.download_done),
-                    title: Text('转换为本地歌曲'),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
               if (!isBuiltIn)
                 PopupMenuItem(
                   value: 'delete',
@@ -1178,75 +1063,6 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
         .read(playerStateProvider.notifier)
         .playPlaylist(songs, startIndex: index);
     ResponsiveSnackBar.show(context, message: '播放：${song.title}');
-  }
-
-  /// 启动网络歌曲→本地歌曲转换
-  Future<void> _startConvertToLocal() async {
-    final api = ref.read(playlistApiProvider);
-    try {
-      await api.convertPlaylistToLocal(_playlistIdInt);
-      if (!mounted) return;
-      ResponsiveSnackBar.show(context, message: '转换任务已启动，请耐心等待');
-      _pollConvertProgress(api);
-    } on DioException catch (e) {
-      if (!mounted) return;
-      // 优先显示后端返回的友好提示(如"该歌单没有需要转换的网络歌曲")
-      final data = e.response?.data;
-      final backendMsg = data is Map ? data['error']?.toString() : null;
-      final status = e.response?.statusCode ?? 0;
-      if (backendMsg != null &&
-          backendMsg.isNotEmpty &&
-          status >= 400 &&
-          status < 500) {
-        ResponsiveSnackBar.show(context, message: backendMsg);
-      } else {
-        ResponsiveSnackBar.showError(
-          context,
-          message: '启动转换失败: ${e.message ?? e}',
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ResponsiveSnackBar.showError(context, message: '启动转换失败: $e');
-    }
-  }
-
-  /// 轮询转换进度
-  void _pollConvertProgress(PlaylistApi api) {
-    _convertTimer?.cancel();
-    Future<void> fetchOnce() async {
-      try {
-        final progress = await api.getConvertProgress(_playlistIdInt);
-        if (!mounted) return;
-        setState(() => _convertProgress = progress);
-        if (progress.isFinished) {
-          _convertTimer?.cancel();
-          _convertTimer = null;
-          // 转换完成后刷新歌曲列表
-          ref.invalidate(playlistSongsProvider(_playlistIdInt));
-        }
-      } catch (e) {
-        // 轮询失败保留 timer 继续重试,避免短暂网络抖动中断
-      }
-    }
-
-    fetchOnce();
-    _convertTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      fetchOnce();
-    });
-  }
-
-  /// 取消转换
-  Future<void> _cancelConvertToLocal() async {
-    final api = ref.read(playlistApiProvider);
-    try {
-      await api.cancelConvert(_playlistIdInt);
-      if (!mounted) return;
-      ResponsiveSnackBar.show(context, message: '已请求取消');
-    } catch (e) {
-      if (!mounted) return;
-      ResponsiveSnackBar.showError(context, message: '取消失败: $e');
-    }
   }
 
   /// 从歌单移除歌曲

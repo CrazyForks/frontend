@@ -281,8 +281,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.duplicateCheck),
           ),
-          const Divider(height: 1),
-          _buildAutoConvertTile(),
         ],
       ),
     ];
@@ -687,38 +685,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ResponsiveSnackBar.show(
                   context,
                   message: value ? '已开启 HLS 代理' : '已关闭 HLS 代理',
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ResponsiveSnackBar.showError(context, message: '保存失败: $e');
-              }
-            },
-    );
-  }
-
-  Widget _buildAutoConvertTile() {
-    final enabledAsync = ref.watch(autoConvertEnabledProvider);
-    final enabled = enabledAsync.value ?? false;
-
-    return SwitchListTile(
-      secondary: const Icon(Icons.download_done_outlined),
-      title: const Text('网络歌曲自动转为本地'),
-      subtitle: const Text('网络歌曲缓存完成后,自动落地到音乐库,按歌单分目录存储'),
-      value: enabled,
-      onChanged: enabledAsync.isLoading
-          ? null
-          : (value) async {
-              final dio = ref.read(dioProvider);
-              try {
-                await dio.put(
-                  '${AppConfig.apiPrefix}/settings/auto-convert',
-                  data: {'enabled': value},
-                );
-                ref.invalidate(autoConvertEnabledProvider);
-                if (!mounted) return;
-                ResponsiveSnackBar.show(
-                  context,
-                  message: value ? '已开启自动转换' : '已关闭自动转换',
                 );
               } catch (e) {
                 if (!mounted) return;

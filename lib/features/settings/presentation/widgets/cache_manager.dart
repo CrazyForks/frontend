@@ -12,6 +12,16 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/cache_api.dart';
 import '../providers/settings_provider.dart';
 
+String _formatSize(int bytes) {
+  if (bytes <= 0) return '0 B';
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  if (bytes < 1024 * 1024 * 1024) {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+}
+
 /// 缓存大小档位选项
 const _cacheSizeOptions = [
   (value: 100 * 1024 * 1024, label: '100 MB'),
@@ -226,16 +236,53 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
     }
   }
 
-  /// 更新服务端缓存配置
+  /// 更新服务端缓存配置（仅 maxSize）
   Future<void> _updateServerCacheConfig(int maxSize) async {
     try {
       final cacheApi = ref.read(cacheApiProvider);
-      await cacheApi.updateCacheConfig(CacheConfig(maxSize: maxSize));
+      final current = ref.read(serverCacheConfigProvider).value;
+      await cacheApi.updateCacheConfig(CacheConfig(
+        maxSize: maxSize,
+        cacheDir: current?.cacheDir ?? '',
+      ));
       ref.invalidate(serverCacheConfigProvider);
       ref.invalidate(serverCacheStatsProvider);
     } catch (e) {
       if (mounted) {
         ResponsiveSnackBar.showError(context, message: '更新配置失败: $e');
+      }
+    }
+  }
+
+  /// 修改缓存目录
+  Future<void> _editCacheDir(CacheConfig config) async {
+    final cacheApi = ref.read(cacheApiProvider);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _CacheDirDialog(
+        cacheApi: cacheApi,
+        currentDir: config.cacheDir,
+        defaultDir: config.defaultCacheDir,
+      ),
+    );
+    if (result == null || result == config.cacheDir) return;
+    try {
+      final api = ref.read(cacheApiProvider);
+      await api.updateCacheConfig(CacheConfig(
+        maxSize: config.maxSize,
+        cacheDir: result,
+      ));
+      ref.invalidate(serverCacheConfigProvider);
+      ref.invalidate(serverCacheStatsProvider);
+      if (mounted) {
+        ResponsiveSnackBar.show(
+          context,
+          message: result.isEmpty ? '已恢复默认缓存目录' : '缓存目录已更新',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ResponsiveSnackBar.showError(context, message: '更新失败: $e');
       }
     }
   }
@@ -265,17 +312,6 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
         ],
       ),
     );
-  }
-
-  /// 格式化文件大小
-  String _formatSize(int bytes) {
-    if (bytes <= 0) return '0 B';
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   /// 根据 maxSize 值找到对应的档位索引
@@ -417,6 +453,29 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
+
+              // 缓存目录
+              configAsync.when(
+                data: (config) {
+                  final dir = config.cacheDir.isNotEmpty
+                      ? config.cacheDir
+                      : config.defaultCacheDir;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.folder_outlined),
+                    title: const Text('缓存目录'),
+                    subtitle: Text(
+                      dir.isNotEmpty ? dir : '未配置',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _editCacheDir(config),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
 
               // 最大缓存大小滑动条
               configAsync.when(
@@ -648,6 +707,197 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 缓存目录编辑对话框（含验证按钮和磁盘空间显示）
+class _CacheDirDialog extends StatefulWidget {
+  final CacheApi cacheApi;
+  final String currentDir;
+  final String defaultDir;
+
+  const _CacheDirDialog({
+    required this.cacheApi,
+    required this.currentDir,
+    required this.defaultDir,
+  });
+
+  @override
+  State<_CacheDirDialog> createState() => _CacheDirDialogState();
+}
+
+class _CacheDirDialogState extends State<_CacheDirDialog> {
+  late final TextEditingController _controller;
+  bool _validating = false;
+  DirValidateResult? _validateResult;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentDir);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _validate() async {
+    final path = _controller.text.trim();
+    if (path.isEmpty) return;
+    setState(() {
+      _validating = true;
+      _validateResult = null;
+    });
+    try {
+      final result = await widget.cacheApi.validateCacheDir(path);
+      if (mounted) setState(() => _validateResult = result);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _validateResult = DirValidateResult(
+          valid: false,
+          created: false,
+          totalSize: 0,
+          freeSize: 0,
+          error: e.toString(),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _validating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return AlertDialog(
+      title: const Text('缓存目录'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('设置服务端音乐缓存的存储目录。留空则使用默认目录。切换目录不会自动迁移旧缓存文件。'),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      labelText: '缓存目录（绝对路径）',
+                      hintText: widget.defaultDir,
+                      helperText: '默认: ${widget.defaultDir}',
+                      helperMaxLines: 2,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (_) {
+                      setState(() => _validateResult = null);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: OutlinedButton(
+                    onPressed: _validating || _controller.text.trim().isEmpty
+                        ? null
+                        : _validate,
+                    child: _validating
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('验证'),
+                  ),
+                ),
+              ],
+            ),
+            if (_validateResult != null) ...[
+              const SizedBox(height: 12),
+              _buildValidateResult(colorScheme, textTheme),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        if (widget.currentDir.isNotEmpty)
+          TextButton(
+            onPressed: () => Navigator.pop(context, ''),
+            child: const Text('恢复默认'),
+          ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: const Text('保存'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildValidateResult(ColorScheme colorScheme, TextTheme textTheme) {
+    final result = _validateResult!;
+    if (!result.valid) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: colorScheme.error, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                result.error ?? '目录不可用',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final parts = <String>[];
+    if (result.created) parts.add('目录已自动创建');
+    if (result.totalSize > 0) {
+      parts.add('磁盘总量 ${_formatSize(result.totalSize)}');
+      parts.add('可用 ${_formatSize(result.freeSize)}');
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_outline, color: colorScheme.primary, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '目录可用${parts.isNotEmpty ? '  ·  ${parts.join('  ·  ')}' : ''}',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onPrimaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
