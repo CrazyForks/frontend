@@ -65,6 +65,7 @@ class PlaylistRepository {
     String? description,
     String? coverPath,
     String? coverUrl,
+    int? coverSongId,
   }) async {
     try {
       return await playlistApi.updatePlaylist(
@@ -73,6 +74,7 @@ class PlaylistRepository {
         description: description,
         coverPath: coverPath,
         coverUrl: coverUrl,
+        coverSongId: coverSongId,
       );
     } on DioException catch (e) {
       throw _handleError(e);

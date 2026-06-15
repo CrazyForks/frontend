@@ -396,6 +396,7 @@ class PlaylistNotifier extends Notifier<AsyncValue<void>> {
     String? description,
     String? coverPath,
     String? coverUrl,
+    int? coverSongId,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -405,6 +406,7 @@ class PlaylistNotifier extends Notifier<AsyncValue<void>> {
         description: description,
         coverPath: coverPath,
         coverUrl: coverUrl,
+        coverSongId: coverSongId,
       );
       state = const AsyncValue.data(null);
       // 刷新歌单详情和列表

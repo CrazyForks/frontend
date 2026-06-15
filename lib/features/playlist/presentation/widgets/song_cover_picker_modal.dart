@@ -123,7 +123,10 @@ class SongCoverPickerModal extends ConsumerWidget {
                               onTap: () {
                                 Navigator.of(
                                   context,
-                                ).pop({'coverUrl': song.coverUrl});
+                                ).pop({
+                                  'songId': song.id,
+                                  'coverUrl': song.coverUrl,
+                                });
                               },
                             );
                           }, childCount: songsWithCover.length),
@@ -311,12 +314,12 @@ class _CoverGridItem extends StatelessWidget {
 
 /// 显示歌曲封面选择弹窗的便捷方法
 ///
-/// 返回选中的封面信息 Map，包含 'coverPath' 和 'coverUrl'，取消返回 null
-Future<Map<String, String?>?> showSongCoverPicker(
+/// 返回选中的封面信息 Map，包含 'songId'(int) 和 'coverUrl'(String?)，取消返回 null
+Future<Map<String, dynamic>?> showSongCoverPicker(
   BuildContext context,
   int playlistId,
 ) {
-  return showModalBottomSheet<Map<String, String?>>(
+  return showModalBottomSheet<Map<String, dynamic>>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

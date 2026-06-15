@@ -69,6 +69,7 @@ class PlaylistApi {
     String? description,
     String? coverPath,
     String? coverUrl,
+    int? coverSongId,
   }) async {
     final data = <String, dynamic>{};
     if (name != null) {
@@ -77,11 +78,15 @@ class PlaylistApi {
     if (description != null) {
       data['description'] = description;
     }
-    if (coverPath != null) {
-      data['cover_path'] = coverPath;
-    }
-    if (coverUrl != null) {
-      data['cover_url'] = coverUrl;
+    if (coverSongId != null) {
+      data['cover_song_id'] = coverSongId;
+    } else {
+      if (coverPath != null) {
+        data['cover_path'] = coverPath;
+      }
+      if (coverUrl != null) {
+        data['cover_url'] = coverUrl;
+      }
     }
 
     final response = await dio.put(

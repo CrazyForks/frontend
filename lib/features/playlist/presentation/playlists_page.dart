@@ -882,8 +882,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       // 处理封面
       final coverMode = result['coverMode'] as String?;
       final localFile = result['localFile'] as PlatformFile?;
-      final selectedCoverPath = result['selectedCoverPath'] as String?;
-      final selectedCoverUrl = result['selectedCoverUrl'] as String?;
+      final selectedCoverSongId = result['selectedCoverSongId'] as int?;
 
       if (coverMode == 'local' && localFile != null) {
         // 上传本地图片
@@ -909,14 +908,13 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
         if (updated != null && mounted) {
           ResponsiveSnackBar.showSuccess(context, message: '歌单更新成功');
         }
-      } else if (coverMode == 'song') {
+      } else if (coverMode == 'song' && selectedCoverSongId != null) {
         // 从歌曲选择的封面
         final updated = await notifier.updatePlaylist(
           playlist.id,
           name: result['name'] as String,
           description: result['description'] as String?,
-          coverPath: selectedCoverPath ?? '',
-          coverUrl: selectedCoverUrl ?? '',
+          coverSongId: selectedCoverSongId,
         );
 
         if (updated != null && mounted) {
@@ -1101,8 +1099,8 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
   /// 封面选择模式（仅编辑模式）
   String? _coverMode;
   PlatformFile? _localFile;
-  String? _selectedCoverPath;
   String? _selectedCoverUrl;
+  int? _selectedCoverSongId;
 
   @override
   void initState() {
@@ -1160,8 +1158,8 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
     final result = await showSongCoverPicker(context, widget.playlistId!);
     if (result != null) {
       setState(() {
-        _selectedCoverPath = result['coverPath'];
-        _selectedCoverUrl = result['coverUrl'];
+        _selectedCoverSongId = result['songId'] as int?;
+        _selectedCoverUrl = result['coverUrl'] as String?;
         _coverMode = 'song';
         _localFile = null;
       });
@@ -1173,8 +1171,8 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
     setState(() {
       _coverMode = 'clear';
       _localFile = null;
-      _selectedCoverPath = null;
       _selectedCoverUrl = null;
+      _selectedCoverSongId = null;
     });
   }
 
@@ -1362,8 +1360,9 @@ class _PlaylistFormDialogState extends State<_PlaylistFormDialog> {
       if (widget.isEdit) {
         result['coverMode'] = _coverMode;
         result['localFile'] = _localFile;
-        result['selectedCoverPath'] = _selectedCoverPath;
         result['selectedCoverUrl'] = _selectedCoverUrl;
+        result['selectedCoverSongId'] = _selectedCoverSongId;
+        result['selectedCoverSongId'] = _selectedCoverSongId;
       }
 
       Navigator.of(context).pop(result);

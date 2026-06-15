@@ -1443,9 +1443,9 @@ class _PlaylistEditDialogState extends ConsumerState<_PlaylistEditDialog> {
   /// 本地选择的文件
   PlatformFile? _localFile;
 
-  /// 从歌曲选择的封面路径
-  String? _selectedCoverPath;
+  /// 从歌曲选择的封面信息
   String? _selectedCoverUrl;
+  int? _selectedCoverSongId;
 
   /// 是否正在保存
   bool _isSaving = false;
@@ -1505,8 +1505,8 @@ class _PlaylistEditDialogState extends ConsumerState<_PlaylistEditDialog> {
     final result = await showSongCoverPicker(context, widget.playlistId);
     if (result != null) {
       setState(() {
-        _selectedCoverPath = result['coverPath'];
-        _selectedCoverUrl = result['coverUrl'];
+        _selectedCoverSongId = result['songId'] as int?;
+        _selectedCoverUrl = result['coverUrl'] as String?;
         _coverMode = 'song';
         _localFile = null;
       });
@@ -1518,8 +1518,8 @@ class _PlaylistEditDialogState extends ConsumerState<_PlaylistEditDialog> {
     setState(() {
       _coverMode = 'clear';
       _localFile = null;
-      _selectedCoverPath = null;
       _selectedCoverUrl = null;
+      _selectedCoverSongId = null;
     });
   }
 
@@ -1555,13 +1555,13 @@ class _PlaylistEditDialogState extends ConsumerState<_PlaylistEditDialog> {
           name: name,
           description: description.isEmpty ? null : description,
         );
-      } else if (_coverMode == 'song') {
+      } else if (_coverMode == 'song' && _selectedCoverSongId != null) {
         // 从歌曲选择的封面
         await notifier.updatePlaylist(
           widget.playlistId,
           name: name,
           description: description.isEmpty ? null : description,
-          coverPath: _selectedCoverPath ?? '',
+          coverSongId: _selectedCoverSongId,
         );
       } else if (_coverMode == 'clear') {
         // 清除封面
