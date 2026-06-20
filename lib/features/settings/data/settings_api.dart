@@ -195,6 +195,64 @@ class TabConfig {
   int get totalCount => 2 + optionalCount; // 首页 + 设置 + 可选项
 }
 
+/// 用户偏好设置（跨设备同步）
+class UserPreferences {
+  final String themeMode;
+  final String playMode;
+  final String playlistViewMode;
+  final String audioQuality;
+  final int localCacheMaxSize;
+  final double volume;
+
+  UserPreferences({
+    required this.themeMode,
+    required this.playMode,
+    required this.playlistViewMode,
+    required this.audioQuality,
+    required this.localCacheMaxSize,
+    required this.volume,
+  });
+
+  factory UserPreferences.defaults() => UserPreferences(
+    themeMode: 'system',
+    playMode: 'order',
+    playlistViewMode: 'grid',
+    audioQuality: 'original',
+    localCacheMaxSize: 1073741824,
+    volume: 50.0,
+  );
+
+  factory UserPreferences.fromJson(Map<String, dynamic> json) {
+    return UserPreferences(
+      themeMode: json['theme_mode'] as String? ?? 'system',
+      playMode: json['play_mode'] as String? ?? 'order',
+      playlistViewMode: json['playlist_view_mode'] as String? ?? 'grid',
+      audioQuality: json['audio_quality'] as String? ?? 'original',
+      localCacheMaxSize: json['local_cache_max_size'] as int? ?? 1073741824,
+      volume: (json['volume'] as num?)?.toDouble() ?? 50.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'theme_mode': themeMode,
+    'play_mode': playMode,
+    'playlist_view_mode': playlistViewMode,
+    'audio_quality': audioQuality,
+    'local_cache_max_size': localCacheMaxSize,
+    'volume': volume,
+  };
+
+  bool isAllDefaults() {
+    final d = UserPreferences.defaults();
+    return themeMode == d.themeMode &&
+        playMode == d.playMode &&
+        playlistViewMode == d.playlistViewMode &&
+        audioQuality == d.audioQuality &&
+        localCacheMaxSize == d.localCacheMaxSize &&
+        volume == d.volume;
+  }
+}
+
 /// 业务化设置 API 集合（/api/v1/settings/*）
 ///
 /// 用户可见的功能开关一律走这里；通用 KV 配置仍走 ConfigApi（admin 入口）。
@@ -458,6 +516,33 @@ class SettingsApi {
         data: config.toJson(),
       );
       return TabConfig.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  // ---------- 用户偏好（跨设备同步） ----------
+
+  Future<UserPreferences> getUserPreferences() async {
+    try {
+      final response = await dio.get(
+        '${AppConfig.apiPrefix}/settings/user-preferences',
+      );
+      return UserPreferences.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  Future<UserPreferences> updateUserPreferences(
+    UserPreferences prefs,
+  ) async {
+    try {
+      final response = await dio.put(
+        '${AppConfig.apiPrefix}/settings/user-preferences',
+        data: prefs.toJson(),
+      );
+      return UserPreferences.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }

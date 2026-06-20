@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/app_config.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/storage/preference_sync_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/cache_api.dart';
 import '../../data/config_api.dart';
@@ -151,6 +152,7 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       await prefs.setThemeMode(mode);
+      pushPreferencesToServer(ref.read(dioProvider));
     } catch (e) {
       // 保存失败忽略
     }
@@ -676,6 +678,7 @@ class AudioQualityNotifier extends Notifier<String> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       await prefs.setAudioQuality(quality);
+      pushPreferencesToServer(ref.read(dioProvider));
     } catch (_) {}
   }
 }

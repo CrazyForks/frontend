@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/api_client.dart';
+import '../../../../core/storage/preference_sync_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// 歌单视图模式枚举
@@ -48,6 +50,7 @@ class PlaylistViewModeNotifier extends Notifier<PlaylistViewMode> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       await prefs.setPlaylistViewMode(newMode.name);
+      pushPreferencesToServer(ref.read(dioProvider));
       debugPrint('[PlaylistView] Saved view mode: ${newMode.name}');
     } catch (e) {
       debugPrint('[PlaylistView] Failed to save view mode: $e');
@@ -60,6 +63,7 @@ class PlaylistViewModeNotifier extends Notifier<PlaylistViewMode> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       await prefs.setPlaylistViewMode(mode.name);
+      pushPreferencesToServer(ref.read(dioProvider));
       debugPrint('[PlaylistView] Saved view mode: ${mode.name}');
     } catch (e) {
       debugPrint('[PlaylistView] Failed to save view mode: $e');

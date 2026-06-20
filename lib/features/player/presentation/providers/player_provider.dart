@@ -11,6 +11,7 @@ import '../../../../core/audio/audio_service.dart';
 import '../../../../core/audio/media_browse_data_source.dart';
 import '../../../../core/platform/live_activity_service.dart';
 import '../../../../core/storage/app_preferences.dart';
+import '../../../../core/storage/preference_sync_service.dart';
 import '../../../../core/utils/audio_format_helper.dart';
 import '../../../../core/utils/platform_utils.dart';
 import '../../../../core/network/api_client.dart';
@@ -644,6 +645,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         try {
           final prefs = await ref.read(appPreferencesProvider.future);
           await prefs.setVolume(clampedVolume);
+          pushPreferencesToServer(ref.read(dioProvider));
         } catch (e) {
           debugPrint('[Player] Failed to save volume: $e');
         }
@@ -674,6 +676,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       await prefs.setPlayMode(mode.toStorageString());
+      pushPreferencesToServer(ref.read(dioProvider));
       debugPrint('[Player] Saved playMode: ${mode.toStorageString()}');
     } catch (e) {
       debugPrint('[Player] Failed to save playMode: $e');

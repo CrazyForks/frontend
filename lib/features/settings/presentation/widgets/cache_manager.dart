@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/lyric_cache_service.dart';
+import '../../../../core/storage/preference_sync_service.dart';
 import '../../../../core/utils/web_cache_clearer.dart' as web_cache;
 import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -85,6 +87,7 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
       final prefs = await ref.read(appPreferencesProvider.future);
       final maxSize = _cacheSizeOptions[index].value;
       await prefs.setLocalCacheMaxSize(maxSize);
+      pushPreferencesToServer(ref.read(dioProvider));
     } catch (e) {
       if (mounted) {
         ResponsiveSnackBar.showError(context, message: '保存配置失败: $e');

@@ -8,10 +8,12 @@ import '../../../../core/network/base_url_provider.dart';
 import '../../../../core/network/server_entry.dart';
 import '../../../../core/network/servers_provider.dart';
 import '../../../../core/storage/app_preferences.dart';
+import '../../../../core/storage/preference_sync_service.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../data/auth_api.dart';
 import '../../data/auth_repository.dart';
 import '../../domain/auth_state.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 
 /// AppPreferences Provider（异步初始化）
 final appPreferencesProvider = FutureProvider<AppPreferences>((ref) async {
@@ -117,6 +119,11 @@ class AuthNotifier extends Notifier<AuthState> {
       final prefs = await ref.read(appPreferencesProvider.future);
       await prefs.setLastUsername(username);
       await prefs.setLastPassword(password);
+
+      // 从服务端同步用户偏好（服务端优先；首次登录时反向推送本地值）
+      await syncPreferencesFromServer(ref.read(dioProvider));
+      ref.invalidate(themeModeProvider);
+      ref.invalidate(audioQualityProvider);
 
       state = state.authenticated();
     } on FormatException catch (e) {
