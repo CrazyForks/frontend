@@ -260,6 +260,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       playerState,
     ) {
       final isLive = state.currentSong?.isLive ?? false;
+      final wasPlaying = state.isPlaying;
       state = state.copyWith(
         isPlaying: playerState.playing,
         isBuffering:
@@ -267,6 +268,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
             (playerState.processingState == ja.ProcessingState.buffering &&
             !isLive),
       );
+      if (wasPlaying != playerState.playing) {
+        _liveActivity.updatePlaybackState(
+          isPlaying: playerState.playing,
+          progress: state.progress,
+        );
+      }
     });
     // 歌曲结束通过 _audioHandler.onSongCompleted 回调处理
 
@@ -285,30 +292,26 @@ class PlayerNotifier extends Notifier<PlayerState> {
     }
   }
 
-  /// 初始化 Live Activity 监听
+  /// 初始化 Live Activity 服务
   void _initLiveActivityListeners() {
-    final liveActivity = LiveActivityService();
+    _liveActivity = LiveActivityService();
+  }
 
-    ref.listen(playerStateProvider.select((s) => s.currentSong), (prev, next) {
-      if (next == null) {
-        liveActivity.endActivity();
-      } else if (prev?.id != next.id) {
-        liveActivity.startActivity(
-          title: next.title,
-          artist: next.artist ?? '',
-          artUrl: next.coverUrl != null
-              ? UrlHelper.buildCoverUrl(next.coverUrl!)
-              : null,
-        );
-      }
-    });
+  late final LiveActivityService _liveActivity;
 
-    ref.listen(playerStateProvider.select((s) => s.isPlaying), (prev, next) {
-      liveActivity.updatePlaybackState(
-        isPlaying: next,
-        progress: state.progress,
+  /// 通知 Live Activity 当前歌曲变更
+  void _syncLiveActivitySong(Song? song) {
+    if (song == null) {
+      _liveActivity.endActivity();
+    } else {
+      _liveActivity.startActivity(
+        title: song.title,
+        artist: song.artist ?? '',
+        artUrl: song.coverUrl != null
+            ? UrlHelper.buildCoverUrl(song.coverUrl!)
+            : null,
       );
-    });
+    }
   }
 
   void _notifyPlayEvent(int songId, String type) {
@@ -728,6 +731,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
       currentSong: newSong,
       clearCurrentSong: newSong == null,
     );
+    if (newSong == null) {
+      _syncLiveActivitySong(null);
+    }
     _savePlaybackState();
   }
 
@@ -782,6 +788,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       duration: Duration.zero,
       clearSourcePlaylistId: true,
     );
+    _syncLiveActivitySong(null);
     _savePlaybackState();
   }
 
@@ -1388,6 +1395,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
         previousSong.id != song.id &&
         _audioHandler.processingState != ja.ProcessingState.completed) {
       _notifyPlayEvent(previousSong.id, 'skip');
+    }
+
+    if (previousSong?.id != song.id) {
+      _syncLiveActivitySong(song);
     }
 
     debugPrint(

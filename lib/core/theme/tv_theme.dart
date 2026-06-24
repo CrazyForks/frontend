@@ -55,7 +55,7 @@ class TvTheme {
   static const double listItemMinHeight = 72;
 
   /// 导航栏高度
-  static const double navBarHeight = 80;
+  static const double navBarHeight = 88;
 
   /// Tab 项最小高度
   static const double tabItemMinHeight = 64;
