@@ -80,40 +80,9 @@ class EqualizerPlugin: NSObject {
 
     @available(macOS 12.0, *)
     private func attachToPlayer(_ avPlayer: AVQueuePlayer) -> Bool {
-        guard !isAttached else { return true }
-
-        let engine = AVAudioEngine()
-        let eq = AVAudioUnitEQ(numberOfBands: UInt32(frequencies.count))
-
-        for (i, freq) in frequencies.enumerated() {
-            let band = eq.bands[i]
-            band.filterType = .parametric
-            band.frequency = freq
-            band.bandwidth = 1.0
-            band.gain = 0
-            band.bypass = false
-        }
-
-        engine.attach(eq)
-
-        let outputNode = avPlayer.audioOutputNode
-        let mainMixer = engine.mainMixerNode
-        let format = outputNode.outputFormat(forBus: 0)
-
-        engine.connect(outputNode, to: eq, format: format)
-        engine.connect(eq, to: mainMixer, format: format)
-
-        do {
-            try engine.start()
-            audioEngine = engine
-            eqNode = eq
-            isAttached = true
-            print("[EQ-Darwin] Audio engine started with EQ")
-            return true
-        } catch {
-            print("[EQ-Darwin] Failed to start audio engine: \(error)")
-            return false
-        }
+        // AVPlayer.audioOutputNode 仅在 iOS/tvOS 18+ 可用，macOS SDK 中不存在
+        // macOS 上 just_audio 走 media_kit/mpv，EQ 通过 mpv 音频滤镜实现
+        return false
     }
 
     private func findAVPlayer() -> AVQueuePlayer? {

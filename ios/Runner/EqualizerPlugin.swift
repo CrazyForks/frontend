@@ -60,11 +60,11 @@ class EqualizerPlugin: NSObject {
     }
 
     private func initialize() -> Bool {
-        guard #available(iOS 15.0, *) else { return false }
+        guard #available(iOS 18.0, *) else { return false }
         return setupEQ()
     }
 
-    @available(iOS 15.0, *)
+    @available(iOS 18.0, *)
     private func setupEQ() -> Bool {
         guard !isAttached else { return true }
 
@@ -76,12 +76,12 @@ class EqualizerPlugin: NSObject {
         return attachToPlayer(avPlayer)
     }
 
-    @available(iOS 15.0, *)
+    @available(iOS 18.0, *)
     private func attachToPlayer(_ avPlayer: AVQueuePlayer) -> Bool {
         guard !isAttached else { return true }
 
         let engine = AVAudioEngine()
-        let eq = AVAudioUnitEQ(numberOfBands: UInt32(frequencies.count))
+        let eq = AVAudioUnitEQ(numberOfBands: frequencies.count)
 
         for (i, freq) in frequencies.enumerated() {
             let band = eq.bands[i]
@@ -142,7 +142,7 @@ class EqualizerPlugin: NSObject {
         let enabled = args["enabled"] as? Bool ?? false
         let bands = args["bands"] as? [Double] ?? []
 
-        if #available(iOS 15.0, *) {
+        if #available(iOS 18.0, *) {
             if !isAttached, let avPlayer = findAVPlayer() {
                 _ = attachToPlayer(avPlayer)
             }
