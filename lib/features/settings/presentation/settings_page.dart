@@ -177,7 +177,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppConfig.isEmbedded ? 'Songloft' : currentUrl,
+                  AppConfig.isEmbedded
+                      ? 'Songloft'
+                      : ref.watch(runModeProvider) == RunMode.local
+                          ? '本地模式'
+                          : currentUrl,
                   style: textTheme.titleSmall?.copyWith(
                     color: colorScheme.onPrimaryContainer,
                   ),
@@ -195,7 +199,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ],
             ),
           ),
-          if (!AppConfig.isEmbedded && ref.watch(runModeProvider) != RunMode.local)
+          if (!AppConfig.isEmbedded)
             TextButton(
               onPressed: () => context.push(AppRoutes.servers),
               style: TextButton.styleFrom(
@@ -600,11 +604,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         title: '账户',
         icon: Icons.account_circle_outlined,
         children: [
-          if (!AppConfig.isEmbedded && ref.watch(runModeProvider) != RunMode.local) ...[
+          if (!AppConfig.isEmbedded) ...[
             ListTile(
-              leading: const Icon(Icons.link),
-              title: const Text('服务器'),
-              subtitle: _buildApiUrlSubtitle(),
+              leading: Icon(ref.watch(runModeProvider) == RunMode.local
+                  ? Icons.phone_android
+                  : Icons.link),
+              title: Text(ref.watch(runModeProvider) == RunMode.local
+                  ? '本地模式'
+                  : '服务器'),
+              subtitle: ref.watch(runModeProvider) == RunMode.local
+                  ? Text(
+                      ref.watch(localMusicDirProvider) ?? '未选择音乐目录',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  : _buildApiUrlSubtitle(),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(AppRoutes.servers),
             ),
