@@ -79,8 +79,7 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
               _loadCompleter?.complete(_duration);
             }
           }
-        } else if (_processingState != ProcessingStateMessage.completed ||
-            isBuffering) {
+        } else if (_processingState != ProcessingStateMessage.completed) {
           _processingState = isBuffering
               ? ProcessingStateMessage.buffering
               : ProcessingStateMessage.ready;
@@ -113,6 +112,10 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
             _currentIndex == player.state.playlist.medias.length - 1 &&
             player.state.playlistMode == PlaylistMode.none) {
           _processingState = ProcessingStateMessage.completed;
+        } else if (!completed &&
+            _processingState == ProcessingStateMessage.completed) {
+          // seek 从 completed 状态恢复时，允许过渡到 buffering
+          _processingState = ProcessingStateMessage.buffering;
         }
         _errorCode = null;
         _errorMessage = null;
