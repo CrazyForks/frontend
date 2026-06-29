@@ -40,42 +40,14 @@ final audioHandlerProvider = Provider<SongloftAudioHandler>((ref) {
 /// 全局 Tracely 客户端（未启用时为 null）
 TracelyClient? _tracelyClient;
 
+const _desktopPluginStartupTimeout = Duration(seconds: 3);
+const _audioStartupTimeout = Duration(seconds: 5);
+
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Web 端默认启用语义树，无需用户手动点击 "Enable accessibility"
-  if (kIsWeb) {
-    SemanticsBinding.instance.ensureSemantics();
-  }
 
-  // Web 上 dart:io 的 Platform 不可用，调用任意 getter 会抛 UnsupportedError，
-  // 必须用 kIsWeb 守卫后再访问 Platform.isWindows
-  if (!kIsWeb && Platform.isWindows) {
-    await WindowsSingleInstance.ensureSingleInstance(
-      args,
-      'songloft_player_instance',
-      onSecondWindow: (List<String> args) {
-        windowManager.show();
-        windowManager.focus();
-      },
-    );
-  }
-
-  // Windows 和 Linux 平台需要 media_kit 作为 just_audio 的后端
-  // 必须在 AudioService.init() 之前调用
-  // 使用自定义 SongloftJustAudioPlatform 替代 JustAudioMediaKit，
-  // 以暴露 media_kit Player 实例供 EQ 均衡器设置 mpv 音频滤镜。
-  if (!kIsWeb) {
-    if (Platform.isWindows || Platform.isLinux) {
-      SongloftJustAudioPlatform.register();
-    } else {
-      JustAudioMediaKit.ensureInitialized();
-    }
-  }
-
-  // 初始化 Windows 系统托盘与拦截关闭事件
-  await WindowTrayManager.setup();
-
-  // 全局异常处理，防止未捕获异常导致白屏
+  // Install global handlers before any plugin initialization. Several desktop
+  // plugins run before runApp; catching their failures keeps startup visible.
   FlutterError.onError = (FlutterErrorDetails details) {
     debugPrint('[FlutterError] ${details.exceptionAsString()}');
     FlutterError.presentError(details);
@@ -95,6 +67,49 @@ void main(List<String> args) async {
     return true;
   };
 
+  // Web 端默认启用语义树，无需用户手动点击 "Enable accessibility"
+  if (kIsWeb) {
+    SemanticsBinding.instance.ensureSemantics();
+  }
+
+  // Web 上 dart:io 的 Platform 不可用，调用任意 getter 会抛 UnsupportedError，
+  // 必须用 kIsWeb 守卫后再访问 Platform.isWindows
+  if (!kIsWeb && Platform.isWindows) {
+    try {
+      await WindowsSingleInstance.ensureSingleInstance(
+        args,
+        'songloft_player_instance',
+        onSecondWindow: (List<String> args) {
+          windowManager.show();
+          windowManager.focus();
+        },
+      ).timeout(_desktopPluginStartupTimeout);
+    } catch (e, stackTrace) {
+      debugPrint('[Main] Windows 单实例初始化失败，继续启动: $e');
+      debugPrint('[Main] Stack trace: $stackTrace');
+    }
+  }
+
+  // Windows 和 Linux 平台需要 media_kit 作为 just_audio 的后端
+  // 必须在 AudioService.init() 之前调用
+  // 使用自定义 SongloftJustAudioPlatform 替代 JustAudioMediaKit，
+  // 以暴露 media_kit Player 实例供 EQ 均衡器设置 mpv 音频滤镜。
+  if (!kIsWeb) {
+    if (Platform.isWindows || Platform.isLinux) {
+      SongloftJustAudioPlatform.register();
+    } else {
+      JustAudioMediaKit.ensureInitialized();
+    }
+  }
+
+  // 初始化 Windows 系统托盘与拦截关闭事件。托盘是非关键功能，失败不能阻塞首帧。
+  try {
+    await WindowTrayManager.setup().timeout(_desktopPluginStartupTimeout);
+  } catch (e, stackTrace) {
+    debugPrint('[Main] Windows 托盘初始化失败，继续启动: $e');
+    debugPrint('[Main] Stack trace: $stackTrace');
+  }
+
   AppConfig.isTvMode = await TvDetector.isTv();
 
   if (AppConfig.isEmbedded) {
@@ -104,9 +119,10 @@ void main(List<String> args) async {
     // 检测 <base href> 中的 sub-path（由 Go 服务端运行时注入）
     final uriBasePath = Uri.base.path;
     if (uriBasePath.length > 1) {
-      final trimmed = uriBasePath.endsWith('/')
-          ? uriBasePath.substring(0, uriBasePath.length - 1)
-          : uriBasePath;
+      final trimmed =
+          uriBasePath.endsWith('/')
+              ? uriBasePath.substring(0, uriBasePath.length - 1)
+              : uriBasePath;
       AppConfig.basePath = trimmed;
       AppConfig.apiPrefix = '$trimmed/api/v1';
     }
@@ -142,8 +158,12 @@ void main(List<String> args) async {
       if (lastVersion.isEmpty) {
         _tracelyClient!.reportInstall(currentVersion, platform, userId);
       } else if (lastVersion != currentVersion) {
-        _tracelyClient!
-            .reportUpgrade(lastVersion, currentVersion, platform, userId);
+        _tracelyClient!.reportUpgrade(
+          lastVersion,
+          currentVersion,
+          platform,
+          userId,
+        );
       }
       if (lastVersion != currentVersion) {
         await prefs.setString('_tracely_reported_version', currentVersion);
@@ -187,12 +207,24 @@ void main(List<String> args) async {
 
   // Linux: 注册 MPRIS 平台实现，使 audio_service 自动集成 D-Bus 媒体键
   if (!kIsWeb && Platform.isLinux) {
-    AudioServiceMpris.registerWith();
+    try {
+      AudioServiceMpris.registerWith();
+    } catch (e, stackTrace) {
+      debugPrint('[Main] MPRIS 注册失败，继续启动: $e');
+      debugPrint('[Main] Stack trace: $stackTrace');
+    }
   }
 
   // Windows: 初始化 SMTC (System Media Transport Controls)
+  var smtcAvailable = false;
   if (!kIsWeb && Platform.isWindows) {
-    await initializeSmtc();
+    try {
+      await initializeSmtc().timeout(_desktopPluginStartupTimeout);
+      smtcAvailable = true;
+    } catch (e, stackTrace) {
+      debugPrint('[Main] SMTC 初始化失败，继续启动: $e');
+      debugPrint('[Main] Stack trace: $stackTrace');
+    }
   }
 
   // 初始化 audio_service（带降级保护）
@@ -223,8 +255,8 @@ void main(List<String> args) async {
                 AndroidContentStyle.gridItemHintValue,
           },
         ),
-      );
-      await audioHandler.ensureInitialized();
+      ).timeout(_audioStartupTimeout);
+      await audioHandler.ensureInitialized().timeout(_audioStartupTimeout);
       debugPrint(
         '[Main] ✅ AudioService 初始化成功, handler type: ${audioHandler.runtimeType}',
       );
@@ -233,14 +265,24 @@ void main(List<String> args) async {
       debugPrint('[Main] Stack trace: $stackTrace');
       debugPrint('[Main] ⚠️ 使用降级 handler (通知栏功能将不可用)');
       audioHandler = SongloftAudioHandler();
-      await audioHandler.ensureInitialized();
+      try {
+        await audioHandler.ensureInitialized().timeout(_audioStartupTimeout);
+      } catch (fallbackError, fallbackStackTrace) {
+        debugPrint('[Main] 降级 handler 初始化失败，继续启动: $fallbackError');
+        debugPrint('[Main] Stack trace: $fallbackStackTrace');
+      }
     }
   }
 
   // Windows: 创建 SMTC 桥接服务，连接系统媒体传输控件与音频处理器
   SmtcService? smtcService;
-  if (!kIsWeb && Platform.isWindows) {
-    smtcService = SmtcService(audioHandler);
+  if (!kIsWeb && Platform.isWindows && smtcAvailable) {
+    try {
+      smtcService = SmtcService(audioHandler);
+    } catch (e, stackTrace) {
+      debugPrint('[Main] SMTC 服务创建失败，继续启动: $e');
+      debugPrint('[Main] Stack trace: $stackTrace');
+    }
   }
 
   // 注入退出前清理回调：先释放音频资源，避免窗口销毁时 libmpv C++ 线程仍在运行导致 Fail Fast Exception
