@@ -27,6 +27,7 @@ import 'core/tracely/tracely_client.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/responsive.dart';
 import 'core/router/app_router.dart';
+import 'core/utils/file_logger.dart';
 import 'core/utils/platform_utils.dart';
 import 'core/utils/window_tray_manager.dart';
 import 'features/settings/presentation/providers/settings_provider.dart';
@@ -45,6 +46,17 @@ const _audioStartupTimeout = Duration(seconds: 5);
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化文件日志并拦截 debugPrint，使所有日志同时写入控制台和文件。
+  // 必须在所有 debugPrint 调用之前完成，确保捕获完整的启动日志。
+  await FileLogger.init();
+  final originalDebugPrint = debugPrint;
+  debugPrint = (String? message, {int? wrapWidth}) {
+    originalDebugPrint(message, wrapWidth: wrapWidth);
+    if (message != null) {
+      FileLogger.writeln(message);
+    }
+  };
 
   // Install global handlers before any plugin initialization. Several desktop
   // plugins run before runApp; catching their failures keeps startup visible.
@@ -95,10 +107,15 @@ void main(List<String> args) async {
   // 使用自定义 SongloftJustAudioPlatform 替代 JustAudioMediaKit，
   // 以暴露 media_kit Player 实例供 EQ 均衡器设置 mpv 音频滤镜。
   if (!kIsWeb) {
-    if (Platform.isWindows || Platform.isLinux) {
-      SongloftJustAudioPlatform.register();
-    } else {
-      JustAudioMediaKit.ensureInitialized();
+    try {
+      if (Platform.isWindows || Platform.isLinux) {
+        SongloftJustAudioPlatform.register();
+      } else {
+        JustAudioMediaKit.ensureInitialized();
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[Main] MediaKit 初始化失败，音频功能将不可用: $e');
+      debugPrint('[Main] Stack trace: $stackTrace');
     }
   }
 
