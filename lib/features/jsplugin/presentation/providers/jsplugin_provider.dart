@@ -35,3 +35,13 @@ final pluginRegistriesProvider =
   final api = ref.watch(settingsApiProvider);
   return api.getPluginRegistries();
 });
+
+// ============================================================================
+// Plugin Keep-Alive Providers
+// ============================================================================
+
+/// 获取插件常驻白名单
+final pluginKeepAliveProvider = FutureProvider<List<String>>((ref) async {
+  final api = ref.watch(settingsApiProvider);
+  return api.getPluginKeepAlive();
+});

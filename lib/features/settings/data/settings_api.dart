@@ -483,6 +483,31 @@ class SettingsApi {
     }
   }
 
+  // ---------- 插件常驻白名单 ----------
+
+  Future<List<String>> getPluginKeepAlive() async {
+    try {
+      final response = await dio.get(
+        '${AppConfig.apiPrefix}/settings/plugin-keep-alive',
+      );
+      final data = response.data as Map<String, dynamic>;
+      return List<String>.from(data['plugins'] ?? []);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  Future<void> setPluginKeepAlive(List<String> plugins) async {
+    try {
+      await dio.put(
+        '${AppConfig.apiPrefix}/settings/plugin-keep-alive',
+        data: {'plugins': plugins},
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   // ---------- 自动扫描配置 ----------
 
   Future<AutoScanSetting> getAutoScan() async {

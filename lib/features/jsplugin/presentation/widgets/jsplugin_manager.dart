@@ -10,6 +10,7 @@ import '../../../../core/network/api_exceptions.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/responsive.dart';
 import '../../../../shared/utils/responsive_snackbar.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../data/jsplugin_api.dart';
 import '../providers/jsplugin_provider.dart';
 import 'plugin_icon.dart';
@@ -580,6 +581,31 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
     }
   }
 
+  Future<void> _toggleKeepAlive() async {
+    final settingsApi = ref.read(settingsApiProvider);
+    final currentList =
+        ref.read(pluginKeepAliveProvider).value ?? <String>[];
+    final entryPath = widget.plugin.entryPath;
+    if (entryPath == null) return;
+
+    final List<String> newList = currentList.contains(entryPath)
+        ? currentList.where((e) => e != entryPath).toList()
+        : [...currentList, entryPath];
+
+    try {
+      await settingsApi.setPluginKeepAlive(newList);
+      ref.invalidate(pluginKeepAliveProvider);
+    } on ApiException catch (e) {
+      if (mounted) {
+        ResponsiveSnackBar.showError(context, message: '操作失败: ${e.message}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ResponsiveSnackBar.showError(context, message: '操作失败: $e');
+      }
+    }
+  }
+
   Future<void> _deletePlugin() async {
     final result = await showDialog<({bool confirmed, bool keepData})>(
       context: context,
@@ -828,6 +854,9 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
   List<Widget> _buildTrailingActions(bool isMobile) {
     final plugin = widget.plugin;
     final colorScheme = Theme.of(context).colorScheme;
+    final keepAliveList =
+        ref.watch(pluginKeepAliveProvider).value ?? [];
+    final isKeepAlive = keepAliveList.contains(plugin.entryPath);
 
     final Widget switchOrLoader =
         _isToggling
@@ -848,6 +877,8 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
             switch (value) {
               case 'homepage':
                 _openHomepage(plugin.homepage!);
+              case 'keep_alive':
+                _toggleKeepAlive();
               case 'update':
                 _showUpdateDialog();
               case 'force_update':
@@ -870,6 +901,23 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
                   ),
                   const PopupMenuDivider(),
                 ],
+                if (plugin.isActive)
+                  PopupMenuItem<String>(
+                    value: 'keep_alive',
+                    child: ListTile(
+                      leading: Icon(
+                        isKeepAlive
+                            ? Icons.push_pin
+                            : Icons.push_pin_outlined,
+                      ),
+                      title: const Text('常驻运行'),
+                      trailing: isKeepAlive
+                          ? const Icon(Icons.check, size: 18)
+                          : null,
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
                 const PopupMenuItem<String>(
                   value: 'update',
                   child: ListTile(
@@ -939,6 +987,8 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
         tooltip: '更新',
         onSelected: (value) {
           switch (value) {
+            case 'keep_alive':
+              _toggleKeepAlive();
             case 'update':
               _showUpdateDialog();
             case 'force_update':
@@ -946,6 +996,23 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
           }
         },
         itemBuilder: (context) => [
+          if (plugin.isActive)
+            PopupMenuItem<String>(
+              value: 'keep_alive',
+              child: ListTile(
+                leading: Icon(
+                  isKeepAlive
+                      ? Icons.push_pin
+                      : Icons.push_pin_outlined,
+                ),
+                title: const Text('常驻运行'),
+                trailing: isKeepAlive
+                    ? const Icon(Icons.check, size: 18)
+                    : null,
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
           const PopupMenuItem<String>(
             value: 'update',
             child: ListTile(
