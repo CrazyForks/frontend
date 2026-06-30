@@ -13,8 +13,7 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
-    guard let controller = window?.rootViewController as? FlutterViewController else { return }
-    let messenger = controller.binaryMessenger
+    let messenger = engineBridge.applicationRegistrar.messenger()
     LiveActivityManager.shared.register(with: messenger)
     EqualizerPlugin.shared.register(with: messenger)
     SongloftBackendPlugin.shared.register(with: messenger)
