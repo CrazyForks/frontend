@@ -35,6 +35,25 @@ class WindowTrayManager with WindowListener, TrayListener {
     await manager._initTray();
   }
 
+  /// 修复 Windows 高 DPI 下启动时「窗口一半白屏、resize/全屏后恢复」的问题。
+  ///
+  /// 根因：首帧渲染的 Flutter surface 尺寸与窗口客户区不匹配，白色区域为未绘制部分，
+  /// 直到一次 resize 触发引擎按客户区重排才恢复。首帧渲染后主动做一次尺寸抖动强制重排。
+  /// 手法与 window_manager 内部 setFullScreen 的修复一致（见其 GitHub issue #311）。
+  static void fixInitialSurfaceSize() {
+    if (kIsWeb || !Platform.isWindows) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 200));
+      try {
+        final size = await windowManager.getSize();
+        await windowManager.setSize(size + const Offset(1, 1));
+        await windowManager.setSize(size);
+      } catch (e) {
+        debugPrint('[WindowTrayManager] 首帧尺寸修复失败: $e');
+      }
+    });
+  }
+
   Future<void> _initTray() async {
     String getIconPath() {
       if (Platform.isWindows) {

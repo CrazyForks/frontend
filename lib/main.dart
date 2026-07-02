@@ -320,6 +320,9 @@ void main(List<String> args) async {
       child: const StartupGate(child: SongloftApp()),
     ),
   );
+
+  // Windows 高 DPI 下启动首帧可能出现「窗口一半白屏」，首帧后触发一次尺寸重排修复。
+  WindowTrayManager.fixInitialSurfaceSize();
 }
 
 String _generateUserId() {
