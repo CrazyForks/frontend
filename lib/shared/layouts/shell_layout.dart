@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -86,42 +86,58 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
     final isPluginTab = location.startsWith('/plugin-tab/');
     final isSettings = location.startsWith('/settings');
 
-    // 追踪已访问的插件 tab（首次访问时创建，之后通过 Offstage 保持存活）
     final currentEntryPath =
         isPluginTab ? location.replaceFirst('/plugin-tab/', '') : null;
-    if (currentEntryPath != null) {
-      _visitedPluginTabs.add(currentEntryPath);
-    }
 
-    // 清理已移除/禁用的插件
-    final validPaths = activeDest.indexToRoute
-        .where((r) => r.startsWith('/plugin-tab/'))
-        .map((r) => r.replaceFirst('/plugin-tab/', ''))
-        .toSet();
-    _visitedPluginTabs.retainAll(validPaths);
-
-    // 构建 body：插件 tab 通过 Offstage 持久化，避免 iframe 反复销毁/重建
+    // 构建 body：
+    // - Web：插件 tab 通过 Offstage 持久化，避免 CanvasKit 反复销毁/重建
+    //   iframe 触发渲染器段错误（见 32d8924）
+    // - 原生（桌面/移动）：只渲染当前激活的插件 tab，切走即销毁 WebView。
+    //   桌面端 flutter_inappwebview 的 WebView2 是独立原生表面，Offstage
+    //   无法隐藏它，保活会在切到其他页面后残留灰块（songloft-org/songloft#246）
     Widget body;
-    if (_visitedPluginTabs.isEmpty) {
-      body = widget.child;
-    } else {
-      body = Stack(
-        children: [
-          Offstage(
-            offstage: isPluginTab,
-            child: widget.child,
-          ),
-          for (final ep in _visitedPluginTabs)
+    if (kIsWeb) {
+      // 追踪已访问的插件 tab（首次访问时创建，之后通过 Offstage 保持存活）
+      if (currentEntryPath != null) {
+        _visitedPluginTabs.add(currentEntryPath);
+      }
+
+      // 清理已移除/禁用的插件
+      final validPaths = activeDest.indexToRoute
+          .where((r) => r.startsWith('/plugin-tab/'))
+          .map((r) => r.replaceFirst('/plugin-tab/', ''))
+          .toSet();
+      _visitedPluginTabs.retainAll(validPaths);
+
+      if (_visitedPluginTabs.isEmpty) {
+        body = widget.child;
+      } else {
+        body = Stack(
+          children: [
             Offstage(
-              offstage: currentEntryPath != ep,
-              child: PluginTabPage(
-                key: ValueKey('plugin-keep-$ep'),
-                entryPath: ep,
-                isActive: currentEntryPath == ep,
-              ),
+              offstage: isPluginTab,
+              child: widget.child,
             ),
-        ],
+            for (final ep in _visitedPluginTabs)
+              Offstage(
+                offstage: currentEntryPath != ep,
+                child: PluginTabPage(
+                  key: ValueKey('plugin-keep-$ep'),
+                  entryPath: ep,
+                  isActive: currentEntryPath == ep,
+                ),
+              ),
+          ],
+        );
+      }
+    } else if (currentEntryPath != null) {
+      body = PluginTabPage(
+        key: ValueKey('plugin-active-$currentEntryPath'),
+        entryPath: currentEntryPath,
+        isActive: true,
       );
+    } else {
+      body = widget.child;
     }
 
     return AdaptiveScaffold(
