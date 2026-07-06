@@ -15,6 +15,7 @@
 #   ./scripts/build-frontend.sh all ./frontend-build
 
 set -e
+set -o pipefail
 
 # 颜色定义
 RED='\033[0;31m'
@@ -436,12 +437,16 @@ build_macos() {
     # 1. 构建 Flutter macOS .app
     flutter build macos --release "${FLUTTER_VERSION_ARGS[@]}" 2>&1 | tee -a "$log_file"
 
-    # 如果存在 Go 后端二进制，拷贝到 .app/Contents/MacOS/ 目录
+    # Xcode 构建阶段会在签名前嵌入 Go 后端二进制。
     local go_server="macos/Runner/songloft-server"
     if [ -f "$go_server" ]; then
         for app_dir in build/macos/Build/Products/Release/*.app; do
-            cp "$go_server" "$app_dir/Contents/MacOS/"
-            echo -e "${GREEN}✓ [macOS]${NC} Go 后端已打包进 .app"
+            if [ ! -x "$app_dir/Contents/MacOS/songloft-server" ]; then
+                echo -e "${RED}✗ [macOS]${NC} Go 后端未打包进 .app"
+                return 1
+            fi
+            codesign --verify --deep --strict --verbose=2 "$app_dir" 2>&1 | tee -a "$log_file"
+            echo -e "${GREEN}✓ [macOS]${NC} Go 后端已打包进 .app 并通过签名校验"
         done
     fi
 
