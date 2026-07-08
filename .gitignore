@@ -47,3 +47,8 @@ app.*.map.json
 .aone_copilot/
 dist/
 pubspec.lock
+
+# 嵌入桌面客户端的 Go 后端二进制（由 make build-go-desktop-* 构建，不入库）
+/macos/Runner/songloft-server
+/windows/runner/songloft-server.exe
+/linux/runner/songloft-server

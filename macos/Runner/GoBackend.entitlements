@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  songloft-server 是被沙盒化的 Runner.app 作为子进程启动的 Go 后端。
+	  沙盒 app 启动的子进程必须带 app-sandbox + inherit，才能继承父进程的
+	  沙盒授权（network.server / network.client / user-selected 文件访问）。
+	  否则子进程拿不到网络权限，ListenAndServe 会失败：
+	  "listen tcp :PORT: bind: operation not permitted"，本地模式随即报错。
+	  带 inherit 的子进程只能声明这两个 key，不能再单独申请其它 entitlement。
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.inherit</key>
+	<true/>
+</dict>
+</plist>
