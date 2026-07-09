@@ -258,21 +258,37 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
 
   Widget _buildScanningState(ScanProgress progress) {
     final isCreatingPlaylists = progress.isCreatingPlaylists;
+    final isSplittingCue = progress.isSplittingCue;
     final isDiscovering = progress.status == 'scanning';
+    // 发现文件、CUE 切分、创建歌单阶段进度不可量化，用不确定进度条
+    final indeterminate =
+        isCreatingPlaylists || isSplittingCue || isDiscovering;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LinearProgressIndicator(
-          value: (isCreatingPlaylists || isDiscovering)
-              ? null
-              : progress.progress / 100,
+          value: indeterminate ? null : progress.progress / 100,
           minHeight: 8,
           borderRadius: BorderRadius.circular(4),
         ),
         const SizedBox(height: 12),
         if (isCreatingPlaylists)
           Text('正在按目录自动创建歌单...', style: Theme.of(context).textTheme.bodySmall)
-        else if (isDiscovering) ...[
+        else if (isSplittingCue) ...[
+          Text(
+            '正在切分整轨(CUE)${progress.cueSplitSources > 0 ? ': 已处理 ${progress.cueSplitSources} 个来源' : '...'}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (progress.currentFile != null && progress.currentFile!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              progress.currentFile!,
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ] else if (isDiscovering) ...[
           Text(
             '正在发现文件${progress.discoveredFiles > 0 ? ': 已发现 ${progress.discoveredFiles} 个' : '...'}',
             style: Theme.of(context).textTheme.bodySmall,
@@ -293,6 +309,7 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
         ],
         const SizedBox(height: 12),
         OutlinedButton.icon(
+          // CUE 切分阶段后端支持取消，仅自动创建歌单阶段禁用
           onPressed: isCreatingPlaylists ? null : _cancelScan,
           icon: const Icon(Icons.cancel),
           label: const Text('取消扫描'),

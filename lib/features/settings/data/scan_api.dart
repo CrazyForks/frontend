@@ -6,7 +6,7 @@ import '../../../core/network/api_exceptions.dart';
 /// 扫描进度模型
 class ScanProgress {
   final String
-  status; // 'idle', 'scanning', 'importing', 'creating_playlists', 'completed', 'failed', 'cancelling', 'cancelled'
+  status; // 'idle', 'scanning', 'importing', 'splitting_cue', 'creating_playlists', 'completed', 'failed', 'cancelling', 'cancelled'
   final String? currentFile;
   final int discoveredFiles;
   final int totalFiles;
@@ -14,6 +14,7 @@ class ScanProgress {
   final int importedFiles;
   final int skippedFiles;
   final int failedFiles;
+  final int cueSplitSources;
   final int localSongCount;
 
   ScanProgress({
@@ -25,6 +26,7 @@ class ScanProgress {
     required this.importedFiles,
     required this.skippedFiles,
     required this.failedFiles,
+    this.cueSplitSources = 0,
     this.localSongCount = 0,
   });
 
@@ -38,6 +40,7 @@ class ScanProgress {
       importedFiles: json['imported_files'] as int? ?? 0,
       skippedFiles: json['skipped_files'] as int? ?? 0,
       failedFiles: json['failed_files'] as int? ?? 0,
+      cueSplitSources: json['cue_split_sources'] as int? ?? 0,
       localSongCount: json['local_song_count'] as int? ?? 0,
     );
   }
@@ -55,15 +58,19 @@ class ScanProgress {
   /// 计算进度百分比 0-100
   int get progress => totalFiles > 0 ? (scannedFiles * 100 ~/ totalFiles) : 0;
 
-  /// 是否正在扫描（包括 scanning、importing、creating_playlists 阶段）
+  /// 是否正在扫描（包括 scanning、importing、splitting_cue、creating_playlists 阶段）
   bool get isScanning =>
       status == 'scanning' ||
       status == 'importing' ||
+      status == 'splitting_cue' ||
       status == 'creating_playlists' ||
       status == 'cancelling';
 
   /// 是否处于自动创建歌单阶段
   bool get isCreatingPlaylists => status == 'creating_playlists';
+
+  /// 是否处于 CUE 整轨切分阶段
+  bool get isSplittingCue => status == 'splitting_cue';
 
   /// 是否完成
   bool get isCompleted => status == 'completed';
