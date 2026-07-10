@@ -237,44 +237,70 @@ class DesktopPlayer extends ConsumerWidget {
   ) {
     final theme = Theme.of(context);
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // 播放模式
-        _buildPlayModeButton(context, state, notifier, theme),
-        // 音量控制：使用响应式组件自动适配
-        Flexible(
-          child: ResponsiveVolumeControl(
-            volume: state.volume,
-            onVolumeChanged: notifier.setVolume,
+    final volume = ResponsiveVolumeControl(
+      volume: state.volume,
+      onVolumeChanged: notifier.setVolume,
+    );
+
+    // 音量之后的次要操作按钮
+    final actions = <Widget>[
+      // 均衡器
+      IconButton(
+        onPressed: () => showEqualizerSheet(context),
+        icon: const Icon(Icons.equalizer_rounded, size: 20),
+        tooltip: '均衡器',
+        visualDensity: VisualDensity.compact,
+      ),
+      // 投屏
+      const CastButton(iconSize: 20, visualDensity: VisualDensity.compact),
+      // 睡眠定时
+      _buildSleepTimerButton(context, state, notifier, theme),
+      // 歌词按钮
+      _buildLyricsButton(context, state, theme),
+      // 播放列表
+      IconButton(
+        onPressed: notifier.togglePlaylistDrawer,
+        icon: Icon(
+          Icons.queue_music_rounded,
+          size: 20,
+          color: state.showPlaylistDrawer ? theme.colorScheme.primary : null,
+        ),
+        tooltip: '播放列表',
+        visualDensity: VisualDensity.compact,
+      ),
+    ];
+
+    // 窗口较窄（如平板布局 / 缩小的桌面窗口）时，固定尺寸的按钮会超出
+    // Expanded(flex:3) 分配的宽度导致 RenderFlex 溢出。这里按可用宽度分档：
+    // - 空间充足：内联音量滑块 + 全部按钮（原布局）
+    // - 空间紧张：整体等比缩小并让音量退化为弹出图标，保证任意宽度都不溢出
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 300) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildPlayModeButton(context, state, notifier, theme),
+              Flexible(child: volume),
+              ...actions,
+            ],
+          );
+        }
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildPlayModeButton(context, state, notifier, theme),
+              // 无界约束下 ResponsiveVolumeControl 自动退化为弹出图标
+              volume,
+              ...actions,
+            ],
           ),
-        ),
-        // 均衡器
-        IconButton(
-          onPressed: () => showEqualizerSheet(context),
-          icon: const Icon(Icons.equalizer_rounded, size: 20),
-          tooltip: '均衡器',
-          visualDensity: VisualDensity.compact,
-        ),
-        // 投屏
-        const CastButton(iconSize: 20, visualDensity: VisualDensity.compact),
-        // 睡眠定时
-        _buildSleepTimerButton(context, state, notifier, theme),
-        // 歌词按钮
-        _buildLyricsButton(context, state, theme),
-        // 播放列表
-        IconButton(
-          onPressed: notifier.togglePlaylistDrawer,
-          icon: Icon(
-            Icons.queue_music_rounded,
-            size: 20,
-            color: state.showPlaylistDrawer ? theme.colorScheme.primary : null,
-          ),
-          tooltip: '播放列表',
-          visualDensity: VisualDensity.compact,
-        ),
-      ],
+        );
+      },
     );
   }
 

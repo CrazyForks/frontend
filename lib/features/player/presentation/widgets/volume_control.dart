@@ -264,8 +264,9 @@ class ResponsiveVolumeControl extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 宽度足够时显示完整的音量控制
-        if (constraints.maxWidth >= threshold) {
+        // 宽度足够时显示完整的音量控制；
+        // 无界约束（FittedBox / 横向滚动等场景）下退化为弹出式，避免内部 Flexible 报错
+        if (constraints.maxWidth.isFinite && constraints.maxWidth >= threshold) {
           return VolumeControl(
             volume: volume,
             onVolumeChanged: onVolumeChanged,
