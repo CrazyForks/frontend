@@ -9,6 +9,10 @@ import '../../../../core/utils/url_helper.dart';
 import '../../../../shared/models/song.dart';
 import '../../../../shared/widgets/favorite_button.dart';
 
+/// 桌面端「操作按钮」列宽度。tile 内的按钮区与列表表头占位需保持一致，
+/// 否则表头与行的操作列对不齐；宽度需容纳 5 个紧凑按钮（play/收藏/编辑/加歌单/删除）。
+const double kDesktopActionsWidth = 180;
+
 /// 歌曲列表项组件
 class SongListTile extends ConsumerWidget {
   final Song song;
@@ -191,7 +195,10 @@ class SongListTile extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             // 操作按钮
-            SizedBox(width: 140, child: _buildDesktopActions(context)),
+            SizedBox(
+              width: kDesktopActionsWidth,
+              child: _buildDesktopActions(context),
+            ),
           ],
         ),
       ),
@@ -313,15 +320,14 @@ class SongListTile extends ConsumerWidget {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                if (song.type != AppConstants.songTypeLocal)
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: ListTile(
-                      leading: Icon(Icons.edit),
-                      title: Text('编辑'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: Icon(Icons.edit),
+                    title: Text('编辑'),
+                    contentPadding: EdgeInsets.zero,
                   ),
+                ),
                 const PopupMenuItem(
                   value: 'add_to_playlist',
                   child: ListTile(
@@ -345,46 +351,46 @@ class SongListTile extends ConsumerWidget {
   }
 
   Widget _buildDesktopActions(BuildContext context) {
-    if (isSelectionMode) return const SizedBox(width: 140);
+    if (isSelectionMode) return const SizedBox(width: kDesktopActionsWidth);
 
+    // 紧凑化：默认 IconButton 触摸目标 48px，5 个按钮会撑破操作列导致右侧按钮
+    // （编辑/添加/删除）被裁剪不可见。shrinkWrap + compact 让按钮回落到 minWidth。
     const constraints = BoxConstraints(minWidth: 28, minHeight: 28);
+
+    Widget actionButton({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback? onPressed,
+    }) {
+      return IconButton(
+        icon: Icon(icon),
+        tooltip: tooltip,
+        onPressed: onPressed,
+        iconSize: 20,
+        padding: EdgeInsets.zero,
+        constraints: constraints,
+        visualDensity: VisualDensity.compact,
+        style: IconButton.styleFrom(
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      );
+    }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          icon: const Icon(Icons.play_arrow),
-          tooltip: '播放',
-          onPressed: onTap,
-          iconSize: 20,
-          padding: EdgeInsets.zero,
-          constraints: constraints,
-        ),
+        actionButton(icon: Icons.play_arrow, tooltip: '播放', onPressed: onTap),
         FavoriteButton(songId: song.id, songType: song.type, size: 20),
-        if (song.type != AppConstants.songTypeLocal)
-          IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: '编辑',
-            onPressed: onEdit,
-            iconSize: 20,
-            padding: EdgeInsets.zero,
-            constraints: constraints,
-          ),
-        IconButton(
-          icon: const Icon(Icons.playlist_add),
+        actionButton(icon: Icons.edit, tooltip: '编辑', onPressed: onEdit),
+        actionButton(
+          icon: Icons.playlist_add,
           tooltip: '添加到歌单',
           onPressed: onAddToPlaylist,
-          iconSize: 20,
-          padding: EdgeInsets.zero,
-          constraints: constraints,
         ),
-        IconButton(
-          icon: const Icon(Icons.delete_outline),
+        actionButton(
+          icon: Icons.delete_outline,
           tooltip: '删除',
           onPressed: onDelete,
-          iconSize: 20,
-          padding: EdgeInsets.zero,
-          constraints: constraints,
         ),
       ],
     );

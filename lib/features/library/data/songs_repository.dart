@@ -164,6 +164,27 @@ class SongsRepository {
     }
   }
 
+  /// 写入本地歌曲标签（透传 SongsApi.writeSongTags，包错误处理）
+  Future<({String fileWrite})> writeSongTags(
+    int id, {
+    String? title,
+    String? artist,
+    String? album,
+    bool renameFile = false,
+  }) async {
+    try {
+      return await songsApi.writeSongTags(
+        id,
+        title: title,
+        artist: artist,
+        album: album,
+        renameFile: renameFile,
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// 删除歌曲
   Future<void> deleteSong(int id, {bool deleteFiles = false}) async {
     try {

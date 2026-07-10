@@ -232,6 +232,37 @@ class SongsApi {
     return (fileWriteStatus: status);
   }
 
+  /// 写入本地歌曲标签
+  ///
+  /// PUT /api/v1/songs/{id}/tags
+  ///
+  /// 仅本地歌曲：把 title/artist/album 同时写入数据库和音频文件标签。
+  /// [renameFile] 为 true 时后端按新标题重命名本地文件（保留原目录与扩展名，
+  /// CUE 歌曲不生效）；标题清理后为空或目标文件名已存在时后端返回 400。
+  ///
+  /// 返回 `fileWrite`：'written' / 'skipped' / 'failed' —— 表示后端是否成功
+  /// 把标签回写到本地音频文件，由调用方按状态显示对应 toast。
+  Future<({String fileWrite})> writeSongTags(
+    int id, {
+    String? title,
+    String? artist,
+    String? album,
+    bool renameFile = false,
+  }) async {
+    final data = <String, dynamic>{
+      if (title != null) 'title': title,
+      if (artist != null) 'artist': artist,
+      if (album != null) 'album': album,
+      'rename_file': renameFile,
+    };
+    final response = await dio.put<Map<String, dynamic>>(
+      '${AppConfig.apiPrefix}/songs/$id/tags',
+      data: data,
+    );
+    final fileWrite = response.data?['file_write'] as String? ?? 'skipped';
+    return (fileWrite: fileWrite);
+  }
+
   /// 删除歌曲
   Future<void> deleteSong(int id, {bool deleteFiles = false}) async {
     await dio.delete(

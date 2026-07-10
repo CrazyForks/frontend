@@ -19,6 +19,7 @@ import '../../../shared/widgets/delete_song_dialog.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/song_picker_modal.dart';
 import '../../library/presentation/providers/songs_provider.dart';
+import '../../library/presentation/song_edit_page.dart';
 import '../../player/presentation/providers/player_provider.dart';
 import '../domain/playlist.dart';
 import 'providers/playlist_provider.dart';
@@ -1324,6 +1325,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
           onTap: () => _playSong(song, songs, index),
           onRemove: () => _removeSong(playlist.id, song),
           onDeleteFromLibrary: () => _deleteSongFromLibrary(song),
+          onEdit: () => _navigateToEditSong(song),
           onLongPress: () {
             _enterSelectMode();
             _toggleSongSelection(song.id);
@@ -1557,6 +1559,20 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     }
   }
 
+  /// 编辑歌曲（跳转编辑页，返回后刷新歌单歌曲列表与歌曲库）
+  Future<void> _navigateToEditSong(Song song) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SongEditPage(song: song, songType: song.type),
+      ),
+    );
+    if (result == true) {
+      ref.invalidate(playlistSongsProvider(_playlistIdInt));
+      ref.invalidate(songsListProvider);
+    }
+  }
+
   Future<void> _deleteSongFromLibrary(Song song) async {
     final result = await DeleteSongDialog.show(
       context,
@@ -1632,6 +1648,7 @@ class _SongListTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onRemove;
   final VoidCallback? onDeleteFromLibrary;
+  final VoidCallback? onEdit;
   final VoidCallback? onLongPress;
 
   /// 是否显示拖拽手柄（排序模式）
@@ -1656,6 +1673,7 @@ class _SongListTile extends StatelessWidget {
     required this.onTap,
     required this.onRemove,
     this.onDeleteFromLibrary,
+    this.onEdit,
     this.onLongPress,
     this.showDragHandle = false,
     this.showCheckbox = false,
@@ -1758,7 +1776,9 @@ class _SongListTile extends StatelessWidget {
                       color: colorScheme.onSurfaceVariant,
                     ),
                     onSelected: (value) {
-                      if (value == 'remove') {
+                      if (value == 'edit') {
+                        onEdit?.call();
+                      } else if (value == 'remove') {
                         onRemove();
                       } else if (value == 'delete') {
                         onDeleteFromLibrary?.call();
@@ -1766,6 +1786,16 @@ class _SongListTile extends StatelessWidget {
                     },
                     itemBuilder:
                         (context) => [
+                          if (onEdit != null)
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                leading: Icon(Icons.edit),
+                                title: Text('编辑'),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
                           const PopupMenuItem(
                             value: 'remove',
                             child: ListTile(

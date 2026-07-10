@@ -8,10 +8,10 @@ import '../../../shared/models/song.dart';
 import '../../../shared/utils/responsive_snackbar.dart';
 import 'providers/songs_provider.dart';
 
-/// 编辑/添加网络歌曲或电台的页面
+/// 编辑/添加网络歌曲或电台，以及编辑本地歌曲的页面
 class SongEditPage extends ConsumerStatefulWidget {
   final Song? song;
-  final String songType; // 'remote' 或 'radio'
+  final String songType; // 'remote' / 'radio' / 'local'（本地仅编辑）
 
   const SongEditPage({super.key, this.song, required this.songType});
 
@@ -29,9 +29,19 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
   late final TextEditingController _durationController;
   late final TextEditingController _lyricUrlController;
   bool _isSubmitting = false;
+  bool _renameFile = true; // 本地歌曲：改标题时同步重命名文件，默认开启
 
   bool get isEditMode => widget.song != null;
   bool get isRadio => widget.songType == AppConstants.songTypeRadio;
+  bool get isLocal => widget.songType == AppConstants.songTypeLocal;
+
+  /// 插件音源网络歌曲：DB 的 url 为空（靠 source_data 播放），序列化后 source_url 也为空。
+  /// 这类歌曲没有可编辑的直链 URL，编辑时隐藏 URL 字段、也不回传 url，
+  /// 避免把内部播放端点（/api/v1/songs/{id}/play）当作源地址写回 DB。
+  bool get isPluginRemote =>
+      isEditMode &&
+      widget.song?.type == AppConstants.songTypeRemote &&
+      (widget.song?.sourceUrl == null || widget.song!.sourceUrl!.isEmpty);
 
   @override
   void initState() {
@@ -39,9 +49,9 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
     _titleController = TextEditingController(text: widget.song?.title ?? '');
     _artistController = TextEditingController(text: widget.song?.artist ?? '');
     _albumController = TextEditingController(text: widget.song?.album ?? '');
-    _urlController = TextEditingController(
-      text: widget.song?.sourceUrl ?? widget.song?.url ?? '',
-    );
+    // 仅用 source_url（原始源地址）；不要 fallback 到 song.url，
+    // 因为 song.url 是内部播放端点（/api/v1/songs/{id}/play），并非可编辑的源 URL。
+    _urlController = TextEditingController(text: widget.song?.sourceUrl ?? '');
     _coverUrlController = TextEditingController(
       text: widget.song?.sourceCoverUrl ?? '',
     );
@@ -71,7 +81,7 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
       appBar: AppBar(
         title: Text(
           isEditMode
-              ? (isRadio ? '编辑电台' : '编辑网络歌曲')
+              ? (isLocal ? '编辑本地歌曲' : (isRadio ? '编辑电台' : '编辑网络歌曲'))
               : (isRadio ? '添加电台' : '添加网络歌曲'),
         ),
         actions: [
@@ -104,17 +114,21 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '服务端端点（只读）',
+                          isLocal ? '文件信息（只读）' : '服务端端点（只读）',
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 8),
-                        _buildReadOnlyUrlRow('播放', widget.song!.url),
-                        if (widget.song!.coverUrl != null &&
-                            widget.song!.coverUrl!.isNotEmpty)
-                          _buildReadOnlyUrlRow('封面', widget.song!.coverUrl!),
-                        if (widget.song!.lyricUrl != null &&
-                            widget.song!.lyricUrl!.isNotEmpty)
-                          _buildReadOnlyUrlRow('歌词', widget.song!.lyricUrl!),
+                        if (isLocal)
+                          _buildReadOnlyUrlRow('文件', widget.song!.filePath)
+                        else ...[
+                          _buildReadOnlyUrlRow('播放', widget.song!.url),
+                          if (widget.song!.coverUrl != null &&
+                              widget.song!.coverUrl!.isNotEmpty)
+                            _buildReadOnlyUrlRow('封面', widget.song!.coverUrl!),
+                          if (widget.song!.lyricUrl != null &&
+                              widget.song!.lyricUrl!.isNotEmpty)
+                            _buildReadOnlyUrlRow('歌词', widget.song!.lyricUrl!),
+                        ],
                       ],
                     ),
                   ),
@@ -152,7 +166,7 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
               ),
               const SizedBox(height: 16),
 
-              // 专辑（仅网络歌曲）
+              // 专辑（仅网络歌曲与本地歌曲，电台除外）
               if (!isRadio) ...[
                 TextFormField(
                   controller: _albumController,
@@ -166,70 +180,87 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
                 const SizedBox(height: 16),
               ],
 
-              // URL
-              TextFormField(
-                controller: _urlController,
-                decoration: InputDecoration(
-                  labelText: isEditMode ? '源音频 URL *' : 'URL *',
-                  hintText: '请输入音频链接',
-                  border: const OutlineInputBorder(),
+              // 同步重命名文件（仅本地歌曲）
+              if (isLocal) ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _renameFile,
+                  onChanged: (v) => setState(() => _renameFile = v),
+                  title: const Text('同步重命名文件'),
+                  subtitle: const Text('按新标题重命名本地音频文件，同时写入 title 标签'),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '请输入 URL';
-                  }
-                  final uri = Uri.tryParse(value);
-                  if (uri == null || !uri.hasScheme) {
-                    return '请输入有效的 URL';
-                  }
-                  return null;
-                },
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 16),
-
-              // 封面 URL
-              TextFormField(
-                controller: _coverUrlController,
-                decoration: InputDecoration(
-                  labelText: isEditMode ? '源封面 URL' : '封面 URL',
-                  hintText: '请输入封面图片链接',
-                  border: const OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 16),
-
-              // 时长（仅网络歌曲）
-              if (!isRadio) ...[
-                TextFormField(
-                  controller: _durationController,
-                  decoration: const InputDecoration(
-                    labelText: '时长（秒）',
-                    hintText: '请输入时长',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
               ],
 
-              // 歌词 URL（仅网络歌曲）
-              if (!isRadio) ...[
+              // 以下字段仅网络歌曲/电台可编辑，本地歌曲隐藏
+              if (!isLocal) ...[
+                // URL（插件音源歌曲没有可编辑直链，隐藏此字段）
+                if (!isPluginRemote) ...[
+                  TextFormField(
+                    controller: _urlController,
+                    decoration: InputDecoration(
+                      labelText: isEditMode ? '源音频 URL *' : 'URL *',
+                      hintText: '请输入音频链接',
+                      border: const OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '请输入 URL';
+                      }
+                      final uri = Uri.tryParse(value);
+                      if (uri == null || !uri.hasScheme) {
+                        return '请输入有效的 URL';
+                      }
+                      return null;
+                    },
+                    keyboardType: TextInputType.url,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // 封面 URL
                 TextFormField(
-                  controller: _lyricUrlController,
+                  controller: _coverUrlController,
                   decoration: InputDecoration(
-                    labelText: isEditMode ? '歌词远程 URL' : '歌词 URL',
-                    hintText: '请输入歌词接口链接',
+                    labelText: isEditMode ? '源封面 URL' : '封面 URL',
+                    hintText: '请输入封面图片链接',
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.url,
-                  textInputAction: TextInputAction.done,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
+
+                // 时长（仅网络歌曲）
+                if (!isRadio) ...[
+                  TextFormField(
+                    controller: _durationController,
+                    decoration: const InputDecoration(
+                      labelText: '时长（秒）',
+                      hintText: '请输入时长',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // 歌词 URL（仅网络歌曲）
+                if (!isRadio) ...[
+                  TextFormField(
+                    controller: _lyricUrlController,
+                    decoration: InputDecoration(
+                      labelText: isEditMode ? '歌词远程 URL' : '歌词 URL',
+                      hintText: '请输入歌词接口链接',
+                      border: const OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.url,
+                    textInputAction: TextInputAction.done,
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ],
 
               // 封面预览
@@ -326,7 +357,16 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
     try {
       final repository = ref.read(songsRepositoryProvider);
 
-      if (isEditMode) {
+      if (isEditMode && isLocal) {
+        // 本地歌曲：把 title/artist/album 写入文件标签 + DB，并按开关同步重命名文件
+        await repository.writeSongTags(
+          widget.song!.id,
+          title: _titleController.text.trim(),
+          artist: _artistController.text.trim(),
+          album: _albumController.text.trim(),
+          renameFile: _renameFile,
+        );
+      } else if (isEditMode) {
         // 更新歌曲
         await repository.updateSong(
           widget.song!.id,
@@ -341,7 +381,8 @@ class _SongEditPageState extends ConsumerState<SongEditPage> {
                   : (_albumController.text.trim().isEmpty
                       ? null
                       : _albumController.text.trim()),
-          url: _urlController.text.trim(),
+          // 插件音源歌曲无可编辑直链，不回传 url（后端保留原值，避免污染源地址）。
+          url: isPluginRemote ? null : _urlController.text.trim(),
           coverUrl:
               _coverUrlController.text.trim().isEmpty
                   ? null

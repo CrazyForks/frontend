@@ -450,10 +450,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             ref.read(songsListProvider.notifier).toggleSongSelection(song.id);
           },
           onDelete: () => _showDeleteConfirmDialog(context, song.id),
-          onEdit:
-              song.type != AppConstants.songTypeLocal
-                  ? () => _navigateToEditSong(context, song)
-                  : null,
+          onEdit: () => _navigateToEditSong(context, song),
           onAddToPlaylist: () => _showAddToPlaylistDialog(context, [song.id]),
         );
       },
@@ -552,7 +549,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const SizedBox(width: 140), // 操作按钮空间
+                  const SizedBox(
+                    width: kDesktopActionsWidth,
+                  ), // 操作按钮空间，与行内操作列对齐
                 ],
               ),
             ),
@@ -595,10 +594,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                           .toggleSongSelection(song.id);
                     },
                     onDelete: () => _showDeleteConfirmDialog(context, song.id),
-                    onEdit:
-                        song.type != AppConstants.songTypeLocal
-                            ? () => _navigateToEditSong(context, song)
-                            : null,
+                    onEdit: () => _navigateToEditSong(context, song),
                     onAddToPlaylist:
                         () => _showAddToPlaylistDialog(context, [song.id]),
                   );
