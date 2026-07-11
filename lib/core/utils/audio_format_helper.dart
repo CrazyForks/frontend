@@ -36,6 +36,7 @@ class AudioFormatHelper {
       case 'mp4':
       case 'm4a':
       case 'aac':
+      case 'mov': // QuickTime/ISO-BMFF 同族容器（如 bilibili 下载源），按 m4a 处理
         return 'm4a';
       case 'ogg':
       case 'vorbis':
