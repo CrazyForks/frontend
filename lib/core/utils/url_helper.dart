@@ -30,7 +30,11 @@ class UrlHelper {
     final fullUrl =
         '${AppConfig.baseUrl}${AppConfig.basePath}$url${separator}access_token=$token';
 
-    debugPrint('[UrlHelper] Built resource URL: $fullUrl');
+    // 该日志在每次构建资源 URL（封面/播放/歌词）时触发，且含 access_token；
+    // 仅 debug 构建输出，避免 release 端日志刷屏与凭证明文落盘。
+    if (kDebugMode) {
+      debugPrint('[UrlHelper] Built resource URL: $fullUrl');
+    }
     return fullUrl;
   }
 

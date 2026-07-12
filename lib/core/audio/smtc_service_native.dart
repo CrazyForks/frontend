@@ -13,7 +13,7 @@ Future<void> initializeSmtc() async {
 class SmtcService {
   final SongloftAudioHandler _audioHandler;
   late final SMTCWindows _smtc;
-  static const _disposePendingTimeout = Duration(seconds: 2);
+  static const _disposePendingTimeout = Duration(seconds: 1);
 
   StreamSubscription<PlaybackState>? _playbackSub;
   StreamSubscription<MediaItem?>? _mediaItemSub;

@@ -15,6 +15,22 @@ class FileLogger {
 
   static const _maxAgeDays = 3;
 
+  /// 单次会话写入文件的体积上限（兜底防护）。热路径日志异常刷屏时，
+  /// 超过此上限即停止落盘（控制台不受影响），避免日志文件被撑到数百 MB。
+  static const _maxSessionBytes = 20 * 1024 * 1024;
+  static int _writtenBytes = 0;
+  static bool _capReached = false;
+
+  /// 敏感 token 脱敏：日志里的 access_token / token 查询参数值一律替换为 ***，
+  /// 避免可用凭证明文落盘。
+  static final RegExp _tokenPattern = RegExp(
+    r'((?:access_token|token)=)[^&\s]+',
+    caseSensitive: false,
+  );
+
+  static String _redact(String line) =>
+      line.replaceAllMapped(_tokenPattern, (m) => '${m[1]}***');
+
   static Future<void> init() async {
     try {
       final appDir = await getApplicationSupportDirectory();
@@ -49,11 +65,21 @@ class FileLogger {
 
   static void writeln(String line) {
     final sink = _sink;
-    if (sink == null) return;
+    if (sink == null || _capReached) return;
     final now = DateTime.now();
     final ts =
         '${_pad(now.hour)}:${_pad(now.minute)}:${_pad(now.second)}.${_pad3(now.millisecond)}';
-    sink.writeln('[$ts] $line');
+    final entry = '[$ts] ${_redact(line)}';
+    _writtenBytes += entry.length + 1; // +1 约计换行符
+    if (_writtenBytes > _maxSessionBytes) {
+      _capReached = true;
+      sink.writeln(
+        '[$ts] [FileLogger] 已达单次会话日志上限 '
+        '(${_maxSessionBytes ~/ (1024 * 1024)}MB)，后续日志仅输出到控制台。',
+      );
+      return;
+    }
+    sink.writeln(entry);
   }
 
   static Future<void> flush() async {

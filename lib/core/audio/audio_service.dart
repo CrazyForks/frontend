@@ -73,12 +73,16 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
 
     // 监听 playbackState 变化，用于排查通知栏问题
     _playbackLogSub = playbackState.listen((state) {
-      debugPrint(
-        '[AudioService] 📢 playbackState 更新: playing=${state.playing}, '
-        'processingState=${state.processingState}, '
-        'position=${state.updatePosition}, '
-        'controls=${state.controls.length}个',
-      );
+      // 该日志随每个播放事件/进度 tick 高频触发，仅 debug 构建输出，
+      // 避免 release 端日志文件被撑爆。
+      if (kDebugMode) {
+        debugPrint(
+          '[AudioService] 📢 playbackState 更新: playing=${state.playing}, '
+          'processingState=${state.processingState}, '
+          'position=${state.updatePosition}, '
+          'controls=${state.controls.length}个',
+        );
+      }
     });
 
     // 监听播放完成
@@ -172,12 +176,15 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       speed: _player.speed,
       queueIndex: 0,
     );
-    debugPrint(
-      '[AudioService] 🔄 _transformEvent: playing=${state.playing}, '
-      'processingState=${state.processingState}, '
-      'position=${state.updatePosition.inSeconds}s, '
-      'controls=${state.controls.length}个',
-    );
+    // 每个 PlaybackEvent 都会触发，高频；仅 debug 构建输出。
+    if (kDebugMode) {
+      debugPrint(
+        '[AudioService] 🔄 _transformEvent: playing=${state.playing}, '
+        'processingState=${state.processingState}, '
+        'position=${state.updatePosition.inSeconds}s, '
+        'controls=${state.controls.length}个',
+      );
+    }
     return state;
   }
 
@@ -393,9 +400,17 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       debugPrint('[Player] SongloftAudioHandler: song url: $songUrl');
       final liveHeaders = _buildLiveStreamHeaders(song);
 
-      // Web 平台 / 电台直播流使用 AudioSource.uri（直播流无法缓存）,
-      // 其他平台普通歌曲使用 LockCachingAudioSource 实现边播边缓存
-      if (kIsWeb || song.isLive) {
+      // Web 平台 / 电台直播流使用 AudioSource.uri（直播流无法缓存）。
+      // Windows 也走 AudioSource.uri：LockCachingAudioSource 会把远端音频缓存到
+      // %TEMP%\just_audio_cache 再 renameSync，而 Windows 下打开的文件句柄会阻止
+      // rename（POSIX 不会），重播/重试同一 URL 时抛 errno 32「另一个程序正在使用此文件」
+      // 导致播放失败并陷入无限重试（songloft-org/songloft#271）。desktop 由 libmpv
+      // 直接支持网络流 seek，且后端 cache_service 已提供透明缓存，客户端缓存纯属冗余。
+      // 其他平台（Android/iOS/Linux/macOS）普通歌曲仍用 LockCachingAudioSource 边播边缓存。
+      final isWindows =
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+      final useLiveSource = kIsWeb || song.isLive || isWindows;
+      if (useLiveSource) {
         source = ja.AudioSource.uri(Uri.parse(songUrl), headers: liveHeaders);
       } else {
         source = ja.LockCachingAudioSource(Uri.parse(songUrl));

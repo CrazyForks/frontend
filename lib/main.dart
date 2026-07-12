@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, exit;
 import 'dart:ui';
 
 import 'package:audio_service/audio_service.dart';
@@ -47,7 +47,6 @@ TracelyClient? _tracelyClient;
 
 const _desktopPluginStartupTimeout = Duration(seconds: 3);
 const _audioStartupTimeout = Duration(seconds: 5);
-const _windowsMpvTeardownGracePeriod = Duration(seconds: 6);
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -341,12 +340,16 @@ void main(List<String> args) async {
       });
       await runCleanup('音频停止', audioHandler.stop);
       await runCleanup('音频释放', audioHandler.dispose);
-      await runCleanup('libmpv 延迟销毁等待', () async {
-        // media_kit 在 Windows 上会在 Player.dispose() 返回后延迟销毁 libmpv。
-        // 窗口/Flutter engine 立即退出时，libmpv 后台线程仍可能触发 Fail Fast。
-        await Future<void>.delayed(_windowsMpvTeardownGracePeriod);
-      });
       await runCleanup('内嵌后端停止', EmbeddedBackendService.stop);
+      await runCleanup('日志刷新', FileLogger.close);
+
+      // 强制终止进程：media_kit 在 Windows 上会在 Player.dispose() 返回后延迟销毁
+      // libmpv，其后台线程在窗口销毁后仍可能触发 Windows Fail Fast 报警框
+      // （songloft-org/songloft#271）。之前用 6 秒死等既拖慢退出又没根治报警。
+      // 清理完成后立即 exit(0)，让 OS 抢在 libmpv 后台线程之前回收整个进程，
+      // 既消除报警框又让退出瞬时完成。
+      debugPrint('[Main] 清理完成，强制退出进程');
+      exit(0);
     };
   }
 
