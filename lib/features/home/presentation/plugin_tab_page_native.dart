@@ -208,6 +208,18 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage>
           allowFileAccessFromFileURLs: true,
           allowUniversalAccessFromFileURLs: true,
           supportZoom: false,
+          // Android：关闭 Hybrid Composition，改用 Virtual Display 渲染。
+          // 插件 Tab 的 WebView 靠 shell 层 Offstage 做保活（切走隐藏、切回复用，
+          // songloft-org/songloft#273）。Hybrid Composition 下 WebView 是独立原生
+          // 表面 + overlay surface 合成，反复 Offstage 切换后 overlay 会重建异常，
+          // 把画在其上的底部 NavigationBar 抹成黑块（用户报「切出再返回菜单栏黑屏」）。
+          // Virtual Display 把 WebView 渲染进 Flutter 纹理、完全在控件树内合成，
+          // 无独立 overlay，Offstage 保活干净、nav bar 不再被抹黑。
+          // 代价：Virtual Display 的 IME 支持弱于 Hybrid Composition，插件内文本
+          // 输入（如搜索框）体验可能下降；需要重输入的场景走全屏 WebView 页
+          // （plugin_webview_page_native，仍用默认 Hybrid Composition）。
+          // iOS/macOS 忽略此项（WKWebView 无此问题）。
+          useHybridComposition: false,
         ),
         onWebViewCreated: (controller) {
           _webViewController = controller;
