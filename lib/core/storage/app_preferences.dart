@@ -297,6 +297,18 @@ class AppPreferences {
     return _prefs.setBool(_shortcutsEnabledKey, value);
   }
 
+  static const _autoPlayOnLaunchKey = 'player_auto_play_on_launch';
+
+  /// 打开客户端后是否自动继续播放上次的歌曲（默认关闭）。
+  /// 纯本地设置，不参与服务器偏好同步（songloft-org/songloft-player#19）。
+  bool getAutoPlayOnLaunch() {
+    return _prefs.getBool(_autoPlayOnLaunchKey) ?? false;
+  }
+
+  Future<bool> setAutoPlayOnLaunch(bool value) {
+    return _prefs.setBool(_autoPlayOnLaunchKey, value);
+  }
+
   /// 快捷键绑定表（原始 JSON 字符串，解析在 provider 层做）。null 表示从未自定义。
   String? getShortcutBindings() {
     return _prefs.getString(_shortcutBindingsKey);

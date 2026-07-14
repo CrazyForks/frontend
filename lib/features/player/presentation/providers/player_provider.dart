@@ -160,6 +160,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
       }
       // 恢复播放队列
       await _restorePlaybackState(prefs);
+      // 打开客户端后自动播放（纯本地开关，默认关闭）：仅在成功恢复出当前歌曲时
+      // 触发，复用 _playCurrent 路径会自动 seek 回上次进度
+      // （songloft-org/songloft-player#19）
+      if (prefs.getAutoPlayOnLaunch() && state.hasSong) {
+        debugPrint('[Player] Auto-play on launch enabled, resuming playback');
+        final gen = ++_playGeneration;
+        await _playCurrent(gen);
+      }
       // 触发歌词 Provider 创建，确保灵动岛能收到歌词更新
       ref.read(lyricStateProvider);
     } catch (e) {

@@ -5288,6 +5288,18 @@ abstract class AppLocalizations {
   /// **'转码为 MP3，适合弱网环境'**
   String get settingsQualityTranscodeDesc;
 
+  /// No description provided for @settingsAutoPlayOnLaunchTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开后自动播放'**
+  String get settingsAutoPlayOnLaunchTitle;
+
+  /// No description provided for @settingsAutoPlayOnLaunchDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动客户端后自动继续上次的播放'**
+  String get settingsAutoPlayOnLaunchDesc;
+
   /// No description provided for @settingsShortcutsEntryTitle.
   ///
   /// In zh, this message translates to:

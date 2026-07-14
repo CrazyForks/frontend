@@ -2929,6 +2929,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsQualityTranscodeDesc => '转码为 MP3，适合弱网环境';
 
   @override
+  String get settingsAutoPlayOnLaunchTitle => '打开后自动播放';
+
+  @override
+  String get settingsAutoPlayOnLaunchDesc => '启动客户端后自动继续上次的播放';
+
+  @override
   String get settingsShortcutsEntryTitle => '键盘快捷键';
 
   @override

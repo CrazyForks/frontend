@@ -1910,6 +1910,8 @@
   "settingsQualityDialogTitle": "Select audio quality",
   "settingsQualityOriginalDesc": "No transcoding, use the file's original bitrate",
   "settingsQualityTranscodeDesc": "Transcode to MP3, suited for weak networks",
+  "settingsAutoPlayOnLaunchTitle": "Auto-play on launch",
+  "settingsAutoPlayOnLaunchDesc": "Resume the last playback automatically when the app opens",
   "settingsShortcutsEntryTitle": "Keyboard shortcuts",
   "settingsShortcutsEntrySubtitle": "Customize playback control keys",
   "settingsShortcutsPageTitle": "Keyboard shortcuts",

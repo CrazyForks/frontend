@@ -3057,6 +3057,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Transcode to MP3, suited for weak networks';
 
   @override
+  String get settingsAutoPlayOnLaunchTitle => 'Auto-play on launch';
+
+  @override
+  String get settingsAutoPlayOnLaunchDesc =>
+      'Resume the last playback automatically when the app opens';
+
+  @override
   String get settingsShortcutsEntryTitle => 'Keyboard shortcuts';
 
   @override

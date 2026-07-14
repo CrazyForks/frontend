@@ -448,6 +448,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   List<Widget> _buildPlaybackItems() {
     final l10n = AppLocalizations.of(context);
     final quality = ref.watch(audioQualityProvider);
+    final autoPlayOnLaunch = ref.watch(autoPlayOnLaunchProvider);
     final labels = {
       'original': l10n.settingsQualityOriginal,
       '128': l10n.settingsQualityLow,
@@ -515,6 +516,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   message: l10n.settingsSwitchFailed(e.toString()),
                 );
               }
+            },
+          ),
+          const Divider(height: 1),
+          // 打开客户端后自动播放（纯本地设置）
+          SwitchListTile(
+            secondary: const Icon(Icons.play_arrow_outlined),
+            title: Text(l10n.settingsAutoPlayOnLaunchTitle),
+            subtitle: Text(l10n.settingsAutoPlayOnLaunchDesc),
+            value: autoPlayOnLaunch,
+            onChanged: (v) {
+              ref.read(autoPlayOnLaunchProvider.notifier).setEnabled(v);
             },
           ),
           // 键盘快捷键（仅桌面）
