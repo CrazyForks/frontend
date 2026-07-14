@@ -96,50 +96,28 @@ class _JSPluginManagerState extends ConsumerState<JSPluginManager>
         // 顶部操作栏
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child:
-              context.isMobile
-                  ? Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _showUploadDialog,
-                        icon: const Icon(Icons.upload_file),
-                        label: Text(l10n.jspluginUploadPlugin),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _showBatchUpdateDialog,
-                        icon: const Icon(Icons.system_update),
-                        label: Text(l10n.jspluginUpdateAll),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _cleanupOrphanStorage,
-                        icon: const Icon(Icons.cleaning_services_outlined),
-                        label: Text(l10n.jspluginCleanupData),
-                      ),
-                    ],
-                  )
-                  : Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _showUploadDialog,
-                        icon: const Icon(Icons.upload_file),
-                        label: Text(l10n.jspluginUploadPlugin),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: _showBatchUpdateDialog,
-                        icon: const Icon(Icons.system_update),
-                        label: Text(l10n.jspluginUpdateAll),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: _cleanupOrphanStorage,
-                        icon: const Icon(Icons.cleaning_services_outlined),
-                        label: Text(l10n.jspluginCleanupData),
-                      ),
-                    ],
-                  ),
+          // 统一用 Wrap：空间足够时横排，不够时自动换行，避免窄面板下 Row 溢出
+          child: Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _showUploadDialog,
+                icon: const Icon(Icons.upload_file),
+                label: Text(l10n.jspluginUploadPlugin),
+              ),
+              OutlinedButton.icon(
+                onPressed: _showBatchUpdateDialog,
+                icon: const Icon(Icons.system_update),
+                label: Text(l10n.jspluginUpdateAll),
+              ),
+              OutlinedButton.icon(
+                onPressed: _cleanupOrphanStorage,
+                icon: const Icon(Icons.cleaning_services_outlined),
+                label: Text(l10n.jspluginCleanupData),
+              ),
+            ],
+          ),
         ),
         const Divider(height: 1),
 
