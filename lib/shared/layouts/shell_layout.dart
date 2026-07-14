@@ -36,6 +36,17 @@ class ShellLayout extends ConsumerStatefulWidget {
 class _ShellLayoutState extends ConsumerState<ShellLayout> {
   final _visitedPluginTabs = <String>{};
 
+  /// 每个保活插件 Tab 的稳定 GlobalKey（按 entryPath 缓存）。
+  /// Web 端插件页嵌在 HtmlElementView 的 iframe 里，其 platform view 的 viewId
+  /// 一旦销毁重建，浏览器会重新拉取整张插件入口页（表现为页面反复重载/抖动，
+  /// songloft-org/songloft#278）。用 GlobalKey 作 key 可让承载 iframe 的
+  /// PluginTabPage 元素在 Stack 内被重排/换父时**被移动而非 dispose+重建**，
+  /// 从而保住 viewId、不触发 iframe 重载。
+  final _pluginTabKeys = <String, GlobalKey>{};
+
+  GlobalKey _pluginTabKey(String entryPath) =>
+      _pluginTabKeys.putIfAbsent(entryPath, GlobalKey.new);
+
   /// 稳定 GlobalKey：跨响应式断点重建布局时，让 body 子树（含插件 WebView 原生表面）
   /// 被 reparent 而非 dispose+重建，避免拖窗跨断点导致 InAppWebView reload
   /// （songloft-org/songloft-player#20）
@@ -78,8 +89,8 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
 
   @override
   Widget build(BuildContext context) {
-    final tabConfig =
-        ref.watch(tabConfigProvider).value ?? TabConfig.defaultConfig();
+    final tabConfigAsync = ref.watch(tabConfigProvider);
+    final tabConfig = tabConfigAsync.value ?? TabConfig.defaultConfig();
     final plugins = ref.watch(jsPluginsProvider).value ?? [];
     final activeDest = ActiveDestinations.compute(
       tabConfig,
@@ -126,13 +137,23 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
         _visitedPluginTabs.add(currentEntryPath);
       }
 
-      // 清理已移除/禁用的插件
-      final validPaths =
-          activeDest.indexToRoute
-              .where((r) => r.startsWith('/plugin-tab/'))
-              .map((r) => r.replaceFirst('/plugin-tab/', ''))
-              .toSet();
-      _visitedPluginTabs.retainAll(validPaths);
+      // 清理已从配置中移除的插件 tab。**只按 tabConfig（稳定）裁剪，不依赖会
+      // 短暂加载/刷新的 jsPluginsProvider**——否则 plugins 快照瞬时为空
+      // （首次加载 / 依赖重启 / 插件更新触发 ref.invalidate）会误删激活 tab，
+      // 下一帧再加回，导致 PluginTabPage 元素 dispose+重建、iframe 反复重载
+      // （页面抖动，songloft-org/songloft#278）。且仅在 tabConfig 确有数据时
+      // 裁剪，避免 config 加载中回落到默认空配置误删。
+      if (tabConfigAsync.hasValue) {
+        final configuredPaths =
+            tabConfig.pluginTabs
+                .map((pt) => pt.entryPath)
+                .where((p) => p.isNotEmpty)
+                .toSet();
+        // 保留仍在配置内的、以及当前正在浏览的插件（防御 config 与路由的竞态）
+        if (currentEntryPath != null) configuredPaths.add(currentEntryPath);
+        _visitedPluginTabs.retainAll(configuredPaths);
+        _pluginTabKeys.removeWhere((ep, _) => !_visitedPluginTabs.contains(ep));
+      }
 
       if (_visitedPluginTabs.isEmpty) {
         body = widget.child;
@@ -142,9 +163,12 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
             Offstage(offstage: isPluginTab, child: widget.child),
             for (final ep in _visitedPluginTabs)
               Offstage(
+                // GlobalKey 挂在 PluginTabPage 上，使其在 Stack 内被重排/换父时
+                // 被移动而非重建，保住 iframe 的 platform view viewId（#278）。
+                key: ValueKey('plugin-offstage-$ep'),
                 offstage: currentEntryPath != ep,
                 child: PluginTabPage(
-                  key: ValueKey('plugin-keep-$ep'),
+                  key: _pluginTabKey(ep),
                   entryPath: ep,
                   isActive: currentEntryPath == ep,
                 ),
