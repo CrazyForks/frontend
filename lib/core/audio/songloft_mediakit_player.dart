@@ -136,6 +136,11 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
         _updatePlaybackEvent();
       }),
       player.stream.error.listen((error) {
+        // 用 debugPrint 而非 print，使 libmpv/ffmpeg 的原始错误（如
+        // "Failed to open <url>."）写入 FileLogger，便于排查桌面端 HLS 电台
+        // 加载失败——否则最终只会在上层看到被 just_audio 掩盖的
+        // "Loading interrupted"（songloft-org/songloft#249）。
+        debugPrint('[MediaKit] player error: $error');
         final errorUri = RegExp(r'Failed to open (.*)\.').firstMatch(error)?[1];
         final currentMedia = _currentMedia;
         if (errorUri == null ||
@@ -166,8 +171,10 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
         _addPlayerData(PlayerDataMessage(speed: rate));
       }),
       player.stream.log.listen((event) {
-        // ignore: avoid_print
-        print('MPV: [${event.level}] ${event.prefix}: ${event.text}');
+        // 用 debugPrint 写入 FileLogger（main.dart 只拦截 debugPrint，
+        // 裸 print 只进控制台、不进用户可上传的日志文件），
+        // 保证 libmpv 日志能随附件日志一起提交排查（songloft-org/songloft#249）。
+        debugPrint('MPV: [${event.level}] ${event.prefix}: ${event.text}');
       }),
     ];
   }

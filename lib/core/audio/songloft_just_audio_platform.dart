@@ -1,6 +1,7 @@
 import 'dart:collection';
 
 import 'package:flutter/services.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:media_kit/media_kit.dart';
 
@@ -19,6 +20,11 @@ class SongloftJustAudioPlatform extends JustAudioPlatform {
 
   static void register() {
     JustAudioPlatform.instance = instance;
+    // Win/Linux 不调用 JustAudioMediaKit.ensureInitialized()，其静态配置保持
+    // 默认值（mpvLogLevel=error）。SongloftMediaKitPlayer 会读取这些静态字段，
+    // 这里将级别提到 warn，让 ffmpeg 的 HTTP 层告警（403/重定向等）也进入日志，
+    // 便于排查桌面端 HLS 电台加载失败（songloft-org/songloft#249）。
+    JustAudioMediaKit.mpvLogLevel = MPVLogLevel.warn;
     MediaKit.ensureInitialized();
   }
 
