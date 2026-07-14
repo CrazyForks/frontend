@@ -32,6 +32,7 @@ import 'core/router/app_router.dart';
 import 'core/utils/file_logger.dart';
 import 'core/utils/platform_utils.dart';
 import 'core/utils/window_tray_manager.dart';
+import 'features/player/presentation/widgets/player_shortcut_scope.dart';
 import 'features/settings/presentation/providers/settings_provider.dart';
 import 'features/startup/presentation/startup_gate.dart';
 import 'l10n/app_localizations.dart';
@@ -432,13 +433,19 @@ class SongloftApp extends ConsumerWidget {
         final width = MediaQuery.of(context).size.width;
         final screenType = _getScreenType(width);
         final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Theme(
+        final themed = Theme(
           data:
               isDark
                   ? AppTheme.darkTheme(screenType: screenType)
                   : AppTheme.lightTheme(screenType: screenType),
           child: child!,
         );
+        // 桌面端在 MaterialApp.builder（Navigator 之上、WidgetsApp 默认 Shortcuts
+        // 之下）挂载全局播放快捷键监听：此处是所有路由的公共祖先，故 push 的全屏
+        // 播放页 / 队列 BottomSheet 等脱离 ShellRoute 的页面也能命中快捷键
+        // （songloft-org/songloft#279）。移动/Web/TV 不包裹（零开销、零行为变化）。
+        if (!PlatformUtils.isDesktop) return themed;
+        return PlayerShortcutScope(child: themed);
       },
     );
   }
