@@ -108,18 +108,17 @@ void main(List<String> args) async {
     }
   }
 
-  // just_audio 后端选择：使用 media_kit 的平台（Win/Linux 恒用；macOS/移动端由
-  // AudioBackend 的编译期开关决定，默认用各自原生后端）走自定义
-  // SongloftJustAudioPlatform，以暴露 media_kit Player 供 EQ 设置 mpv 滤镜、
-  // 并派生 VideoController 渲染视频画面（songloft-org/songloft#76）。
-  // 必须在 AudioService.init() 之前调用。
+  // just_audio 后端选择：使用 media_kit 的平台（Win/Linux 恒用；macOS/移动端默认也用，
+  // 可由 AudioBackend 的 kill-switch 开关回退原生）走自定义 SongloftJustAudioPlatform，
+  // 以暴露 media_kit Player 供 EQ 设置 mpv 滤镜、并派生 VideoController 渲染视频画面
+  // （songloft-org/songloft#76）。必须在 AudioService.init() 之前调用。
   if (!kIsWeb) {
     try {
       if (AudioBackend.usesMediaKit) {
         SongloftJustAudioPlatform.register();
       } else {
-        // macOS/Android/iOS 默认分支：JustAudioMediaKit 在这些平台默认不接管，
-        // just_audio 回落到原生后端（AVPlayer / ExoPlayer）。
+        // 回退分支（显式传 SONGLOFT_MEDIAKIT_*=false）：JustAudioMediaKit 在
+        // macOS/Android/iOS 不接管，just_audio 回落到原生后端（AVPlayer / ExoPlayer）。
         JustAudioMediaKit.ensureInitialized();
       }
     } catch (e, stackTrace) {
