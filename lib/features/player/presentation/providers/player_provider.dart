@@ -49,6 +49,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   Timer? _sleepTimerCountdown;
   CancelToken? _prefetchCancelToken;
   bool _lateStagePrefetchFired = false; // 剩余30s保险预拉取是否已触发
+  bool _disposed = false; // Notifier 是否已销毁（微任务回调前的安全守卫）
 
   final Random _random = Random();
   final Set<int> _playedIndices = {}; // 随机模式下已播放的索引
@@ -113,6 +114,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _initListeners();
     _initLiveActivityListeners();
     ref.onDispose(() {
+      _disposed = true;
       _positionSubscription?.cancel();
       _durationSubscription?.cancel();
       _playerStateSubscription?.cancel();
@@ -320,7 +322,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
   void _syncLiveActivitySong(Song? song) {
     if (song == null) {
       _liveActivity.endActivity();
-    } else {
+      return;
+    }
+    // lyricStateProvider 首次读取会触发 LyricNotifier.build()，其内部 watch
+    // playerStateProvider；若在 _playCurrent 调用栈内同步 read，会与正在计算的
+    // playerStateProvider 形成 build 期循环依赖（CircularDependencyError），
+    // 导致首次播放被中断、需再点一次才生效。改为微任务延后读取：此刻 playerState
+    // 已就绪，读取仅建立单向数据依赖，不再构成循环。
+    Future.microtask(() {
+      if (_disposed) return;
       final lyricState = ref.read(lyricStateProvider);
       _liveActivity.startActivity(
         title: song.title,
@@ -332,7 +342,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
             ? UrlHelper.buildCoverUrl(song.coverUrl!)
             : null,
       );
-    }
+    });
   }
 
   void _notifyPlayEvent(int songId, String type) {
