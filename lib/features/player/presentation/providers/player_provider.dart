@@ -389,10 +389,20 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
     switch (state.playMode) {
       case PlayMode.single:
-        // 单曲循环
-        debugPrint('[Player] Single loop: restarting current song');
-        _audioHandler.seek(Duration.zero);
-        _audioHandler.play();
+        // 单曲循环：重新加载当前歌曲。
+        // 不能用 seek(0)+play()：部分平台（Web/mediakit 自研平台层）在
+        // completed 状态下 seek 不会重新触发 completed 边沿，导致第二遍后停住
+        // （songloft-org/songloft#284）。复用 togglePlay 对 completed 的处理路径。
+        {
+          debugPrint('[Player] Single loop: reloading current song');
+          final gen = ++_playGeneration;
+          unawaited(
+            _playCurrent(gen).catchError((e, st) {
+              debugPrint('[Player] single loop replay failed: $e');
+              _audioHandler.stop();
+            }),
+          );
+        }
         break;
       case PlayMode.singlePlay:
         // 单曲播放：播完停止，不循环、不切换下一首
