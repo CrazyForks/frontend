@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -5,6 +6,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../../../core/audio/video_controller_provider.dart';
 import '../../../../shared/models/song.dart';
 import '../providers/player_provider.dart';
+import 'web_video_view.dart';
 
 /// 视频画面舞台：视频歌曲在支持的平台（桌面 Win/Linux）渲染 media_kit 的 [Video] 画面，
 /// 否则回退到 [fallback]（通常是封面 / 唱片环）。
@@ -59,9 +61,22 @@ class _VideoStageState extends ConsumerState<VideoStage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.song.isVideo || !isInAppVideoSupported) {
-      return widget.fallback;
+    if (!widget.song.isVideo) return widget.fallback;
+
+    // Web：走独立的 <video> 画面分流（静音，音频仍由 just_audio_web/hls.js 播放），
+    // 不依赖 media_kit 后端，也不触碰电台路径。
+    if (kIsWeb) {
+      return WebVideoView(
+        song: widget.song,
+        fallback: widget.fallback,
+        width: widget.width,
+        height: widget.height,
+        borderRadius: widget.borderRadius,
+      );
     }
+
+    // 原生：需实际使用 media_kit 后端的平台才能派生 VideoController。
+    if (!isInAppVideoSupported) return widget.fallback;
 
     // 切歌后 Player 可能刚被创建，跟随当前歌曲变化重新绑定控制器。
     ref.listen(currentSongProvider, (_, _) {
