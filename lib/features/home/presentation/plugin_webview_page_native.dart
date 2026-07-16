@@ -10,6 +10,7 @@ import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/webview_environment.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../settings/presentation/providers/settings_provider.dart';
+import 'plugin_host_bridge.dart';
 import 'plugin_theme_utils.dart';
 
 /// 插件 WebView 页面（原生平台实现）
@@ -29,7 +30,7 @@ class PluginWebViewPage extends ConsumerStatefulWidget {
 }
 
 class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, PluginHostBridgeMixin {
   static const Duration _pageLoadTimeout = Duration(seconds: 20);
 
   InAppWebViewController? _webViewController;
@@ -132,6 +133,8 @@ class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage>
     final brightness = MediaQuery.of(context).platformBrightness;
     final theme = resolveEffectiveTheme(themeMode, brightness);
 
+    listenPlayerState();
+
     if (_lastTheme == null) {
       _lastTheme = theme;
     } else if (_lastTheme != theme) {
@@ -227,6 +230,7 @@ class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage>
         ),
         onWebViewCreated: (controller) {
           _webViewController = controller;
+          registerHostBridge(controller);
         },
         onLoadStart: (controller, url) {
           if (mounted) {
