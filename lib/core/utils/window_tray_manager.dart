@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/l10n_holder.dart';
 import 'file_logger.dart';
+import 'window_visibility.dart';
 
 class WindowTrayManager with WindowListener, TrayListener {
   static final WindowTrayManager _instance = WindowTrayManager._internal();
@@ -105,7 +106,24 @@ class WindowTrayManager with WindowListener, TrayListener {
     bool isPreventClose = await windowManager.isPreventClose();
     if (isPreventClose) {
       windowManager.hide();
+      // 隐藏到托盘：主窗口不可见，通知插件页销毁 WebView2 HWND，
+      // 否则残留 HWND 会拦截桌面右键（songloft-org/songloft#293）。
+      windowVisibleNotifier.value = false;
     }
+  }
+
+  @override
+  void onWindowMinimize() {
+    // 最小化：Windows 触发的是 minimize（不是 AppLifecycleState.hidden），
+    // 且 WebView2 是独立原生 HWND，Offstage 收不起——通知插件页把 WebView
+    // 整个移出 widget 树来销毁 HWND（songloft-org/songloft#293）。
+    windowVisibleNotifier.value = false;
+  }
+
+  @override
+  void onWindowRestore() {
+    // 从最小化恢复：插件页据此重新挂载 WebView。
+    windowVisibleNotifier.value = true;
   }
 
   @override
@@ -176,6 +194,9 @@ class WindowTrayManager with WindowListener, TrayListener {
 
     await windowManager.show();
     await windowManager.focus();
+    // 从托盘恢复显示：通知插件页重新挂载 WebView（onWindowRestore 仅在
+    // 从最小化恢复时触发，隐藏到托盘再显示不会触发，需在此显式置位）。
+    windowVisibleNotifier.value = true;
     // hide/show 循环后 Flutter 引擎的 IME 上下文可能未正确恢复，
     // 延迟重置焦点以重建输入法连接
     Future.delayed(const Duration(milliseconds: 100), () {

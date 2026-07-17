@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/webview_environment.dart';
+import '../../../core/utils/window_visibility.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../settings/presentation/providers/settings_provider.dart';
 import 'plugin_host_bridge.dart';
@@ -40,6 +41,11 @@ class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage>
   String? _errorMessage;
   String? _lastTheme;
   bool _windowVisible = true;
+  // 窗口是否可见（最小化 / 隐藏到托盘时为 false）。Windows 上 WebView2 是独立原生
+  // HWND，最小化后不自动收起、残留拦截桌面右键（songloft-org/songloft#293）；
+  // Offstage 收不起 HWND，必须据此把 WebView 整个移出 widget 树来销毁。仅 Windows
+  // 会翻转此值（WindowTrayManager 只在 Windows setup），其余平台恒为 true。
+  bool _hwndVisible = windowVisibleNotifier.value;
   // 重试计数：作为 InAppWebView 的 ValueKey，递增即重建整个 WebView 部件，
   // 以恢复 Windows 上「实例创建失败→controller 为 null→reload 无效」的死循环。(songloft#271)
   int _reloadSeq = 0;
@@ -48,12 +54,35 @@ class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    windowVisibleNotifier.addListener(_onWindowVisibilityChanged);
     _startLoadTimer();
+  }
+
+  /// 窗口可见性变化（Windows 最小化 / 托盘）：不可见时下一帧 build 会把
+  /// InAppWebView 移出 widget 树销毁 WebView2 HWND；恢复可见时重建并重新加载。
+  void _onWindowVisibilityChanged() {
+    final visible = windowVisibleNotifier.value;
+    if (!mounted || _hwndVisible == visible) return;
+    setState(() {
+      _hwndVisible = visible;
+      if (!visible) {
+        // WebView 将被移出树，控制器随之失效，避免后续误用旧引用。
+        _webViewController = null;
+      } else {
+        // 重新挂载：复位加载态并换 key 确保是全新实例，onLoadStart/Stop 会接管。
+        _isLoading = true;
+        _pageReady = false;
+        _errorMessage = null;
+        _reloadSeq++;
+        _startLoadTimer();
+      }
+    });
   }
 
   @override
   void dispose() {
     _loadTimer?.cancel();
+    windowVisibleNotifier.removeListener(_onWindowVisibilityChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -194,9 +223,13 @@ class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage>
             children: [
               if (_errorMessage != null)
                 _buildErrorView(colorScheme)
+              else if (_hwndVisible)
+                _buildWebView(theme)
               else
-                _buildWebView(theme),
-              if (_isLoading) const Center(child: CircularProgressIndicator()),
+                // 窗口不可见：不挂载 WebView，销毁原生 HWND（#293）。
+                const SizedBox.expand(),
+              if (_isLoading && _hwndVisible)
+                const Center(child: CircularProgressIndicator()),
             ],
           ),
         ),
