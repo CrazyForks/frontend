@@ -10,10 +10,14 @@ import '../../features/home/presentation/home_page.dart';
 import '../../features/home/presentation/tv_home_page.dart';
 import '../../features/home/presentation/plugin_webview_page.dart';
 import '../../features/library/presentation/library_page.dart';
+import '../../features/library/presentation/tv_library_page.dart';
 import '../../features/library/presentation/category_songs_page.dart';
+import '../../features/library/presentation/tv_category_songs_page.dart';
 import '../../features/playlist/presentation/playlist_detail_page.dart';
+import '../../features/playlist/presentation/tv_playlist_detail_page.dart';
 import '../../features/settings/presentation/servers_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
+import '../../features/settings/presentation/tv_settings_page.dart';
 import '../../features/settings/presentation/tab_config_page.dart';
 import '../../features/jsplugin/presentation/widgets/plugin_registry.dart';
 import '../../features/settings/presentation/duplicate_check_page.dart';
@@ -125,9 +129,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.library,
             pageBuilder:
                 (context, state) => NoTransitionPage(
-                  child: LibraryPage(
-                    initialViewKey: state.uri.queryParameters['view'],
-                  ),
+                  child: AppConfig.isTvMode
+                      ? TvLibraryPage(
+                          initialViewKey: state.uri.queryParameters['view'],
+                        )
+                      : LibraryPage(
+                          initialViewKey: state.uri.queryParameters['view'],
+                        ),
                 ),
           ),
 
@@ -139,11 +147,17 @@ final routerProvider = Provider<GoRouter>((ref) {
               final field = state.pathParameters['field'] ?? '';
               final value = state.uri.queryParameters['value'] ?? '';
               final cover = state.uri.queryParameters['cover'];
-              return CategorySongsPage(
-                field: field,
-                value: value,
-                coverUrl: cover,
-              );
+              return AppConfig.isTvMode
+                  ? TvCategorySongsPage(
+                      field: field,
+                      value: value,
+                      coverUrl: cover,
+                    )
+                  : CategorySongsPage(
+                      field: field,
+                      value: value,
+                      coverUrl: cover,
+                    );
             },
           ),
 
@@ -159,7 +173,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.playlistDetail,
             builder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
-              return PlaylistDetailPage(playlistId: id);
+              return AppConfig.isTvMode
+                  ? TvPlaylistDetailPage(playlistId: id)
+                  : PlaylistDetailPage(playlistId: id);
             },
           ),
 
@@ -167,8 +183,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.settings,
             pageBuilder:
-                (context, state) =>
-                    const NoTransitionPage(child: SettingsPage()),
+                (context, state) => NoTransitionPage(
+                  child: AppConfig.isTvMode
+                      ? const TvSettingsPage()
+                      : const SettingsPage(),
+                ),
           ),
 
           // 服务器列表管理

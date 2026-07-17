@@ -156,7 +156,10 @@ void main(List<String> args) async {
     debugPrint('[Main] Stack trace: $stackTrace');
   }
 
-  AppConfig.isTvMode = await TvDetector.isTv();
+  // 开发期可用 --dart-define=FORCE_TV=true 在桌面/Web 上模拟 TV 布局（窗口需 ≥1920 宽）。
+  // bool.fromEnvironment 是编译时常量，release 默认 false 会被 tree-shaking 移除。
+  const forceTv = bool.fromEnvironment('FORCE_TV', defaultValue: false);
+  AppConfig.isTvMode = forceTv || await TvDetector.isTv();
 
   if (AppConfig.isEmbedded) {
     // 嵌入模式：Flutter Web 嵌入 Go 后端，直接使用当前页面的 origin 作为后端 API 地址
@@ -409,9 +412,13 @@ class _AppScrollBehavior extends MaterialScrollBehavior {
 class SongloftApp extends ConsumerWidget {
   const SongloftApp({super.key});
 
-  /// 根据屏幕宽度获取 ScreenType
+  /// 根据屏幕宽度获取 ScreenType（供响应式主题选择）。
+  /// TV 需同时满足真实电视系统（[AppConfig.isTvMode]）+ 宽度达标，避免高分桌面/Web
+  /// 大屏被误判为 TV 而套用放大字号的电视主题（与 [ResponsiveContext.isTv] 保持一致）。
   ScreenType _getScreenType(double width) {
-    if (width >= ResponsiveBreakpoints.tv) return ScreenType.tv;
+    if (AppConfig.isTvMode && width >= ResponsiveBreakpoints.tv) {
+      return ScreenType.tv;
+    }
     if (width >= ResponsiveBreakpoints.desktop) return ScreenType.desktop;
     if (width >= ResponsiveBreakpoints.tablet) return ScreenType.tablet;
     return ScreenType.mobile;
