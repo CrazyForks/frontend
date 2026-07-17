@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+
+import 'web_surface_recovery.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -88,11 +90,20 @@ class _StartupGateState extends ConsumerState<StartupGate>
     }
   }
 
-  /// 强制整棵渲染树重绘并产出一帧,用于 Web 端 WebGL context 丢失后把内容重新
-  /// 画到引擎重建的 surface 上。仅在 [kIsWeb] 下由 [didChangeAppLifecycleState]
-  /// 调用。
+  /// Web 端 WebGL context 丢失后的恢复。仅在 [kIsWeb] 下由
+  /// [didChangeAppLifecycleState] 调用。分两步:
+  ///
+  /// 1. [recoverLostWebGlContexts]:对已丢失 context 的 canvas 补发
+  ///    `webglcontextlost`,让引擎标记需要重建(覆盖 Android Chrome 静默丢
+  ///    context 却不派发事件、引擎从不重建的情况)。
+  /// 2. 标脏整棵渲染树 + [SchedulerBinding.scheduleForcedFrame]:即使无 dirty
+  ///    节点也强制产出一帧,把当前场景重新光栅化到引擎重建后的 surface 上
+  ///    (普通 scheduleFrame 无 dirty 时不产帧,故不可用)。
   void _forceWebRepaint() {
     if (!mounted) return;
+
+    recoverLostWebGlContexts();
+
     void markTree(RenderObject node) {
       node.markNeedsPaint();
       node.visitChildren(markTree);
