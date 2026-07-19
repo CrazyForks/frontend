@@ -17,30 +17,41 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
 
   late final Player player;
 
-  /// 视频画面控制器：在 [Player] 创建后、任何 `open()` 之前**立即**建好，
-  /// 使 media_kit 的 libmpv render context 在打开媒体时已就绪。
+  /// 视频画面控制器。
   ///
-  /// 若推迟到 UI 首次渲染视频时才创建（旧做法），libmpv 会在 `open()` 时因
-  /// "No render context set" 直接 fatal 并**永久禁用**该会话的视频输出——
-  /// 表现为音频正常、画面全黑/回退封面（songloft-org/songloft#76）。
-  /// 纯音频歌曲也会持有此控制器，仅多一个空闲纹理，无画面开销。
-  /// Web 及回退到原生后端的平台不支持派生 VideoController，置空。
+  /// **桌面（Win/Linux/macOS）**：在 [player] 创建后、任何 `open()` 之前**立即**建好，
+  /// 使 libmpv render context 在打开媒体时已就绪；否则推迟到首次渲染视频才建会触发
+  /// "No render context set" fatal 并永久禁用视频输出（songloft-org/songloft#76）。
   ///
-  /// 注意：必须在构造函数里 [player] 创建后**立即**（eagerly）赋值，
-  /// 不能用 `late final = ...` 惰性初始化——否则仍会推迟到首次访问才建，
-  /// 无法保证早于 `open()`。
-  late final VideoController? videoController;
+  /// **移动端（Android/iOS）**：**不在构造时预建**。VideoController 一经构造即把 player
+  /// 标记为 `isVideoControllerAttached=true`，此后 libmpv 的每个 `open()/play()/seek()`
+  /// 都要先 `await` 视频初始化 Future——而 Android 在无 `Video` widget 挂载时该 Future
+  /// 可能迟迟不完成，导致**所有歌曲（含纯音频）`open()` 被挂住而播放失败**（6d7110c 把
+  /// 移动端默认后端翻成 media_kit 后 Android 全曲无法播放的根因）。故移动端改为惰性：仅在
+  /// [load] 判定为视频源（URL 带 `media=video`）时，于 `open()` 之前才创建
+  /// （见 [_ensureVideoControllerForVideo]），纯音频永不 attach → 不触发该门闩。
+  ///
+  /// Web 及回退到原生后端的平台不支持派生 VideoController，恒为 null。
+  VideoController? videoController;
 
   late final List<StreamSubscription> _streamSubscriptions;
   final _readyCompleter = Completer<void>();
 
-  /// 视频纹理（render context）就绪信号。VideoController 构造同步返回，但其原生
-  /// render context + 纹理是**异步**建立的；若 `open()` 抢在其之前执行，libmpv 仍会
-  /// 报 "No render context set" 而永久禁用视频输出（偶发黑屏）。故首次 `open()` 前
-  /// 等待此信号（纹理 id 变为非 null 即表示 render context 已挂上），加超时兜底。
-  /// videoController 为空（不支持视频的平台）时立即完成。
-  final _videoTextureReady = Completer<void>();
+  /// 视频纹理（render context）就绪等待超时：VideoController 构造同步返回，但其原生
+  /// render context + 纹理是**异步**建立的；首次 `open()` 前等待纹理 id 变为非 null，
+  /// 加此超时兜底（音频优先，不因纹理迟迟不就绪而卡住）。
   static const Duration _videoReadyTimeout = Duration(seconds: 3);
+
+  /// Android ao/cache 兜底是否已配置（只需设一次）。
+  bool _androidAudioConfigured = false;
+
+  static bool get _isMobilePlatform =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  static bool get _isAndroid =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   Future<void> ready() => _readyCompleter.future;
 
@@ -87,11 +98,13 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
       ),
     );
 
-    // 立即派生 VideoController（在任何 open() 之前），让 libmpv 的 render context
-    // 在打开媒体时已就绪，避免视频输出因 "No render context set" 被永久禁用。
-    videoController =
-        AudioBackend.usesMediaKit ? VideoController(player) : null;
-    _watchVideoTextureReady();
+    // 桌面（Win/Linux/macOS）立即派生 VideoController（在任何 open() 之前），让 libmpv 的
+    // render context 在打开媒体时已就绪，避免视频输出因 "No render context set" 被永久禁用。
+    // 移动端刻意不预建（见 videoController 字段文档）：避免 isVideoControllerAttached 的
+    // open() 门闩在 Android 无 Video widget 时挂住全部播放；改由 load() 惰性按视频源创建。
+    if (AudioBackend.usesMediaKit && !_isMobilePlatform) {
+      videoController = VideoController(player);
+    }
 
     if (JustAudioMediaKit.prefetchPlaylist) {
       _setMpvProperty('prefetch-playlist', 'yes');
@@ -243,32 +256,64 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
     _dataController.add(message);
   }
 
-  /// 监听 VideoController 纹理 id：非 null 即表示 render context 已建立，
-  /// 完成 [_videoTextureReady]。videoController 为空则立即完成。
-  void _watchVideoTextureReady() {
+  /// 移动端惰性创建 VideoController：仅当本次确为视频源时，于 `open()` 之前建好，
+  /// 保证 render context 就绪（避免 "No render context set"）。桌面已在构造时建好，
+  /// 此处 no-op；纯音频（videoController 保持 null）不 attach → 不触发 open() 门闩。
+  void _ensureVideoControllerForVideo() {
+    if (videoController != null || !AudioBackend.usesMediaKit) return;
+    videoController = VideoController(player);
+  }
+
+  /// 首次 `open()` 前等待**当前** VideoController 的纹理就绪，避免 render context 未挂上
+  /// 就打开媒体导致视频输出被永久禁用。无控制器（纯音频）或已就绪则立即返回；超时兜底
+  /// （音频优先，不因纹理迟迟不就绪而卡住）。
+  Future<void> _awaitVideoTextureReady() async {
     final controller = videoController;
-    if (controller == null || controller.id.value != null) {
-      if (!_videoTextureReady.isCompleted) _videoTextureReady.complete();
-      return;
-    }
+    if (controller == null || controller.id.value != null) return;
+    final completer = Completer<void>();
     void listener() {
-      if (controller.id.value != null && !_videoTextureReady.isCompleted) {
-        _videoTextureReady.complete();
+      if (controller.id.value != null && !completer.isCompleted) {
+        completer.complete();
         controller.id.removeListener(listener);
       }
     }
 
     controller.id.addListener(listener);
+    try {
+      await completer.future.timeout(_videoReadyTimeout);
+    } on TimeoutException {
+      controller.id.removeListener(listener);
+      debugPrint('[SongloftMediaKitPlayer] 视频纹理就绪超时，继续打开媒体');
+    }
   }
 
-  /// 首次 `open()` 前等待视频纹理就绪，避免 render context 未挂上就打开媒体导致
-  /// 视频输出被永久禁用。超时兜底（音频优先，不因纹理迟迟不就绪而卡住）。
-  Future<void> _awaitVideoTextureReady() async {
-    if (_videoTextureReady.isCompleted) return;
+  /// 判定一次加载请求是否为视频源（URL 带 `media=video`，由 UrlHelper.buildVideoUrl 追加）。
+  bool _isVideoRequest(AudioSourceMessage message) => switch (message) {
+    UriAudioSourceMessage(:final uri) => uri.contains('media=video'),
+    ClippingAudioSourceMessage(:final child) => child.uri.contains(
+      'media=video',
+    ),
+    ConcatenatingAudioSourceMessage(:final children) => children.any(
+      _isVideoRequest,
+    ),
+    _ => false,
+  };
+
+  /// Android 音频输出/缓存兜底（只配置一次，首次 open 前）：
+  /// - `ao=audiotrack,opensles`：media_kit 在 Android 硬编码 `ao=opensles`，个别设备
+  ///   OpenSL ES 输出异常会「有进度、无 error、但完全无声」；优先 AudioTrack（旧 ExoPlayer
+  ///   后端亦走它），opensles 兜底。
+  /// - `cache-on-disk=no`：libmpv 磁盘缓存目录默认取 CWD/XDG_CACHE_HOME，Android（尤其
+  ///   Bundle 本地模式 CWD=`/`）常不可写；just_audio 的 LockCaching 已自带边播边缓存，
+  ///   libmpv 无需再落盘。
+  Future<void> _configureAndroidAudioOnce() async {
+    if (_androidAudioConfigured || !_isAndroid) return;
+    _androidAudioConfigured = true;
     try {
-      await _videoTextureReady.future.timeout(_videoReadyTimeout);
-    } on TimeoutException {
-      debugPrint('[SongloftMediaKitPlayer] 视频纹理就绪超时，继续打开媒体');
+      await _setMpvProperty('ao', 'audiotrack,opensles');
+      await _setMpvProperty('cache-on-disk', 'no');
+    } catch (e) {
+      debugPrint('[SongloftMediaKitPlayer] Android ao/cache 配置失败 (ignored): $e');
     }
   }
 
@@ -294,7 +339,16 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
     _errorMessage = null;
     _updatePlaybackEvent();
 
-    // 打开媒体前确保视频 render context 已就绪（首次之后 completer 已完成，无开销），
+    // 移动端惰性创建 VideoController：仅视频源在 open() 之前建（纯音频不 attach，
+    // 规避 isVideoControllerAttached 对 open() 的门闩）。桌面已在构造时建好，此处 no-op。
+    if (_isVideoRequest(request.audioSourceMessage)) {
+      _ensureVideoControllerForVideo();
+    }
+
+    // Android 音频输出/缓存兜底（首次 open 前配置一次）。
+    await _configureAndroidAudioOnce();
+
+    // 打开媒体前确保视频 render context 已就绪（无 VideoController 时立即返回，无开销），
     // 消除 open() 抢跑于纹理建立之前导致的偶发黑屏。
     await _awaitVideoTextureReady();
 
