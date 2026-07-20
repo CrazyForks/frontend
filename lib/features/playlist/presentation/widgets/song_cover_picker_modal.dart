@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../shared/widgets/network_cover_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -278,7 +278,7 @@ class _CoverGridItem extends StatelessWidget {
                 child:
                     coverUrl != null
                         ? ExcludeSemantics(
-                          child: CachedNetworkImage(
+                          child: NetworkCoverImage(
                             imageUrl: UrlHelper.buildCoverUrl(coverUrl),
                             fit: BoxFit.cover,
                             placeholder:

@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'network_cover_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_dimensions.dart';
@@ -402,7 +402,7 @@ class BrowseCard extends StatelessWidget {
         : null;
     if (url == null) return _buildPlaceholder(context, iconSize: 48);
     return ExcludeSemantics(
-      child: CachedNetworkImage(
+      child: NetworkCoverImage(
         imageUrl: url,
         fit: BoxFit.cover,
         placeholder: (context, url) =>

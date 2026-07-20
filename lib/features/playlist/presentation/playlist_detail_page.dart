@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../shared/widgets/network_cover_image.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -603,7 +603,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
             clipBehavior: Clip.antiAlias,
             child: playlist.coverImageUrl != null
                 ? ExcludeSemantics(
-                    child: CachedNetworkImage(
+                    child: NetworkCoverImage(
                       imageUrl: UrlHelper.buildCoverUrl(
                         playlist.coverImageUrl!,
                       ),
@@ -812,7 +812,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
           clipBehavior: Clip.antiAlias,
           child: playlist.coverImageUrl != null
               ? ExcludeSemantics(
-                child: CachedNetworkImage(
+                child: NetworkCoverImage(
                     imageUrl: UrlHelper.buildCoverUrl(playlist.coverImageUrl!),
                     fit: BoxFit.cover,
                     placeholder: (context, url) =>

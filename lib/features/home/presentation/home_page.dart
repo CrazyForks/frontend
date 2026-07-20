@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../shared/widgets/network_cover_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -384,7 +384,7 @@ class _GridPlaylistCard extends StatelessWidget {
   }
 
   Widget _buildNetworkImage(String coverUrl, ColorScheme colorScheme) {
-    return CachedNetworkImage(
+    return NetworkCoverImage(
       imageUrl: UrlHelper.buildCoverUrl(coverUrl),
       fit: BoxFit.cover,
       placeholder: (context, url) => _buildPlaceholder(colorScheme),

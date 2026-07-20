@@ -1,6 +1,6 @@
 import 'dart:io' show File;
 
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../shared/widgets/network_cover_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -113,7 +113,7 @@ mixin PlaylistCoverEditMixin<T extends StatefulWidget> on State<T> {
     final previewUrl = coverPreviewUrl;
     if (previewUrl != null && previewUrl.isNotEmpty) {
       return ExcludeSemantics(
-        child: CachedNetworkImage(
+        child: NetworkCoverImage(
           imageUrl: UrlHelper.buildCoverUrl(previewUrl),
           fit: BoxFit.cover,
           placeholder:

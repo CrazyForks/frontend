@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../shared/widgets/network_cover_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_dimensions.dart';
@@ -196,7 +196,7 @@ class HeroCard extends StatelessWidget {
   Widget _buildCoverImage(ColorScheme colorScheme) {
     final coverUrl = playlist.coverImageUrl;
     if (coverUrl != null && coverUrl.isNotEmpty) {
-      return CachedNetworkImage(
+      return NetworkCoverImage(
         imageUrl: UrlHelper.buildCoverUrl(coverUrl),
         fit: BoxFit.cover,
         placeholder:

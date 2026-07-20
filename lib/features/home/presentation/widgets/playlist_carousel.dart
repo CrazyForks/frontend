@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../shared/widgets/network_cover_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/responsive.dart';
@@ -107,7 +107,7 @@ class _PlaylistCarouselItem extends StatelessWidget {
                   children: [
                     playlist.coverImageUrl != null
                         ? ExcludeSemantics(
-                          child: CachedNetworkImage(
+                          child: NetworkCoverImage(
                             imageUrl: UrlHelper.buildCoverUrl(
                               playlist.coverImageUrl!,
                             ),
