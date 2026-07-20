@@ -46,6 +46,9 @@ class _StartupGateState extends ConsumerState<StartupGate>
   _StartupHint _hint = _StartupHint.starting;
   String _connectingTarget = '';
 
+  /// 上次执行 Web 重绘恢复的时间，用于节流（避免频繁切后台抖动时连续重建整树）。
+  DateTime _lastWebRepaint = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void initState() {
     super.initState();
@@ -70,9 +73,52 @@ class _StartupGateState extends ConsumerState<StartupGate>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!kIsWeb || state != AppLifecycleState.resumed) return;
-    // Web 回前台时轻量补几帧。切后台 WebGL context 丢失的根因(引擎
-    // flutter/flutter#184683 的 LateInitializationError)已由 web 构建改用含
-    // #185116 修复的 beta 3.47 从引擎层解决,这里无需再做重建/补发等干预。
+    _forceWebRepaint();
+  }
+
+  /// Web 切后台回前台的渲染恢复。
+  ///
+  /// Android Chrome 后台会丢弃标签页的 WebGL context。web 构建钉在含引擎修复
+  /// flutter/flutter#185116 的 beta 3.47，该修复只去掉 `_handledContextLostEvent`
+  /// 的 `late`（避免 `webglcontextlost` 同步触发时的 LateInitializationError 崩溃
+  /// = 切后台回来黑屏），引擎(`canvaskit/surface.dart` onContextLost)随后只重建
+  /// GrContext/SkSurface，**不会重传已解码位图的 GPU 纹理**。
+  ///
+  /// 后果分两类：
+  /// - **矢量内容**（渐变/纯色/占位）每帧从 Picture 重新录制光栅化，自动恢复；
+  /// - **封面等位图**走 cached_network_image_web 的 WebCodecs VideoFrame 惰性纹理，
+  ///   其源在后台被浏览器回收后，重绘时从死源惰性重传出全零像素 → **偶发纯黑封面**
+  ///   （errorWidget 捕获不到，因为解码在框架层是“成功”的，失败发生在 GPU 绘制层）。
+  ///
+  /// 修复：resume 时驱逐图片缓存（含活图，保证后续 resolve 缓存未命中），再
+  /// `reassembleApplication()` 让每个 Image 重新 resolve → 走 flutter_cache_manager
+  /// 字节缓存重新解码 → 新建 VideoFrame → 上传到重建后的 GrContext。缺一不可：只清
+  /// 缓存 widget 不会 re-resolve（复用死图）；只 reassemble 又会命中旧缓存（复用死图）。
+  /// 单纯 `scheduleFrame` 只重录矢量、对死纹理无效。
+  void _forceWebRepaint() {
+    if (!mounted) return;
+
+    // 节流：切后台频繁抖动时避免连续重建整棵树，退化为轻量补帧。
+    final now = DateTime.now();
+    if (now.difference(_lastWebRepaint) < const Duration(seconds: 2)) {
+      WidgetsBinding.instance.scheduleFrame();
+      return;
+    }
+    _lastWebRepaint = now;
+
+    // 1) 驱逐图片缓存（含活图）。clear() 只清 keepAlive 缓存、不动活图，且清缓存
+    //    本身不触发重解码，故必须同时 clearLiveImages()。
+    final imageCache = PaintingBinding.instance.imageCache;
+    imageCache.clear();
+    imageCache.clearLiveImages();
+
+    // 2) 强制整棵树重新 resolve 图片（否则已挂载 widget 复用旧的死 ui.Image）。
+    //    延后到下一帧，避开 resume 回调期间的构建阶段。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) WidgetsBinding.instance.reassembleApplication();
+    });
+
+    // 3) 兜底补几帧，确保矢量层与重建后的树都被重绘。
     for (var i = 0; i < 3; i++) {
       Future.delayed(Duration(milliseconds: i * 200), () {
         if (mounted) WidgetsBinding.instance.scheduleFrame();
