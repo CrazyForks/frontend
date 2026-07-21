@@ -175,6 +175,35 @@ final facetListProvider =
       FacetListNotifier.new,
     );
 
+/// getSongs 的分类过滤参数集合（各维度互斥，仅其一非空）。
+typedef CategoryFilter = ({
+  String? genre,
+  String? artist,
+  String? album,
+  String? language,
+  String? style,
+  int? year,
+  int? decade,
+});
+
+/// 将分类维度 [key]（field + value）映射为 getSongs 的过滤参数。
+///
+/// 分类页拉取分页、以及点击单曲后后台补齐整个分类队列，都要用同一套映射，
+/// 故抽出此纯函数作为唯一来源，避免映射逻辑散落多处漂移。
+CategoryFilter categorySongsFilter(({String field, String value}) key) {
+  final field = key.field;
+  final value = key.value;
+  return (
+    genre: field == 'genre' ? value : null,
+    artist: field == 'artist' ? value : null,
+    album: field == 'album' ? value : null,
+    language: field == 'language' ? value : null,
+    style: field == 'style' ? value : null,
+    year: field == 'year' ? int.tryParse(value) : null,
+    decade: field == 'decade' ? int.tryParse(value) : null,
+  );
+}
+
 /// 某分类下歌曲的分页 Notifier。
 ///
 /// - family 参数为 (field, value)：field 决定给 getSongs 传哪个过滤参数，
@@ -194,16 +223,15 @@ class CategorySongsNotifier extends AsyncNotifier<PaginatedSongsState> {
 
   /// 按 field 分发到对应的 getSongs 过滤参数并发起请求。
   Future<SongListResponse> _fetch(SongsApi api, {required int offset}) {
-    final field = _key.field;
-    final value = _key.value;
+    final f = categorySongsFilter(_key);
     return api.getSongs(
-      genre: field == 'genre' ? value : null,
-      artist: field == 'artist' ? value : null,
-      album: field == 'album' ? value : null,
-      language: field == 'language' ? value : null,
-      style: field == 'style' ? value : null,
-      year: field == 'year' ? int.tryParse(value) : null,
-      decade: field == 'decade' ? int.tryParse(value) : null,
+      genre: f.genre,
+      artist: f.artist,
+      album: f.album,
+      language: f.language,
+      style: f.style,
+      year: f.year,
+      decade: f.decade,
       limit: pageLimit,
       offset: offset,
     );

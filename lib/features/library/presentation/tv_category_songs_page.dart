@@ -60,9 +60,25 @@ class _TvCategorySongsPageState extends ConsumerState<TvCategorySongsPage> {
   }
 
   void _onSongTap(List<Song> songs, int index) {
-    ref
-        .read(playerStateProvider.notifier)
-        .playPlaylist(songs, startIndex: index);
+    final state = ref.read(categorySongsProvider(_key)).value;
+    final notifier = ref.read(playerStateProvider.notifier);
+    notifier.playPlaylist(songs, startIndex: index);
+    // 分类下歌曲超过一页时，后台补齐整个分类队列，避免队列被截断到已加载页
+    // （songloft-org/songloft#299）。
+    if (state != null && state.hasMore) {
+      final f = categorySongsFilter(_key);
+      notifier.loadRemainingSongsForCurrentPlaylist(
+        loadedCount: songs.length,
+        total: state.total,
+        genre: f.genre,
+        artist: f.artist,
+        album: f.album,
+        language: f.language,
+        style: f.style,
+        year: f.year,
+        decade: f.decade,
+      );
+    }
   }
 
   Future<void> _playAll() async {

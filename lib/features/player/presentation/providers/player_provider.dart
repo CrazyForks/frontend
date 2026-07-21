@@ -1310,14 +1310,22 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 后台异步加载剩余歌曲（按筛选条件）并追加到播放列表
   /// [generation] 启动时的代次快照，每次 await 后检查是否过期
+  /// 可选的分类过滤参数（genre/artist/album/...）用于分类页补齐整个分类队列
   Future<void> _loadRemainingSongsByFilter(
     SongsApi songsApi,
     String? keyword,
     String? type,
     int startOffset,
     int total,
-    int generation,
-  ) async {
+    int generation, {
+    String? genre,
+    String? artist,
+    String? album,
+    String? language,
+    String? style,
+    int? year,
+    int? decade,
+  }) async {
     const batchLimit = 100;
     const maxRetries = 3;
     int offset = startOffset;
@@ -1343,6 +1351,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
             response = await songsApi.getSongs(
               keyword: keyword,
               type: type,
+              genre: genre,
+              artist: artist,
+              album: album,
+              language: language,
+              style: style,
+              year: year,
+              decade: decade,
               limit: batchLimit,
               offset: offset,
             );
@@ -1398,12 +1413,20 @@ class PlayerNotifier extends Notifier<PlayerState> {
     }
   }
 
-  /// 后台加载剩余歌曲追加到当前播放列表（供 library 页面点击单曲后补全队列）
+  /// 后台加载剩余歌曲追加到当前播放列表（供 library / 分类页点击单曲后补全队列）
+  /// 可选分类过滤参数（genre/artist/album/...）用于按分类维度补齐整个队列
   void loadRemainingSongsForCurrentPlaylist({
     String? keyword,
     String? type,
     required int loadedCount,
     required int total,
+    String? genre,
+    String? artist,
+    String? album,
+    String? language,
+    String? style,
+    int? year,
+    int? decade,
   }) {
     final songsApi = ref.read(songsApiProvider);
     final generation = _loadGeneration;
@@ -1417,6 +1440,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
       loadedCount,
       total,
       generation,
+      genre: genre,
+      artist: artist,
+      album: album,
+      language: language,
+      style: style,
+      year: year,
+      decade: decade,
     );
   }
 
