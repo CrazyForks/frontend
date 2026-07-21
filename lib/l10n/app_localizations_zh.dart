@@ -2062,6 +2062,19 @@ class AppLocalizationsZh extends AppLocalizations {
       '将清除所有前端静态资源缓存并刷新页面。不会影响登录状态和服务端数据。';
 
   @override
+  String get webUpdateAvailableTitle => '发现新版本';
+
+  @override
+  String get webUpdateAvailableContent =>
+      '检测到服务端已更新，当前页面仍是旧版本。点击「立即刷新」将清理浏览器缓存并加载最新版本，不会影响登录状态。';
+
+  @override
+  String get webUpdateAvailableRefresh => '立即刷新';
+
+  @override
+  String get webUpdateAvailableLater => '稍后';
+
+  @override
   String settingsCacheUpdateConfigFailed(String error) {
     return '更新配置失败: $error';
   }

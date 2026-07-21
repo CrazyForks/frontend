@@ -3806,6 +3806,30 @@ abstract class AppLocalizations {
   /// **'将清除所有前端静态资源缓存并刷新页面。不会影响登录状态和服务端数据。'**
   String get settingsCacheCleanBrowserContent;
 
+  /// No description provided for @webUpdateAvailableTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'发现新版本'**
+  String get webUpdateAvailableTitle;
+
+  /// No description provided for @webUpdateAvailableContent.
+  ///
+  /// In zh, this message translates to:
+  /// **'检测到服务端已更新，当前页面仍是旧版本。点击「立即刷新」将清理浏览器缓存并加载最新版本，不会影响登录状态。'**
+  String get webUpdateAvailableContent;
+
+  /// No description provided for @webUpdateAvailableRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'立即刷新'**
+  String get webUpdateAvailableRefresh;
+
+  /// No description provided for @webUpdateAvailableLater.
+  ///
+  /// In zh, this message translates to:
+  /// **'稍后'**
+  String get webUpdateAvailableLater;
+
   /// No description provided for @settingsCacheUpdateConfigFailed.
   ///
   /// In zh, this message translates to:

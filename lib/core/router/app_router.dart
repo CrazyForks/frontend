@@ -55,6 +55,10 @@ class _AuthChangeNotifier extends ChangeNotifier {
 }
 
 /// GoRouter Provider
+/// 根 Navigator key，供路由体系外的全局逻辑（如 Web 更新提示弹窗）拿到
+/// 位于 MaterialApp 之下的 BuildContext 弹出对话框。
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final routerProvider = Provider<GoRouter>((ref) {
   final authChangeNotifier = _AuthChangeNotifier(ref);
 
@@ -63,6 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   });
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: AppRoutes.home,
     debugLogDiagnostics: true,
     refreshListenable: authChangeNotifier,

@@ -196,6 +196,12 @@ build_web() {
     echo "var _deployMode = '${mode}';" > "$output/deploy-mode.js"
     echo -e "${GREEN}✓ [Web]${NC} 已生成部署模式配置 (${mode})"
 
+    # 生成前端版本标记，供运行时检测浏览器缓存是否过期（同源自比，绕过缓存拉取）。
+    # 在 flutter build 之后写入，故不进入 Service Worker 的 RESOURCES map，SW 会网络透传取到最新值。
+    printf '{"version":"%s","buildTime":"%s"}\n' \
+        "$FRONTEND_VERSION_VALUE" "$FRONTEND_BUILD_TIME_VALUE" > "$output/version.json"
+    echo -e "${GREEN}✓ [Web]${NC} 已生成版本标记 version.json (${FRONTEND_VERSION_VALUE} / ${FRONTEND_BUILD_TIME_VALUE})"
+
     # canvaskit 清理：仅在 embedded 模式下清理未使用的渲染器变体（skwasm、wimp、symbols），仅保留 canvaskit 本体
     # standalone 模式不生成本地 canvaskit，无需清理
     if [ "$mode" = "embedded" ] && [ -d "$output/canvaskit" ]; then

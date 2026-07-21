@@ -2158,6 +2158,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'This will clear all cached frontend assets and reload the page. Your login and server data will not be affected.';
 
   @override
+  String get webUpdateAvailableTitle => 'Update available';
+
+  @override
+  String get webUpdateAvailableContent =>
+      'The server has been updated, but this page is still running an older version. Tap \"Refresh now\" to clear the browser cache and load the latest version. Your login will not be affected.';
+
+  @override
+  String get webUpdateAvailableRefresh => 'Refresh now';
+
+  @override
+  String get webUpdateAvailableLater => 'Later';
+
+  @override
   String settingsCacheUpdateConfigFailed(String error) {
     return 'Failed to update config: $error';
   }
