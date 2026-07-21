@@ -1,0 +1,1 @@
+void overrideSemanticsPointerEvents(bool block) {}
