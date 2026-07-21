@@ -122,6 +122,25 @@ TV 模式下：
 - 通知栏回调（`onSkipToNext`/`onSkipToPrevious`/`onSongCompleted`）由 `PlayerNotifier` 注入
 - `notifySongActivated` 钩子：切歌前通知后端取消旧 song 的进行中工作（prefetch/transcode），解决 LockCachingAudioSource 不主动 abort 上游 HTTP 的问题
 
+### 分页列表点单曲的播放队列构建（铁律，songloft-org/songloft#299）
+
+歌单 / 歌曲库 / 分类等长列表都是**滚动分页**加载的（首页 100 条，触底 `loadMore` 再取下一页）。**从这类列表点击某首歌播放时，绝不能把"当前已加载的分页片段"直接当成完整播放队列**，否则队列被截断到已加载页（如最长 100），只在页内循环；用户滚动触发 `loadMore` 后队列才被动增长到 200/300——这正是 #299 的现象。
+
+**统一约定**：分页列表点单曲 = **立即用已加载片段 + startIndex 起播** ＋ **若 `total > 已加载数` 则按与该列表完全相同的筛选/排序条件，从已加载 offset 起后台补齐整个队列**。补齐走 `PlayerNotifier` 的后台加载器，并用 `_loadGeneration` 代次守卫：用户切歌单 / 换筛选 / 清空队列时旧的后台加载自动失效。
+
+| 列表来源 | 起播 + 补齐入口 | 补齐条件 |
+|----------|----------------|----------|
+| 歌单详情（普通 / TV） | `playPlaylistFromLoaded(loadedSongs, startIndex, playlistId, total, sort, order, keyword)` | 同一 `sort/order/keyword`，按 `playlistId` 分页 |
+| 歌曲库「所有歌曲」（普通 / TV） | `playPlaylist(...)` + `loadRemainingSongsForCurrentPlaylist(keyword, type, ...)` | 同一 `keyword/type` 过滤 |
+| 分类页（专辑 / 歌手 / 流派 / 年代…，普通 / TV） | `playPlaylist(...)` + `loadRemainingSongsForCurrentPlaylist(..., genre/artist/album/language/style/year/decade)` | 同一分类维度过滤，映射见 `categorySongsFilter(key)` |
+
+要点：
+
+- **筛选/排序必须与列表一致**：补齐时若用默认条件而非列表当前的 `sort/order/keyword/分类维度`，补进来的歌会与用户看到的顺序/范围错位。分类维度的 `(field,value) → getSongs 参数` 映射统一走 `categorySongsFilter(key)`（`category_provider.dart`），是唯一来源，勿在 UI 层重复手写。
+- **「播放全部」是另一条路**：走 `playPlaylistById`（歌单）或先 `loadAll()` 再 `playPlaylist`（分类/facet），本身即覆盖全量，不受此约定影响。
+- **已是完整列表的场景无需补齐**：队列抽屉 / `queue_page` 用的是 `state.playlist`（播放队列本身）、插件 `setQueue` 传入的是插件解析好的全量歌曲，均非分页片段。
+- **新增任何"分页列表点单曲播放"的页面**，必须一并接上"起播 + 后台补齐"，否则又会引入同类截断。
+
 ### 各平台音频后端
 
 | 平台 | 后端（默认） | 说明 |

@@ -122,6 +122,25 @@ Integrates `audio_service` for system notification bar controls. Core design:
 - Notification callbacks (`onSkipToNext` / `onSkipToPrevious` / `onSongCompleted`) are injected by `PlayerNotifier`
 - `notifySongActivated` hook: notifies the backend to cancel in-progress work (prefetch/transcode) for the old song before switching, resolving an issue where `LockCachingAudioSource` does not abort upstream HTTP connections
 
+### Building the Play Queue When Tapping a Song in a Paginated List (hard rule, songloft-org/songloft#299)
+
+Long lists such as playlists, the song library, and category browsing are all loaded via **scroll pagination** (first page 100 items, `loadMore` fetches the next page on hitting the bottom). **When a song is tapped in such a list to start playback, the "currently loaded page slice" must never be treated as the complete play queue** — otherwise the queue is truncated to the loaded page (e.g. capped at 100), looping within that page; it only grows to 200/300 passively after the user scrolls and triggers `loadMore`. This is exactly the behavior reported in #299.
+
+**Unified convention**: tapping a song in a paginated list = **start playing immediately from the loaded slice + startIndex** PLUS **if `total > loaded count`, background-fill the entire queue from the loaded offset onward, using the exact same filter/sort as the list**. The fill goes through `PlayerNotifier`'s background loader and is guarded by `_loadGeneration`: an in-flight fill is automatically invalidated when the user switches playlists / changes filters / clears the queue.
+
+| List source | Start + fill entry point | Fill criteria |
+|-------------|--------------------------|---------------|
+| Playlist detail (normal / TV) | `playPlaylistFromLoaded(loadedSongs, startIndex, playlistId, total, sort, order, keyword)` | Same `sort/order/keyword`, paged by `playlistId` |
+| Library "All Songs" (normal / TV) | `playPlaylist(...)` + `loadRemainingSongsForCurrentPlaylist(keyword, type, ...)` | Same `keyword/type` filter |
+| Category pages (album / artist / genre / decade…, normal / TV) | `playPlaylist(...)` + `loadRemainingSongsForCurrentPlaylist(..., genre/artist/album/language/style/year/decade)` | Same category-dimension filter, mapping via `categorySongsFilter(key)` |
+
+Key points:
+
+- **Filter/sort must match the list**: if the fill uses default criteria instead of the list's current `sort/order/keyword/category dimension`, the filled-in songs will be misaligned with the order/scope the user sees. The `(field,value) → getSongs params` mapping for category dimensions goes through `categorySongsFilter(key)` (`category_provider.dart`) as the single source of truth — do not re-implement it in the UI layer.
+- **"Play All" is a separate path**: it uses `playPlaylistById` (playlists) or `loadAll()` followed by `playPlaylist` (category/facet), which already covers the full set and is unaffected by this convention.
+- **No fill needed when the list is already complete**: the queue drawer / `queue_page` use `state.playlist` (the play queue itself), and the plugin `setQueue` receives the plugin's already-resolved full song list — neither is a paginated slice.
+- **Any new "tap-to-play in a paginated list" page** must wire up both "start + background fill", otherwise it reintroduces the same truncation.
+
 ### Audio Backend per Platform
 
 | Platform | Backend (default) | Notes |
