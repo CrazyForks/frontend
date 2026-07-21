@@ -108,17 +108,26 @@ final upgradeCheckProvider = FutureProvider<UpgradeCheck>((ref) async {
       .timeout(const Duration(seconds: 15));
 });
 
-/// 获取服务端版本号
-final serverVersionProvider = FutureProvider<String>((ref) async {
-  final dio = ref.watch(dioProvider);
-  final response = await dio.get('${AppConfig.apiPrefix}/version');
-  final data = response.data as Map<String, dynamic>;
-  final version = data['version'] as String?;
-  if (version != null && version.isNotEmpty) {
-    return version;
-  }
-  return l10n.commonUnknown;
-});
+/// 获取服务端版本号 + 构建时间。构建时间用于给开发版标注具体编译时刻，方便核对
+/// 当前跑的到底是不是最新 dev 构建（build_time 缺失/unknown 时为 null）。
+final serverVersionProvider =
+    FutureProvider<({String version, String? buildTime})>((ref) async {
+      final dio = ref.watch(dioProvider);
+      final response = await dio.get('${AppConfig.apiPrefix}/version');
+      final data = response.data as Map<String, dynamic>;
+      final version = data['version'] as String?;
+      final built = data['build_time'] as String?;
+      return (
+        version:
+            (version != null && version.isNotEmpty)
+                ? version
+                : l10n.commonUnknown,
+        buildTime:
+            (built != null && built != 'unknown' && built.isNotEmpty)
+                ? built
+                : null,
+      );
+    });
 
 /// 检查前端（客户端）更新
 /// 带上已记住的 GitHub 代理（FrontendVersionApi 自带 10s 超时）

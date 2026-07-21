@@ -102,13 +102,20 @@ class SettingsServerInfoCard extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final currentUrl = ref.watch(baseUrlProvider);
     final serverVersionAsync = ref.watch(serverVersionProvider);
-    final versionText = serverVersionAsync.value;
-    final versionLabel =
-        versionText == null
-            ? null
-            : versionText == 'dev'
-            ? l10n.settingsDevVersion
-            : 'v$versionText';
+    final versionInfo = serverVersionAsync.value;
+    String? versionLabel;
+    if (versionInfo != null) {
+      // 开发版显示「开发版」，正式版显示 vX.Y.Z；两者都附上构建时间以便核对
+      // 当前跑的具体构建（build_time 缺失/unknown 时省略）。
+      final base =
+          versionInfo.version == 'dev'
+              ? l10n.settingsDevVersion
+              : 'v${versionInfo.version}';
+      versionLabel =
+          versionInfo.buildTime != null
+              ? '$base (${versionInfo.buildTime})'
+              : base;
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -1273,6 +1280,7 @@ class _SettingsCategoryContentState
   Future<void> _showAboutDialog() async {
     String version = '1.0.0';
     String? gitCommit;
+    String? buildTime;
 
     try {
       final dio = ref.read(dioProvider);
@@ -1288,15 +1296,24 @@ class _SettingsCategoryContentState
       if (commit != null && commit != 'unknown' && commit.isNotEmpty) {
         gitCommit = commit;
       }
+      final built = data['build_time'] as String?;
+      if (built != null && built != 'unknown' && built.isNotEmpty) {
+        buildTime = built;
+      }
     } catch (_) {}
 
     if (!mounted) return;
 
     final l10n = AppLocalizations.of(context);
+    // 与设置页顶部版本标签一致：开发版显示「开发版」、正式版显示 vX.Y.Z，
+    // 两者都在后面附上构建时间（缺失时省略）。
+    final versionBase = version == 'dev' ? l10n.settingsDevVersion : 'v$version';
+    final versionLabel =
+        buildTime != null ? '$versionBase ($buildTime)' : versionBase;
     showAboutDialog(
       context: context,
       applicationName: 'Songloft',
-      applicationVersion: version,
+      applicationVersion: versionLabel,
       applicationIcon: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Image.asset(
