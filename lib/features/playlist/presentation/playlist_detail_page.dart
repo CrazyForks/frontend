@@ -68,6 +68,15 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
+    // playlistSongsProvider 常驻（非 autoDispose），离开页面再回来时本页 State 会被
+    // 重建、_searchController 归零，但 provider 里的 keyword 仍在、列表仍按其过滤。
+    // 若不回填，就会出现「搜索框空了但列表还停在搜索结果、且无清除按钮回不去」的错位。
+    final existingKeyword =
+        ref.read(playlistSongsProvider(_playlistIdInt)).value?.keyword ?? '';
+    if (existingKeyword.isNotEmpty) {
+      _searchController.text = existingKeyword;
+      _isSearchMode = true;
+    }
   }
 
   @override
