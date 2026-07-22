@@ -69,6 +69,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _applyInitialViewKey(widget.initialViewKey);
+    // songsListProvider 常驻（非 autoDispose），离开曲库再回来时本页 State 会被重建、
+    // _searchController 归零，但 provider 里的 keyword 仍在、列表仍按其过滤。若不回填，
+    // 就会出现「搜索框空了但列表还停在搜索结果、且无清除按钮回不去」的错位。
+    _searchController.text = ref.read(songsListProvider).keyword;
   }
 
   @override

@@ -39,16 +39,12 @@ class _FacetGridViewState extends ConsumerState<FacetGridView> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void didUpdateWidget(covariant FacetGridView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 切换维度时清空搜索框（不同维度取值空间不同，保留旧关键词会造成困惑）。
-    if (oldWidget.field != widget.field) {
-      _searchController.clear();
-      _debounceTimer?.cancel();
-    }
+    // facetListProvider(field) 常驻（family、非 autoDispose）；且本视图按维度以
+    // ValueKey 挂载，切换维度会让 State 重建、_searchController 归零，但该维度
+    // provider 里的 keyword 仍在、网格仍按其过滤。回填以免「搜索框空了但网格还停在
+    // 搜索结果、无清除按钮回不去」的错位（与 LibraryPage 的处理一致）。
+    _searchController.text =
+        ref.read(facetListProvider(widget.field)).value?.keyword ?? '';
   }
 
   @override
