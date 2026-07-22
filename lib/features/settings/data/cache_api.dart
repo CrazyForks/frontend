@@ -29,10 +29,18 @@ class CacheConfig {
   final String cacheDir;
   final String defaultCacheDir;
 
+  /// 缓存网络歌曲落盘时统一转码的目标格式（''=不转码，按原格式落盘；mp3/m4a/ogg/flac/wav）
+  final String transcodeFormat;
+
+  /// 转码目标码率（''=最高质量；128/192/320）
+  final String transcodeQuality;
+
   CacheConfig({
     required this.maxSize,
     this.cacheDir = '',
     this.defaultCacheDir = '',
+    this.transcodeFormat = '',
+    this.transcodeQuality = '',
   });
 
   factory CacheConfig.fromJson(Map<String, dynamic> json) {
@@ -40,6 +48,8 @@ class CacheConfig {
       maxSize: json['max_size'] as int? ?? 0,
       cacheDir: json['cache_dir'] as String? ?? '',
       defaultCacheDir: json['default_cache_dir'] as String? ?? '',
+      transcodeFormat: json['transcode_format'] as String? ?? '',
+      transcodeQuality: json['transcode_quality'] as String? ?? '',
     );
   }
 
@@ -47,6 +57,8 @@ class CacheConfig {
     return {
       'max_size': maxSize,
       'cache_dir': cacheDir,
+      'transcode_format': transcodeFormat,
+      'transcode_quality': transcodeQuality,
     };
   }
 }

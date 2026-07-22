@@ -1297,6 +1297,14 @@
       }
     }
   },
+  "settingsCacheTranscodeTitle": "Cache transcode format",
+  "settingsCacheTranscodeDesc": "Transcode network songs to a unified format when caching, improving device compatibility (e.g. Xiao AI speakers cannot play MKV); once enabled, video content caches audio only and casting will have no picture",
+  "settingsCacheTranscodeOriginal": "Original (no transcode)",
+  "settingsCacheTranscodeDialogTitle": "Cache transcode format",
+  "settingsCacheTranscodeQualityTitle": "Transcode bitrate",
+  "settingsCacheTranscodeQualityHighest": "Highest quality",
+  "settingsCacheTranscodeQualityDialogTitle": "Transcode bitrate",
+  "settingsCacheTranscodeUpdated": "Cache transcode settings updated",
   "settingsCacheCleaning": "Clearing...",
   "settingsCacheCleanServerButton": "Clear Server Cache",
   "settingsCacheLocalTitle": "Local Cache",

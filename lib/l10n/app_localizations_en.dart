@@ -2220,6 +2220,32 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsCacheTranscodeTitle => 'Cache transcode format';
+
+  @override
+  String get settingsCacheTranscodeDesc =>
+      'Transcode network songs to a unified format when caching, improving device compatibility (e.g. Xiao AI speakers cannot play MKV); once enabled, video content caches audio only and casting will have no picture';
+
+  @override
+  String get settingsCacheTranscodeOriginal => 'Original (no transcode)';
+
+  @override
+  String get settingsCacheTranscodeDialogTitle => 'Cache transcode format';
+
+  @override
+  String get settingsCacheTranscodeQualityTitle => 'Transcode bitrate';
+
+  @override
+  String get settingsCacheTranscodeQualityHighest => 'Highest quality';
+
+  @override
+  String get settingsCacheTranscodeQualityDialogTitle => 'Transcode bitrate';
+
+  @override
+  String get settingsCacheTranscodeUpdated =>
+      'Cache transcode settings updated';
+
+  @override
   String get settingsCacheCleaning => 'Clearing...';
 
   @override

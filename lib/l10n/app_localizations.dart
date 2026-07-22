@@ -3908,6 +3908,54 @@ abstract class AppLocalizations {
   /// **'最大缓存大小: {size}'**
   String settingsCacheMaxSize(String size);
 
+  /// No description provided for @settingsCacheTranscodeTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'缓存转码格式'**
+  String get settingsCacheTranscodeTitle;
+
+  /// No description provided for @settingsCacheTranscodeDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络歌曲缓存时统一转码，提升设备兼容性（如小爱音箱无法播放 MKV）；视频类内容开启后将仅缓存音频、投屏无画面'**
+  String get settingsCacheTranscodeDesc;
+
+  /// No description provided for @settingsCacheTranscodeOriginal.
+  ///
+  /// In zh, this message translates to:
+  /// **'原始（不转码）'**
+  String get settingsCacheTranscodeOriginal;
+
+  /// No description provided for @settingsCacheTranscodeDialogTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'缓存转码格式'**
+  String get settingsCacheTranscodeDialogTitle;
+
+  /// No description provided for @settingsCacheTranscodeQualityTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'转码码率'**
+  String get settingsCacheTranscodeQualityTitle;
+
+  /// No description provided for @settingsCacheTranscodeQualityHighest.
+  ///
+  /// In zh, this message translates to:
+  /// **'最高质量'**
+  String get settingsCacheTranscodeQualityHighest;
+
+  /// No description provided for @settingsCacheTranscodeQualityDialogTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'转码码率'**
+  String get settingsCacheTranscodeQualityDialogTitle;
+
+  /// No description provided for @settingsCacheTranscodeUpdated.
+  ///
+  /// In zh, this message translates to:
+  /// **'缓存转码设置已更新'**
+  String get settingsCacheTranscodeUpdated;
+
   /// No description provided for @settingsCacheCleaning.
   ///
   /// In zh, this message translates to:

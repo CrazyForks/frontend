@@ -2124,6 +2124,31 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsCacheTranscodeTitle => '缓存转码格式';
+
+  @override
+  String get settingsCacheTranscodeDesc =>
+      '网络歌曲缓存时统一转码，提升设备兼容性（如小爱音箱无法播放 MKV）；视频类内容开启后将仅缓存音频、投屏无画面';
+
+  @override
+  String get settingsCacheTranscodeOriginal => '原始（不转码）';
+
+  @override
+  String get settingsCacheTranscodeDialogTitle => '缓存转码格式';
+
+  @override
+  String get settingsCacheTranscodeQualityTitle => '转码码率';
+
+  @override
+  String get settingsCacheTranscodeQualityHighest => '最高质量';
+
+  @override
+  String get settingsCacheTranscodeQualityDialogTitle => '转码码率';
+
+  @override
+  String get settingsCacheTranscodeUpdated => '缓存转码设置已更新';
+
+  @override
   String get settingsCacheCleaning => '清理中...';
 
   @override

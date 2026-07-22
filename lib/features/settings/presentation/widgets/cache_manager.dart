@@ -252,7 +252,7 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
     }
   }
 
-  /// 更新服务端缓存配置（仅 maxSize）
+  /// 更新服务端缓存配置（仅 maxSize），保留其他字段
   Future<void> _updateServerCacheConfig(int maxSize) async {
     try {
       final cacheApi = ref.read(cacheApiProvider);
@@ -260,6 +260,8 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
       await cacheApi.updateCacheConfig(CacheConfig(
         maxSize: maxSize,
         cacheDir: current?.cacheDir ?? '',
+        transcodeFormat: current?.transcodeFormat ?? '',
+        transcodeQuality: current?.transcodeQuality ?? '',
       ));
       ref.invalidate(serverCacheConfigProvider);
       ref.invalidate(serverCacheStatsProvider);
@@ -289,6 +291,8 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
       await api.updateCacheConfig(CacheConfig(
         maxSize: config.maxSize,
         cacheDir: result,
+        transcodeFormat: config.transcodeFormat,
+        transcodeQuality: config.transcodeQuality,
       ));
       ref.invalidate(serverCacheConfigProvider);
       ref.invalidate(serverCacheStatsProvider);
@@ -306,6 +310,100 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
         ResponsiveSnackBar.showError(context,
             message: AppLocalizations.of(context)
                 .settingsCacheUpdateFailed(e.toString()));
+      }
+    }
+  }
+
+  /// 修改缓存转码格式（''=原始不转码 / mp3 / m4a）
+  Future<void> _editTranscodeFormat(CacheConfig config) async {
+    final l10n = AppLocalizations.of(context);
+    final labels = <String, String>{
+      '': l10n.settingsCacheTranscodeOriginal,
+      'mp3': 'MP3',
+      'm4a': 'M4A',
+    };
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(l10n.settingsCacheTranscodeDialogTitle),
+        children: [
+          RadioGroup<String>(
+            groupValue: config.transcodeFormat,
+            onChanged: (v) => Navigator.pop(ctx, v ?? ''),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: labels.entries
+                  .map((e) => RadioListTile<String>(
+                        title: Text(e.value),
+                        value: e.key,
+                      ))
+                  .toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (picked == null || picked == config.transcodeFormat) return;
+    await _saveTranscodeConfig(config, format: picked);
+  }
+
+  /// 修改转码码率（''=最高 / 128 / 192 / 320）
+  Future<void> _editTranscodeQuality(CacheConfig config) async {
+    final l10n = AppLocalizations.of(context);
+    final labels = <String, String>{
+      '': l10n.settingsCacheTranscodeQualityHighest,
+      '128': '128 kbps',
+      '192': '192 kbps',
+      '320': '320 kbps',
+    };
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(l10n.settingsCacheTranscodeQualityDialogTitle),
+        children: [
+          RadioGroup<String>(
+            groupValue: config.transcodeQuality,
+            onChanged: (v) => Navigator.pop(ctx, v ?? ''),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: labels.entries
+                  .map((e) => RadioListTile<String>(
+                        title: Text(e.value),
+                        value: e.key,
+                      ))
+                  .toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (picked == null || picked == config.transcodeQuality) return;
+    await _saveTranscodeConfig(config, quality: picked);
+  }
+
+  /// 保存转码设置（format/quality 二选一变更，其余字段沿用当前配置）
+  Future<void> _saveTranscodeConfig(CacheConfig config,
+      {String? format, String? quality}) async {
+    try {
+      final api = ref.read(cacheApiProvider);
+      await api.updateCacheConfig(CacheConfig(
+        maxSize: config.maxSize,
+        cacheDir: config.cacheDir,
+        transcodeFormat: format ?? config.transcodeFormat,
+        transcodeQuality: quality ?? config.transcodeQuality,
+      ));
+      ref.invalidate(serverCacheConfigProvider);
+      if (mounted) {
+        ResponsiveSnackBar.show(
+          context,
+          message: AppLocalizations.of(context).settingsCacheTranscodeUpdated,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ResponsiveSnackBar.showError(context,
+            message: AppLocalizations.of(context)
+                .settingsCacheUpdateConfigFailed(e.toString()));
       }
     }
   }
@@ -499,6 +597,68 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
                     ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _editCacheDir(config),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
+
+              // 缓存转码格式
+              configAsync.when(
+                data: (config) {
+                  final fmt = config.transcodeFormat;
+                  final fmtLabel = fmt.isEmpty
+                      ? l10n.settingsCacheTranscodeOriginal
+                      : fmt.toUpperCase();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.transform_outlined),
+                        title: Text(l10n.settingsCacheTranscodeTitle),
+                        subtitle: Text(
+                          fmt.isEmpty
+                              ? l10n.settingsCacheTranscodeDesc
+                              : '$fmtLabel · ${l10n.settingsCacheTranscodeDesc}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(fmtLabel,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                )),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                        onTap: () => _editTranscodeFormat(config),
+                      ),
+                      // 转码码率（仅在开启转码后显示）
+                      if (fmt.isNotEmpty)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.speed_outlined),
+                          title: Text(l10n.settingsCacheTranscodeQualityTitle),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                config.transcodeQuality.isEmpty
+                                    ? l10n.settingsCacheTranscodeQualityHighest
+                                    : '${config.transcodeQuality} kbps',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right),
+                            ],
+                          ),
+                          onTap: () => _editTranscodeQuality(config),
+                        ),
+                    ],
                   );
                 },
                 loading: () => const SizedBox.shrink(),
