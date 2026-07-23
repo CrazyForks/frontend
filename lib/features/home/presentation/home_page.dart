@@ -7,7 +7,9 @@ import '../../../core/router/app_router.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/responsive.dart';
+import '../../../core/updater/shorebird_update_service.dart';
 import '../../../core/utils/url_helper.dart';
+import '../../../shared/utils/responsive_snackbar.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../playlist/domain/playlist.dart';
 import '../../player/presentation/providers/player_provider.dart';
@@ -19,11 +21,38 @@ import '../../../features/jsplugin/presentation/widgets/jsplugin_grid.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 
 /// 首页
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  /// 每个 App 会话只提示一次，避免每次回到首页都弹「重启生效」。
+  static bool _patchChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _maybeNotifyPatchReady();
+  }
+
+  /// Shorebird 补丁已下好、待重启生效时轻提示用户。非 Shorebird 构建（dev/web/desktop）
+  /// 下 [ShorebirdUpdateService] 直接返回 false，此处静默跳过。
+  Future<void> _maybeNotifyPatchReady() async {
+    if (_patchChecked) return;
+    _patchChecked = true;
+    final ready = await ShorebirdUpdateService().isPatchReadyToInstall();
+    if (!ready || !mounted) return;
+    ResponsiveSnackBar.show(
+      context,
+      message: AppLocalizations.of(context).patchReadyRestartHint,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final playlistsAsync = ref.watch(playlistListProvider(null));
     final normalPlaylistsAsync = ref.watch(playlistListProvider('normal'));
     final radioPlaylistsAsync = ref.watch(playlistListProvider('radio'));

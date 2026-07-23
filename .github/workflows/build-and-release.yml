@@ -318,18 +318,59 @@ jobs:
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > $RUNNER_TEMP/release.jks
             echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> $GITHUB_ENV
           fi
+      # 仅正式版（tag）安装 Shorebird CLI；dev 构建跳过，不引入任何依赖。
+      - name: Setup Shorebird
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: shorebirdtech/setup-shorebird@v1
+      # 真实 app_id 存在仓库变量 SHOREBIRD_APP_ID（公开标识，非密钥），CI 在
+      # release 前覆写 shorebird.yaml 占位值。缺变量则直接失败，避免用占位值发布。
+      - name: Inject Shorebird app_id
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SHOREBIRD_APP_ID: ${{ vars.SHOREBIRD_APP_ID }}
+        run: |
+          if [ -z "$SHOREBIRD_APP_ID" ]; then
+            echo "::error::缺少仓库变量 SHOREBIRD_APP_ID，无法执行 shorebird release" >&2
+            exit 1
+          fi
+          sed -i "s|^app_id:.*|app_id: ${SHOREBIRD_APP_ID}|" shorebird.yaml
+          echo "已注入 app_id："
+          grep '^app_id:' shorebird.yaml
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: flutter build apk --release --split-per-abi --dart-define=FRONTEND_VERSION=${{ steps.version.outputs.version }} --dart-define=FRONTEND_BUILD_TIME=${{ steps.version.outputs.build_time }} --dart-define=TRACELY_APP_ID=${{ secrets.TRACELY_APP_ID }} --dart-define=TRACELY_APP_SECRET=${{ secrets.TRACELY_APP_SECRET }} --dart-define=TRACELY_HOST=${{ secrets.TRACELY_HOST }}
-      - name: Collect APKs
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+        run: |
+          COMMON_DEFINES="--dart-define=FRONTEND_VERSION=${{ steps.version.outputs.version }} \
+            --dart-define=FRONTEND_BUILD_TIME=${{ steps.version.outputs.build_time }} \
+            --dart-define=TRACELY_APP_ID=${{ secrets.TRACELY_APP_ID }} \
+            --dart-define=TRACELY_APP_SECRET=${{ secrets.TRACELY_APP_SECRET }} \
+            --dart-define=TRACELY_HOST=${{ secrets.TRACELY_HOST }}"
+
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # 正式版：Shorebird release（登记基线 + 产出单个 universal APK）。
+            # `--` 之后的参数透传给底层 flutter build，dart-define 照旧生效。
+            shorebird release android \
+              --flutter-version=${{ env.FLUTTER_VERSION }} \
+              --artifact apk \
+              -- $COMMON_DEFINES
+          else
+            # dev：不接入 Shorebird，同样产出单个 universal APK（不再 split-per-abi）。
+            flutter build apk --release $COMMON_DEFINES
+          fi
+      - name: Collect APK
         run: |
           mkdir -p apk-output
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk apk-output/songloft-arm64-v8a.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk apk-output/songloft-armeabi-v7a.apk
-          cp build/app/outputs/flutter-apk/app-x86_64-release.apk apk-output/songloft-x86_64.apk
+          # 统一产出单个 universal APK（含全部 ABI）。Shorebird release 与普通 flutter
+          # build 的输出目录不同：前者 apk/release/，后者 flutter-apk/。
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # 首次接入时核对 shorebird release 结束打印的实际路径，如与此不符按实际调整。
+            cp build/app/outputs/apk/release/app-release.apk apk-output/songloft-android.apk
+          else
+            cp build/app/outputs/flutter-apk/app-release.apk apk-output/songloft-android.apk
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: songloft-android-apk

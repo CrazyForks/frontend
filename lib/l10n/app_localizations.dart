@@ -98,6 +98,12 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// Shorebird 补丁下载完成、等待重启生效时的轻提示
+  ///
+  /// In zh, this message translates to:
+  /// **'已下载新版本更新，重启应用后生效'**
+  String get patchReadyRestartHint;
+
   /// 设置页-语言分区标题
   ///
   /// In zh, this message translates to:

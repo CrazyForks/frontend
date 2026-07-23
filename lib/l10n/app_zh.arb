@@ -1,5 +1,9 @@
 {
   "@@locale": "zh",
+  "patchReadyRestartHint": "已下载新版本更新，重启应用后生效",
+  "@patchReadyRestartHint": {
+    "description": "Shorebird 补丁下载完成、等待重启生效时的轻提示"
+  },
   "language": "语言",
   "@language": {
     "description": "设置页-语言分区标题"

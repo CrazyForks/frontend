@@ -39,9 +39,7 @@ Download the latest version from [GitHub Releases](https://github.com/songloft-o
 | | [songloft-windows-x64.msix](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-windows-x64.msix) | x64 installer |
 | 🍎 **macOS** | [songloft-macos.dmg](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-macos.dmg) | Universal DMG (Intel/Apple Silicon) |
 | | [songloft-macos.zip](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-macos.zip) | Universal App archive |
-| 🤖 **Android** | [songloft-arm64-v8a.apk](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-arm64-v8a.apk) | ARM64 (recommended) |
-| | [songloft-armeabi-v7a.apk](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-armeabi-v7a.apk) | ARMv7 |
-| | [songloft-x86_64.apk](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-x86_64.apk) | x86_64 emulator/device |
+| 🤖 **Android** | [songloft-android.apk](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-android.apk) | Universal APK (all ABIs) |
 | 📱 **iOS** | [songloft-ios-nosign.ipa](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-ios-nosign.ipa) | Unsigned IPA, install via AltStore/Sideloadly |
 
 > Development builds are available at the [dev branch Release](https://github.com/songloft-org/songloft-player/releases/tag/dev).
@@ -86,7 +84,7 @@ flutter run -d <device-id>                    # Android device
 # Build for each platform
 flutter build web --no-web-resources-cdn                                       # Web (standalone)
 flutter build web --no-web-resources-cdn --dart-define=DEPLOY_MODE=embedded    # Web (embedded)
-flutter build apk --split-per-abi                                              # Android APK
+flutter build apk                                                              # Android APK (universal)
 flutter build ios --no-codesign                                                # iOS
 flutter build macos                                                            # macOS
 flutter build linux                                                            # Linux

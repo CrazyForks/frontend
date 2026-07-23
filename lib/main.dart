@@ -25,6 +25,7 @@ import 'core/env/tv_detector.dart';
 import 'core/network/dio_insecure.dart' show applyGlobalInsecureHttpOverrides;
 import 'core/storage/app_preferences.dart';
 import 'core/storage/secure_storage.dart';
+import 'core/updater/shorebird_update_service.dart';
 import 'core/tracely/tracely_client.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/responsive.dart';
@@ -230,6 +231,21 @@ void main(List<String> args) async {
       }
       if (lastVersion != currentVersion) {
         await prefs.setString('_tracely_reported_version', currentVersion);
+      }
+      // 上报当前生效的 Shorebird 补丁号，用于区分「打没打补丁」（补丁不改 App
+      // 版本号，见 docs/cn/shorebird_hot_update.md §9.7/§9.8）。仅正式版 Android
+      // 有值；其余构建返回 null 时跳过。查询失败已在 service 内吞异常。
+      final patchNumber = await ShorebirdUpdateService().currentPatchNumber();
+      if (patchNumber != null) {
+        _tracelyClient!.reportEvent(
+          'shorebird_patch',
+          {
+            'patch': patchNumber,
+            'version': currentVersion,
+            'platform': platform,
+          },
+          userId,
+        );
       }
     } catch (e) {
       debugPrint('[Main] Tracely 初始化失败: $e');

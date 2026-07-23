@@ -1,5 +1,9 @@
 {
   "@@locale": "en",
+  "patchReadyRestartHint": "A new update has been downloaded. Restart the app to apply it",
+  "@patchReadyRestartHint": {
+    "description": "Light hint shown when a Shorebird patch is downloaded and waiting for restart"
+  },
   "language": "Language",
   "languageSimplifiedChinese": "简体中文",
   "languageEnglish": "English",

@@ -39,9 +39,7 @@ https://github.com/songloft-org/songloft/issues/6
 | | [songloft-windows-x64.msix](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-windows-x64.msix) | x64 安装版 |
 | 🍎 **macOS** | [songloft-macos.dmg](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-macos.dmg) | Universal DMG (Intel/Apple Silicon) |
 | | [songloft-macos.zip](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-macos.zip) | Universal App 压缩包 |
-| 🤖 **Android** | [songloft-arm64-v8a.apk](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-arm64-v8a.apk) | ARM64 设备（推荐） |
-| | [songloft-armeabi-v7a.apk](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-armeabi-v7a.apk) | ARMv7 设备 |
-| | [songloft-x86_64.apk](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-x86_64.apk) | x86_64 模拟器/设备 |
+| 🤖 **Android** | [songloft-android.apk](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-android.apk) | Universal APK（含全部 ABI） |
 | 📱 **iOS** | [songloft-ios-nosign.ipa](https://github.com/songloft-org/songloft-player/releases/latest/download/songloft-ios-nosign.ipa) | 未签名 IPA，可通过 AltStore/Sideloadly 安装 |
 
 > 开发版可在 [dev 分支 Release](https://github.com/songloft-org/songloft-player/releases/tag/dev) 获取。
@@ -86,7 +84,7 @@ flutter run -d <device-id>                    # Android 设备
 # 各平台构建
 flutter build web --no-web-resources-cdn                                       # Web (standalone)
 flutter build web --no-web-resources-cdn --dart-define=DEPLOY_MODE=embedded    # Web (嵌入模式)
-flutter build apk --split-per-abi                                              # Android APK
+flutter build apk                                                              # Android APK (universal)
 flutter build ios --no-codesign                                                # iOS
 flutter build macos                                                            # macOS
 flutter build linux                                                            # Linux
