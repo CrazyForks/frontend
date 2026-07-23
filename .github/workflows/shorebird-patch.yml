@@ -13,6 +13,10 @@ on:
       release_version:
         description: '目标基线版本（pubspec 形式，如 2.11.0+1，须与该正式版完全一致）'
         required: true
+      frontend_version:
+        description: '（可选）补丁内显示的版本号，如 2.11.2；留空则用 release_version 的版本号部分。仅改 Dart 层显示，原生包版本号不变'
+        required: false
+        default: ''
       track:
         description: '下发通道：先 staging 内测，验证 OK 再发 stable（全体用户）'
         type: choice
@@ -60,9 +64,13 @@ jobs:
             echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           fi
 
-          # FRONTEND_VERSION 取 release_version 的版本号部分（去掉 +build），
-          # 其余 dart-define 与对应 release 保持一致（补丁快照配置必须与基线相同）。
-          FRONTEND_VERSION="$(echo '${{ inputs.release_version }}' | cut -d'+' -f1)"
+          # FRONTEND_VERSION 默认取 release_version 的版本号部分（去掉 +build）；
+          # 若显式传了 frontend_version 则用它（可让补丁把设置页显示版本改成更高值，
+          # 仅 Dart 层显示，原生包版本不变）。其余 dart-define 与对应 release 保持一致。
+          FRONTEND_VERSION="${{ inputs.frontend_version }}"
+          if [ -z "$FRONTEND_VERSION" ]; then
+            FRONTEND_VERSION="$(echo '${{ inputs.release_version }}' | cut -d'+' -f1)"
+          fi
           COMMON_DEFINES="--dart-define=FRONTEND_VERSION=${FRONTEND_VERSION} \
             --dart-define=TRACELY_APP_ID=${{ secrets.TRACELY_APP_ID }} \
             --dart-define=TRACELY_APP_SECRET=${{ secrets.TRACELY_APP_SECRET }} \
