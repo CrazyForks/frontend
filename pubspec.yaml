@@ -1,7 +1,7 @@
 name: songloft_flutter
 description: Songloft - 跨平台音乐播放器
 publish_to: 'none'
-version: 2.11.2+1
+version: 2.11.0+1
 license: Apache-2.0
 
 environment:
@@ -73,9 +73,6 @@ dependencies:
   crypto: ^3.0.6
   # DLNA 投屏
   dlna_dart: ^0.1.1
-  # Shorebird 热更新（Dart code push）：仅正式版 Android 接入，查询补丁状态 / 补丁号。
-  # 详见 docs/cn/shorebird_hot_update.md
-  shorebird_code_push: ^2.0.0
 
 dependency_overrides:
   # smtc_windows 1.1.0 的 Rust codegen 使用 flutter_rust_bridge 2.11.1 编译，
@@ -122,8 +119,6 @@ flutter:
   assets:
     - assets/icons/app_icon.png
     - windows/runner/resources/app_icon.ico
-    # Shorebird updater 运行时读取（app_id / auto_update）；必须随包打进 assets
-    - shorebird.yaml
   fonts:
     - family: NotoSansSC
       fonts:

@@ -18,7 +18,7 @@ Requires Android SDK, NDK, and JDK 17+.
 
 - **Android 13+ (API 33)**: The `POST_NOTIFICATIONS` runtime permission must be requested, otherwise playback control notifications will not appear
 - **HyperOS 3 (Xiaomi)**: Set `androidStopForegroundOnPause: false`; without this, the foreground service is reclaimed on pause, interrupting background playback
-- **APK builds**: `flutter build apk --release` produces a **single universal APK** (all ABIs); split-per-abi multi-arch packages are no longer used
+- **Split-ABI APK builds**: `flutter build apk --split-per-abi` generates separate APKs for arm64-v8a, armeabi-v7a, and x86_64
 
 ### Troubleshooting
 

@@ -7,7 +7,6 @@ import '../../../core/router/app_router.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/responsive.dart';
-import '../../../core/updater/shorebird_update_prompt.dart';
 import '../../../core/utils/url_helper.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../playlist/domain/playlist.dart';
@@ -20,37 +19,11 @@ import '../../../features/jsplugin/presentation/widgets/jsplugin_grid.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 
 /// 首页
-class HomePage extends ConsumerStatefulWidget {
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  ConsumerState<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends ConsumerState<HomePage> {
-  /// 每个 App 会话只提示一次，避免每次回到首页都弹「重启生效」。
-  static bool _patchChecked = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // 首帧渲染后再触发，确保 Navigator/context 就绪可弹对话框。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _maybeCheckUpdate();
-    });
-  }
-
-  /// Shorebird 主动式更新流程：发现新版本 → 下载 → 提示重启。每会话检查一次。
-  /// 非 Shorebird 构建（dev/web/desktop）下静默跳过。
-  Future<void> _maybeCheckUpdate() async {
-    if (_patchChecked) return;
-    _patchChecked = true;
-    if (!mounted) return;
-    await maybePromptShorebirdUpdate(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final playlistsAsync = ref.watch(playlistListProvider(null));
     final normalPlaylistsAsync = ref.watch(playlistListProvider('normal'));
     final radioPlaylistsAsync = ref.watch(playlistListProvider('radio'));

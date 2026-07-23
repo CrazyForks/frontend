@@ -500,8 +500,8 @@ build_android() {
     cd "$FRONTEND_DIR"
     mkdir -p "$output"
 
-    # 构建单个 universal APK（含全部 ABI，不再 split-per-abi）
-    flutter build apk --release "${FLUTTER_VERSION_ARGS[@]}" 2>&1 | tee -a "$log_file"
+    # 构建 APK（split-per-abi 生成多架构包）
+    flutter build apk --release --split-per-abi "${FLUTTER_VERSION_ARGS[@]}" 2>&1 | tee -a "$log_file"
     # 复制 APK 产物到输出目录
     if [ -d "build/app/outputs/flutter-apk" ]; then
         cp -r build/app/outputs/flutter-apk "$output/apk"
