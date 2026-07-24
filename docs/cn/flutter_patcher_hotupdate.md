@@ -40,7 +40,7 @@
 
 - manifest:`https://github.com/<repo>/releases/download/<tag>/manifest-<abi>.json`
   - stable:`<tag>` = `v<version>`(经 `/releases/latest` 解析);dev:`<tag>` = `dev`
-  - 内容为 `PatchCheckResult` 形状:`{"hasUpdate":true,"patch":{"version"(= `<semver>-<gitCommit>` 标签),"semanticVersion","gitCommit","flutterBinding","targetVersionCode","patchUrl","md5"}}`
+  - 内容为 `PatchCheckResult` 形状:`{"hasUpdate":true,"patch":{"version","semanticVersion","gitCommit","flutterBinding","targetVersionCode","patchUrl","md5"}}`(其中 `version` 是 `<semver>-<gitCommit>` 形式的补丁标签)
 - patch 包:同 Release 的 `patch-<abi>.zip`(md5 取 zip 的)
 - **向后兼容**:老式 manifest 无 `semanticVersion` / `gitCommit` / `flutterBinding` 时,客户端退回「`hasUpdate` + versionCode 绑定 + 已应用守卫」旧行为。
 

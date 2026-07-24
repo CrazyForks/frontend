@@ -40,7 +40,7 @@ Patches are uploaded as assets with the corresponding Release; the repo is decid
 
 - manifest: `https://github.com/<repo>/releases/download/<tag>/manifest-<abi>.json`
   - stable: `<tag>` = `v<version>` (resolved via `/releases/latest`); dev: `<tag>` = `dev`
-  - content is `PatchCheckResult` shaped: `{"hasUpdate":true,"patch":{"version"(= the `<semver>-<gitCommit>` label),"semanticVersion","gitCommit","flutterBinding","targetVersionCode","patchUrl","md5"}}`
+  - content is `PatchCheckResult` shaped: `{"hasUpdate":true,"patch":{"version","semanticVersion","gitCommit","flutterBinding","targetVersionCode","patchUrl","md5"}}` (`version` is the patch label in the form `<semver>-<gitCommit>`)
 - patch package: `patch-<abi>.zip` in the same Release (md5 over the zip)
 - **Backward compatibility**: when a legacy manifest lacks `semanticVersion` / `gitCommit` / `flutterBinding`, the client falls back to the old "`hasUpdate` + versionCode binding + already-applied guard" behavior.
 
