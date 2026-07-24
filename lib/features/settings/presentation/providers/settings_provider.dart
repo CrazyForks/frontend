@@ -513,6 +513,39 @@ final hlsProxyEnabledProvider =
     );
 
 // ============================================================================
+// 私网代理白名单 Provider
+// ============================================================================
+
+/// 私网代理白名单 Notifier。
+/// 白名单为空时 /proxy 拒绝一切私网地址（SSRF 防护）；填入单 IP / CIDR 网段后，
+/// 目标解析到的私网地址命中白名单即放行（如公网 Songloft 代理内网 WebDAV）。
+/// 业务端点：GET/PUT /api/v1/settings/proxy-private-allowlist
+class ProxyPrivateAllowlistNotifier extends AsyncNotifier<List<String>> {
+  @override
+  Future<List<String>> build() async {
+    final api = ref.watch(settingsApiProvider);
+    try {
+      return await api.getProxyPrivateAllowlist();
+    } catch (_) {
+      return <String>[];
+    }
+  }
+
+  /// 覆盖式保存白名单。后端校验失败（非法条目）时抛出，交由调用方提示。
+  Future<void> setValue(List<String> allowlist) async {
+    final api = ref.read(settingsApiProvider);
+    final saved = await api.setProxyPrivateAllowlist(allowlist);
+    state = AsyncValue.data(saved);
+  }
+}
+
+/// 私网代理白名单 Provider
+final proxyPrivateAllowlistProvider =
+    AsyncNotifierProvider<ProxyPrivateAllowlistNotifier, List<String>>(
+      ProxyPrivateAllowlistNotifier.new,
+    );
+
+// ============================================================================
 // 日志等级 Provider
 // ============================================================================
 

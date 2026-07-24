@@ -2109,6 +2109,20 @@
   "settingsHlsProxySubtitle": "When enabled, the server fetches radio m3u8 and proxies segments, bypassing Referer hotlink protection / CORS. All segments use this machine's bandwidth—mind the traffic cost.",
   "settingsHlsProxyEnabled": "HLS proxy enabled",
   "settingsHlsProxyDisabled": "HLS proxy disabled",
+  "settingsProxyAllowlistTitle": "Private network proxy allowlist",
+  "settingsProxyAllowlistEmpty": "Not configured (private addresses are rejected)",
+  "settingsProxyAllowlistCount": "{count} address(es)/range(s) allowed",
+  "@settingsProxyAllowlistCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsProxyAllowlistDialogDesc": "Proxying private addresses is blocked by default to prevent SSRF. If you need this server to proxy internal resources (e.g. a WebDAV reachable only on the LAN), list the allowed addresses here.",
+  "settingsProxyAllowlistLabel": "Allowed addresses (one per line)",
+  "settingsProxyAllowlistHelper": "One single IP (e.g. 192.168.1.100) or CIDR range (e.g. 192.168.1.0/24) per line. Only affects the generic resource proxy.",
+  "settingsProxyAllowlistSaved": "Private network proxy allowlist saved",
   "settingsInsecureTlsTitle": "Ignore SSL certificate verification",
   "settingsInsecureTlsSubtitle": "Enable when connecting to a server with a self-signed or invalid HTTPS certificate. Applies to both API requests and audio playback.",
   "settingsInsecureTlsEnabled": "Certificate verification ignored",

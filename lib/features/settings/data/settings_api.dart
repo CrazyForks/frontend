@@ -398,6 +398,37 @@ class SettingsApi {
     }
   }
 
+  // ---------- 私网代理白名单（/proxy 允许代理的内网地址） ----------
+
+  /// 获取私网代理白名单条目（单 IP 或 CIDR 网段字符串）。
+  Future<List<String>> getProxyPrivateAllowlist() async {
+    try {
+      final response = await dio.get(
+        '${AppConfig.apiPrefix}/settings/proxy-private-allowlist',
+      );
+      final data = response.data as Map<String, dynamic>;
+      final list = data['allowlist'] as List<dynamic>? ?? [];
+      return list.map((e) => e.toString()).toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 覆盖式更新私网代理白名单。非法条目由后端返回 400。
+  Future<List<String>> setProxyPrivateAllowlist(List<String> allowlist) async {
+    try {
+      final response = await dio.put(
+        '${AppConfig.apiPrefix}/settings/proxy-private-allowlist',
+        data: {'allowlist': allowlist},
+      );
+      final data = response.data as Map<String, dynamic>;
+      final list = data['allowlist'] as List<dynamic>? ?? [];
+      return list.map((e) => e.toString()).toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   // ---------- 扫描后自动创建歌单（按目录结构生成歌单） ----------
 
   Future<bool> getScanAutoCreatePlaylists() async {

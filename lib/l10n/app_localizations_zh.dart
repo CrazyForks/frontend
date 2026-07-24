@@ -3338,6 +3338,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsHlsProxyDisabled => '已关闭 HLS 代理';
 
   @override
+  String get settingsProxyAllowlistTitle => '私网代理白名单';
+
+  @override
+  String get settingsProxyAllowlistEmpty => '未配置（私网地址一律拒绝）';
+
+  @override
+  String settingsProxyAllowlistCount(int count) {
+    return '已允许 $count 个地址/网段';
+  }
+
+  @override
+  String get settingsProxyAllowlistDialogDesc =>
+      '默认禁止代理内网地址以防 SSRF。若需用本服务器代理内网资源（如仅私网可达的 WebDAV），在此列出允许的地址。';
+
+  @override
+  String get settingsProxyAllowlistLabel => '允许的地址（每行一个）';
+
+  @override
+  String get settingsProxyAllowlistHelper =>
+      '每行填一个单 IP（如 192.168.1.100）或 CIDR 网段（如 192.168.1.0/24）。仅影响通用资源代理，不影响其他功能。';
+
+  @override
+  String get settingsProxyAllowlistSaved => '已保存私网代理白名单';
+
+  @override
   String get settingsInsecureTlsTitle => '忽略 SSL 证书校验';
 
   @override

@@ -2214,6 +2214,20 @@
   "settingsHlsProxySubtitle": "开启后服务端拉取电台 m3u8 并代理切片,可绕过 Referer 防盗链 / CORS。所有切片走本机带宽,注意流量成本",
   "settingsHlsProxyEnabled": "已开启 HLS 代理",
   "settingsHlsProxyDisabled": "已关闭 HLS 代理",
+  "settingsProxyAllowlistTitle": "私网代理白名单",
+  "settingsProxyAllowlistEmpty": "未配置（私网地址一律拒绝）",
+  "settingsProxyAllowlistCount": "已允许 {count} 个地址/网段",
+  "@settingsProxyAllowlistCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsProxyAllowlistDialogDesc": "默认禁止代理内网地址以防 SSRF。若需用本服务器代理内网资源（如仅私网可达的 WebDAV），在此列出允许的地址。",
+  "settingsProxyAllowlistLabel": "允许的地址（每行一个）",
+  "settingsProxyAllowlistHelper": "每行填一个单 IP（如 192.168.1.100）或 CIDR 网段（如 192.168.1.0/24）。仅影响通用资源代理，不影响其他功能。",
+  "settingsProxyAllowlistSaved": "已保存私网代理白名单",
   "settingsInsecureTlsTitle": "忽略 SSL 证书校验",
   "settingsInsecureTlsSubtitle": "连接使用自签或无效 HTTPS 证书的服务器时开启。同时对接口请求和音频播放生效",
   "settingsInsecureTlsEnabled": "已开启忽略证书校验",

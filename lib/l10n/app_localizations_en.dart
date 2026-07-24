@@ -3486,6 +3486,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsHlsProxyDisabled => 'HLS proxy disabled';
 
   @override
+  String get settingsProxyAllowlistTitle => 'Private network proxy allowlist';
+
+  @override
+  String get settingsProxyAllowlistEmpty =>
+      'Not configured (private addresses are rejected)';
+
+  @override
+  String settingsProxyAllowlistCount(int count) {
+    return '$count address(es)/range(s) allowed';
+  }
+
+  @override
+  String get settingsProxyAllowlistDialogDesc =>
+      'Proxying private addresses is blocked by default to prevent SSRF. If you need this server to proxy internal resources (e.g. a WebDAV reachable only on the LAN), list the allowed addresses here.';
+
+  @override
+  String get settingsProxyAllowlistLabel => 'Allowed addresses (one per line)';
+
+  @override
+  String get settingsProxyAllowlistHelper =>
+      'One single IP (e.g. 192.168.1.100) or CIDR range (e.g. 192.168.1.0/24) per line. Only affects the generic resource proxy.';
+
+  @override
+  String get settingsProxyAllowlistSaved =>
+      'Private network proxy allowlist saved';
+
+  @override
   String get settingsInsecureTlsTitle => 'Ignore SSL certificate verification';
 
   @override

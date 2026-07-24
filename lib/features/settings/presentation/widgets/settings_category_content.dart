@@ -612,6 +612,8 @@ class _SettingsCategoryContentState
           const Divider(height: 1),
           _buildHlsProxyTile(),
           const Divider(height: 1),
+          _buildProxyAllowlistTile(),
+          const Divider(height: 1),
           _buildInsecureTlsTile(),
         ],
       ),
@@ -1049,6 +1051,90 @@ class _SettingsCategoryContentState
                   );
                 }
               },
+    );
+  }
+
+  Widget _buildProxyAllowlistTile() {
+    final l10n = AppLocalizations.of(context);
+    final allowlistAsync = ref.watch(proxyPrivateAllowlistProvider);
+    final allowlist = allowlistAsync.value ?? const <String>[];
+
+    return ListTile(
+      leading: const Icon(Icons.lan_outlined),
+      title: Text(l10n.settingsProxyAllowlistTitle),
+      subtitle: Text(
+        allowlist.isEmpty
+            ? l10n.settingsProxyAllowlistEmpty
+            : l10n.settingsProxyAllowlistCount(allowlist.length),
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      enabled: !allowlistAsync.isLoading,
+      onTap: () async {
+        final controller = TextEditingController(text: allowlist.join('\n'));
+        final result = await showDialog<List<String>>(
+          context: context,
+          builder:
+              (ctx) => AlertDialog(
+                title: Text(l10n.settingsProxyAllowlistTitle),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.settingsProxyAllowlistDialogDesc),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: controller,
+                      minLines: 3,
+                      maxLines: 8,
+                      decoration: InputDecoration(
+                        labelText: l10n.settingsProxyAllowlistLabel,
+                        hintText: '192.168.1.0/24\n10.0.0.5',
+                        helperText: l10n.settingsProxyAllowlistHelper,
+                        helperMaxLines: 3,
+                        border: const OutlineInputBorder(),
+                      ),
+                      autofocus: true,
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(l10n.commonCancel),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      final entries =
+                          controller.text
+                              .split('\n')
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toList();
+                      Navigator.pop(ctx, entries);
+                    },
+                    child: Text(l10n.settingsSave),
+                  ),
+                ],
+              ),
+        );
+        if (result == null) return;
+        try {
+          await ref
+              .read(proxyPrivateAllowlistProvider.notifier)
+              .setValue(result);
+          if (!mounted) return;
+          ResponsiveSnackBar.show(
+            context,
+            message: l10n.settingsProxyAllowlistSaved,
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ResponsiveSnackBar.showError(
+            context,
+            message: l10n.settingsSaveFailed(e.toString()),
+          );
+        }
+      },
     );
   }
 
