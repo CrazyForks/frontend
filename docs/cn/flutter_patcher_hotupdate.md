@@ -1,8 +1,9 @@
-# flutter_patcher 自托管 Android 热更新
+# flutter_patcher 自托管 Android 热更新（前端 libapp.so）
 
-本文描述 songloft-player 用 [`flutter_patcher`](https://github.com/xuelinger2333/flutter_patcher) 实现的**自托管 Android 热更新**:冷启动**整包替换 `libapp.so`**,补丁托管在自己的 GitHub Release,**启动检查 + 手动更新**;无法热更的版本引导去设置页下载 APK。
+本文描述 songloft-player 用 [`flutter_patcher`](https://github.com/xuelinger2333/flutter_patcher) 实现的**前端自托管 Android 热更新**:冷启动整包替换 `libapp.so`,补丁作为资产随**每次 GitHub Release 自动发布**,客户端启动检查、手动确认下载、冷重启生效;无法热更的版本引导去设置页下载 APK。
 
 > 中英双语并存,改一版需同步 `docs/en/flutter_patcher_hotupdate.md`。
+> Bundle 版把本前端补丁与后端 `libgojni.so` 补丁合并为一次更新体验(同一对话框、一次冷重启),详见 [backend_hotupdate.md](backend_hotupdate.md);本文聚焦**前端机制与标准版发布**。
 
 ## 范围与边界
 
@@ -12,19 +13,21 @@
 | 能热更 | `lib/` 下任意 Dart、纯 Dart 依赖、随包注册的 Flutter assets |
 | 不能热更 | 原生 Kotlin/Java/C++、`AndroidManifest`、`res/`、原生插件增改、Flutter 引擎升级 —— 必须发新 APK |
 | 生效时机 | 补丁下载后**下次冷启动**生效,不在当前进程内替换;插件自带崩溃回滚 + 坏补丁黑名单 |
-| 渠道 | **dev 更 dev、stable 更 stable,不跨渠道**(由编译期 `FRONTEND_VERSION` 决定) |
+| 渠道 | **dev 更 dev、stable 更 stable,不跨渠道**(由编译期 `AppConfig.frontendVersion` 决定) |
 | 校验 | 目前仅 **MD5**(`FlutterPatcher.init(strictSignature: false)`);后续可加 Ed25519 |
 
-## 关键绑定
+## 核心模型:无基线 + 自动发布 + 兼容键
 
-- **versionCode 绑定**:补丁按宿主 APK 的 `versionCode`(= pubspec `version` 的 `+N`)绑定。一个正式版 tag = 一个 versionCode;补丁必须用**相同 versionCode** 打包,装了该 APK 的设备才会应用。
-- **ABI 分片**:APK 走 split-per-abi,补丁按 `arm64-v8a / armeabi-v7a / x86_64` 各出一份;客户端按 `FlutterPatcher.deviceAbi` 取对应 `manifest-<abi>.json`。
+- **无基线**:客户端查**本渠道最新** Release——dev→滚动 tag `dev`;stable→GitHub `/releases/latest`(dev 是 prerelease,latest 天然返回最新正式版)。由 `lib/core/updater/channel_release_resolver.dart` 解析,任意非最新 → 最新。
+- **自动发布**:`build-and-release.yml` 的 `build-android` job 每次发版自动 `dart run flutter_patcher:pack` 产出 `patch-<abi>.zip` + `manifest-<abi>.json` 随 release 上传(仅 `arm64-v8a` / `armeabi-v7a`;`x86_64` 不产补丁)。**已无手动 `patch-release.yml`。**
+- **比较规则**:dev 比 **git commit hash**;stable 比**版本号**(semver,`lib/core/updater/version_compare.dart`)。已应用同补丁(`flutter_patcher.currentVersion == patchLabel`)跳过。
+- **兼容键取代 versionCode 基线**:`libapp.so` 天然按宿主 APK 的 **versionCode** 绑定引擎。本项目 pubspec 的 `+N` **恒定**(CI 不随构建 bump),故所有 dev/stable 构建共用同一 versionCode,自然可跨版本热更——versionCode 是**自动兼容代理**,不是手挑的基线。客户端额外比对 `AppConfig.flutterBinding`(= CI `FLUTTER_VERSION`)与 manifest 的 `flutterBinding`:不同 → 不热更(防同 versionCode 但换了 Flutter 引擎导致崩溃),交「整包不兼容」分支引导下 APK。仅当有意 bump versionCode(通常伴随引擎/原生变更)时才走整包。
 
 ## 客户端流程(启动检查 + 手动)
 
-入口:首页 `initState` 每会话调一次 `PatchUpdateDialog.maybeShow`(`lib/core/updater/`)。
+入口:首页 `initState` 每会话调一次 `PatchUpdateDialog.maybeShow`(`lib/core/updater/`)——前端补丁(本文)与后端补丁(Bundle 版)**合并为一个对话框**。
 
-1. **有匹配补丁**(且未被「忽略此版本」)→ 弹**可关闭**对话框:内含 **GitHub 代理选择**(复用 `GithubProxySelectionMixin`)+ 按钮 **[忽略此版本] [稍后] [下载并更新]**;下载显示进度 → 完成弹「重启生效」([立即重启]=`SystemNavigator.pop()`)。
+1. **有可热更补丁**(且未被「忽略此版本」)→ 弹**可关闭**对话框:列出待更新组件 + **GitHub 代理选择**(复用 `GithubProxySelectionMixin`)+ 按钮 **[忽略此版本] [稍后] [下载并更新]**;下载显示进度 → 完成弹「重启生效」([立即重启] = `EmbeddedBackendService.restartProcess()` **真进程冷启**,让 `libapp.so` 冷启生效)。
 2. **无补丁但同渠道有更高整包版本**(`FrontendVersionApi`,且未被忽略)→ 弹「需要下载新版本」→ **[忽略此版本] [稍后] [前往下载]**;前往下载 = 跳 `/settings`(那里有「检查客户端更新」下 APK)。
 3. 都没有 → 静默。
 
@@ -33,32 +36,30 @@
 
 ## 托管与 URL 约定
 
-补丁作为资产传到**对应版本的 GitHub Release**(本期只做标准版,仓库 `songloft-org/songloft-player`;Bundle 版延后,届时传到父仓库 Release 即可,客户端用 `AppConfig.frontendUpdateRepo` 自动切换、无需改代码)。
+补丁作为资产随对应 Release 上传;仓库由 `AppConfig.frontendUpdateRepo` 决定(标准版 = `songloft-org/songloft-player`;Bundle 版 = 父仓库 `songloft-org/songloft`),客户端按渠道自动切换、无需改代码。
 
 - manifest:`https://github.com/<repo>/releases/download/<tag>/manifest-<abi>.json`
-  - stable:`<tag>` = `v<version>`;dev:`<tag>` = `dev`
-  - 内容为 `PatchCheckResult` 形状:`{"hasUpdate":true,"patch":{"version","patchUrl","md5","targetVersionCode"}}`
-- patch 包:同 Release 的 `patch-<abi>.zip`
+  - stable:`<tag>` = `v<version>`(经 `/releases/latest` 解析);dev:`<tag>` = `dev`
+  - 内容为 `PatchCheckResult` 形状:`{"hasUpdate":true,"patch":{"version"(= `<semver>-<gitCommit>` 标签),"semanticVersion","gitCommit","flutterBinding","targetVersionCode","patchUrl","md5"}}`
+- patch 包:同 Release 的 `patch-<abi>.zip`(md5 取 zip 的)
+- **向后兼容**:老式 manifest 无 `semanticVersion` / `gitCommit` / `flutterBinding` 时,客户端退回「`hasUpdate` + versionCode 绑定 + 已应用守卫」旧行为。
 
-## 发布补丁(`.github/workflows/patch-release.yml`,手动)
+## 发布(`build-and-release.yml` 的 `build-android`,自动)
 
-1. 从要修复的版本代码上 cherry-pick **纯 Dart** 修复,**保持 pubspec versionCode 不变**;
-2. dispatch `Patch Release`,填 `target_version`(stable 填版本号如 `2.11.0`;dev 填 `dev`)、`patch_label`(如 `2.11.0-h1`);
-3. workflow:`flutter build apk --release --split-per-abi`(FRONTEND_VERSION 保持基线渠道值)→ 对每 ABI `dart run flutter_patcher:pack --apk <abi apk> --version <label> --target-version-code <vc> --abi <abi>` → 生成 `patch-<abi>.zip` + `manifest-<abi>.json`(md5 取 zip 的)→ `gh release upload <tag> ... --clobber`。
+每次发版(tag `dev` 或 `v<x.y.z>`)自动执行:`flutter build apk --release --split-per-abi` → 对 `arm64-v8a` / `armeabi-v7a` 各 `dart run flutter_patcher:pack --apk <abi apk> --version <semver>-<commit> --target-version-code <vc> --abi <abi>` → 生成 `patch-<abi>.zip` + `manifest-<abi>.json` → 随 release 上传。**无手动 workflow、无 cherry-pick、无 `patch_label` 输入。**
 
 ## 发布纪律
 
-- **纯 Dart 修复** → 发补丁(不打新 tag),用户热更、重启生效;
-- **动了原生/插件原生侧/引擎** → 打新 tag 发新 APK(不给旧基线发补丁),用户被引导下 APK。
+- **纯 Dart 改动** → 随下次发版自动带补丁,老包热更、冷重启生效(无需单独打补丁 tag);
+- **动了原生 / 插件原生侧 / 引擎** → Flutter 引擎变则 `flutterBinding` 键不匹配,老包自动落整包 APK 分支;有意 bump versionCode 时同理走整包,用户被引导下 APK。
 
 ## 验证
 
 1. `flutter analyze` 通过;`flutter build apk --release --split-per-abi` 成功。
-2. 装某 ABI 的 APK 到真机,记录 versionCode。
-3. 改一处可见 Dart,用 `patch-release.yml`(或本地 `dart run flutter_patcher:pack` + `flutter_patcher:mock_server`)对该 versionCode 发补丁。
-4. 打开 App → 弹「发现新版本」→ 选代理 → 下载 → 重启 → 看到改动 = 成功。
-5. 不兼容路径:发更高正式版 tag 且不发补丁 → 打开应弹「需要下载新版本」→ 跳 `/settings`。
-6. 忽略此版本后同版本不再提示;换更高版本恢复提示。
+2. 装某 ABI 的老 dev / stable APK 到真机。
+3. 发一版更新(改一处可见 Dart)→ 打开 App → 弹「发现新版本」列前端组件 → 选代理 → 下载 → 重启 → 看到改动 = 成功。
+4. 不兼容路径:升级了 Flutter 引擎的新版 → `flutterBinding` 不匹配 → 打开应弹「需要下载新版本」→ 跳 `/settings`。
+5. 忽略此版本后同版本不再提示;换更高版本恢复提示。
 
 ## 注意
 
