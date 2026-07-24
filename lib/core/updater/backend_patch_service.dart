@@ -62,13 +62,16 @@ class BackendPatchInfo {
     final gitCommit = (m['gitCommit'] ?? m['git_commit'] ?? '') as String;
     return BackendPatchInfo(
       // 无独立 patchLabel 时用 version/gitCommit 兜底作展示 + 忽略键。
-      patchLabel: (m['patchLabel'] ??
-          m['patch_label'] ??
-          m['version'] ??
-          gitCommit ??
-          '') as String,
-      version: (m['version'] ?? m['baseVersion'] ?? m['base_version'] ?? '')
-          as String,
+      patchLabel:
+          (m['patchLabel'] ??
+                  m['patch_label'] ??
+                  m['version'] ??
+                  gitCommit ??
+                  '')
+              as String,
+      version:
+          (m['version'] ?? m['baseVersion'] ?? m['base_version'] ?? '')
+              as String,
       gitCommit: gitCommit,
       buildTime: (m['buildTime'] ?? m['build_time'] ?? '') as String,
       abi: (m['abi'] ?? '') as String,
@@ -173,6 +176,12 @@ class BackendPatchService {
       );
       if (!newer) return null;
 
+      // 已下载并 stage 过同一补丁(仅差冷重启生效)→ 不重复提示。运行中后端仍是旧版
+      // 会让上面的版本比较判为「有更新」,但补丁其实已落地;confirmed 态由版本比较
+      // 自然兜底(git_commit 已一致),这里只拦 staged/pending。
+      final staged = await EmbeddedBackendService.getActiveBackendPatch();
+      if (staged != null && _isSameStagedPatch(staged, info)) return null;
+
       return info;
     } catch (e) {
       debugPrint('[BackendPatch] checkPatch 失败: $e');
@@ -266,6 +275,20 @@ class BackendPatchService {
     }
   }
 
+  /// 判断原生已落地(待重启)的补丁是否即本次将提示的补丁——避免点「稍后」后每次
+  /// 进 App 都重复弹同一个后端更新。只针对 staged/pending;confirmed 由版本比较兜底。
+  static bool _isSameStagedPatch(
+    Map<String, dynamic> staged,
+    BackendPatchInfo info,
+  ) {
+    final state = (staged['state'] ?? '') as String;
+    if (state != 'staged' && state != 'pending') return false;
+    final sc = (staged['gitCommit'] ?? '') as String;
+    if (sc.isNotEmpty && info.gitCommit.isNotEmpty) return sc == info.gitCommit;
+    final sl = (staged['patchLabel'] ?? '') as String;
+    return sl.isNotEmpty && sl == info.patchLabel;
+  }
+
   static Map<String, dynamic>? _asMap(dynamic data) {
     if (data is Map) return Map<String, dynamic>.from(data);
     if (data is String && data.trim().isNotEmpty) {
@@ -278,10 +301,7 @@ class BackendPatchService {
   }
 
   static Future<String> _md5OfFile(File file) async {
-    final digest = await file
-        .openRead()
-        .transform(crypto.md5)
-        .first;
+    final digest = await file.openRead().transform(crypto.md5).first;
     return digest.toString();
   }
 }

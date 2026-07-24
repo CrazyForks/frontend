@@ -36,8 +36,12 @@ object ProcessRestarter {
             val pending = PendingIntent.getActivity(context, 0, intent, flags)
 
             val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarm.setExact(
-                AlarmManager.RTC,
+            // 不用 setExact:targetSdk 31+ 的精确闹钟需要 SCHEDULE_EXACT_ALARM 权限,
+            // 本应用未声明该权限,setExact 在 Android 12+ 会抛 SecurityException,导致
+            // 杀进程后无法自动拉起(App 直接关闭、需用户手动重开)。setAndAllowWhileIdle
+            // 无需该权限、且能在 doze 下触发,对「重启后立即拉起」已足够。
+            alarm.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
                 System.currentTimeMillis() + 400,
                 pending
             )

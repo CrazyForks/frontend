@@ -12,6 +12,7 @@ import '../../features/settings/presentation/providers/settings_provider.dart'
 import '../../l10n/app_localizations.dart';
 import '../../shared/constants/github_proxy.dart';
 import '../backend/embedded_backend_service.dart';
+import '../backend/run_mode_provider.dart';
 import '../network/api_client.dart' show dioProvider;
 import '../router/app_router.dart';
 import 'backend_patch_service.dart';
@@ -56,11 +57,17 @@ class PatchUpdateDialog extends ConsumerStatefulWidget {
       resolver: resolver,
     );
 
+    // 后端补丁仅在本地模式有意义:远程模式下 /api/v1/version 是远端服务器版本,
+    // 拿它与本地内嵌后端补丁比较无意义,还会误 stage 让崩溃回滚状态机误判。先确保
+    // 持久化的运行模式已加载再读,避免启动早期误判为 remote。
+    await ref.read(runModeProvider.notifier).ensureLoaded();
+    final isLocalMode = ref.read(runModeProvider) == RunMode.local;
+
     final results = await Future.wait<Object?>([
       frontendService.isSupported
           ? frontendService.checkPatch(githubProxy: proxyOrNull)
           : Future<PatchInfo?>.value(null),
-      backendService.isSupported
+      backendService.isSupported && isLocalMode
           ? backendService.checkPatch(githubProxy: proxyOrNull)
           : Future<BackendPatchInfo?>.value(null),
     ]);
@@ -82,10 +89,11 @@ class PatchUpdateDialog extends ConsumerStatefulWidget {
       await showDialog<void>(
         context: context,
         barrierDismissible: true, // 允许点外部关闭
-        builder: (_) => PatchUpdateDialog._(
-          frontendPatch: frontendPatch,
-          backendPatch: backendPatch,
-        ),
+        builder:
+            (_) => PatchUpdateDialog._(
+              frontendPatch: frontendPatch,
+              backendPatch: backendPatch,
+            ),
       );
       return;
     }
@@ -294,7 +302,9 @@ class _PatchUpdateDialogState extends ConsumerState<PatchUpdateDialog>
       await prefs.setIgnoredPatchVersion(widget.frontendPatch!.version);
     }
     if (widget.backendPatch != null) {
-      await prefs.setIgnoredBackendPatchVersion(widget.backendPatch!.patchLabel);
+      await prefs.setIgnoredBackendPatchVersion(
+        widget.backendPatch!.patchLabel,
+      );
     }
     if (mounted) Navigator.of(context).pop();
   }
@@ -310,7 +320,10 @@ class _PatchUpdateDialogState extends ConsumerState<PatchUpdateDialog>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.updateProxyLabel, style: Theme.of(context).textTheme.labelMedium),
+        Text(
+          l10n.updateProxyLabel,
+          style: Theme.of(context).textTheme.labelMedium,
+        ),
         const SizedBox(height: 4),
         DropdownButton<int>(
           isExpanded: true,
@@ -349,30 +362,33 @@ Future<void> _showIncompatibleDialog(
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => AlertDialog(
-      title: Text(l10n.updateIncompatibleTitle),
-      content: Text(l10n.updateIncompatibleBody(check.latestVersionDisplay)),
-      actions: [
-        TextButton(
-          onPressed: () async {
-            final prefs = await ref.read(appPreferencesProvider.future);
-            await prefs.setIgnoredClientVersion(check.latestVersion);
-            if (ctx.mounted) Navigator.of(ctx).pop();
-          },
-          child: Text(l10n.updateActionIgnore),
+    builder:
+        (ctx) => AlertDialog(
+          title: Text(l10n.updateIncompatibleTitle),
+          content: Text(
+            l10n.updateIncompatibleBody(check.latestVersionDisplay),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                final prefs = await ref.read(appPreferencesProvider.future);
+                await prefs.setIgnoredClientVersion(check.latestVersion);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+              child: Text(l10n.updateActionIgnore),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(l10n.updateActionLater),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                ctx.go(AppRoutes.settings);
+              },
+              child: Text(l10n.updateActionGoDownload),
+            ),
+          ],
         ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(l10n.updateActionLater),
-        ),
-        FilledButton(
-          onPressed: () {
-            Navigator.of(ctx).pop();
-            ctx.go(AppRoutes.settings);
-          },
-          child: Text(l10n.updateActionGoDownload),
-        ),
-      ],
-    ),
   );
 }

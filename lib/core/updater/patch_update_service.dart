@@ -16,8 +16,8 @@ import 'version_compare.dart';
 ///   `/releases/latest`），由 [ChannelReleaseResolver] 解析,任意非最新 → 最新。
 /// - **兼容键取代 versionCode**：libapp.so（Dart AOT）真正绑定的是 **Flutter 引擎版本**,
 ///   用编译期 [AppConfig.flutterBinding] 与 manifest 的 `flutterBinding` 比对;相同即兼容,
-///   返回的 [PatchInfo] `targetVersionCode` 置 **null** 让 flutter_patcher 绑定到当前设备
-///   versionCode（不再跨 versionCode 被丢弃）;不同 → 不热更（交整包分支引导下 APK）。
+///   返回的 [PatchInfo] 保留 manifest 的 `targetVersionCode`（本项目 versionCode 恒定,
+///   已校验其与当前设备一致,故等价于绑定当前设备）;不同 → 不热更（交整包分支引导下 APK）。
 /// - 比较：dev 比 git commit hash;stable 比版本号（[isRemoteNewer]）。已应用同补丁
 ///   （`currentVersion == patchLabel`）跳过。
 /// - **代理**：抓 manifest 与下载 patch 都套用户所选代理前缀。仅 Android;其余平台
@@ -51,7 +51,7 @@ class PatchUpdateService {
   ///
   /// [githubProxy] 抓取用代理前缀（可空）。返回的 [PatchInfo] 的 `patchUrl` 为**原始
   /// 绝对地址**,下载前由调用方按用户当时所选代理套上,以便对话框里改代理即时生效;
-  /// `targetVersionCode` 为 null（绑定当前设备）。无更新 / 不兼容 / 不支持 / 出错 → null。
+  /// `targetVersionCode` 取自 manifest（已校验与当前设备一致）。无更新 / 不兼容 / 不支持 / 出错 → null。
   Future<PatchInfo?> checkPatch({String? githubProxy}) async {
     if (!isSupported) return null;
     try {
@@ -79,15 +79,19 @@ class PatchUpdateService {
           (patch['gitCommit'] ?? patch['git_commit'] ?? '') as String;
       final manifestBinding =
           (patch['flutterBinding'] ?? patch['flutter_binding'] ?? '') as String;
-      final hasSemver = patch.containsKey('semanticVersion') ||
+      final hasSemver =
+          patch.containsKey('semanticVersion') ||
           patch.containsKey('semantic_version');
       final semanticVersion =
           (patch['semanticVersion'] ?? patch['semantic_version'] ?? patchLabel)
               as String;
       final rawVc = patch['targetVersionCode'] ?? patch['target_version_code'];
-      final int? manifestVc = rawVc is num
-          ? rawVc.toInt()
-          : (rawVc is String && rawVc.isNotEmpty ? int.tryParse(rawVc) : null);
+      final int? manifestVc =
+          rawVc is num
+              ? rawVc.toInt()
+              : (rawVc is String && rawVc.isNotEmpty
+                  ? int.tryParse(rawVc)
+                  : null);
 
       // versionCode 兼容闸:libapp.so 与宿主 APK 的 versionCode 必须一致(flutter_patcher
       // 冷启会丢弃不匹配的补丁)。本项目 versionCode 恒定(pubspec +N 不随构建 bump),故此
