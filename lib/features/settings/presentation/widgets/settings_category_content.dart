@@ -543,8 +543,8 @@ class _SettingsCategoryContentState
               onTap: () => context.push(AppRoutes.shortcuts),
             ),
           ],
-          // 桌面歌词悬浮窗（v1 仅 Windows，songloft-org/songloft#318）
-          if (PlatformUtils.isWindows) ...[
+          // 悬浮歌词窗口（Windows 桌面窗口 / Android 系统悬浮窗，songloft-org/songloft#318）
+          if (PlatformUtils.isWindows || PlatformUtils.isAndroid) ...[
             const Divider(height: 1),
             SwitchListTile(
               secondary: const Icon(Icons.lyrics_outlined),

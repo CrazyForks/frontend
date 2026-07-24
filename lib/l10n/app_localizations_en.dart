@@ -3276,7 +3276,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDesktopLyricLockDesc =>
-      'When locked, the window can\'t be dragged and mouse clicks pass through to windows below';
+      'When locked, the window can\'t be dragged and taps pass through to whatever is below';
 
   @override
   String get settingsDesktopLyricFontSizeTitle => 'Lyrics Font Size';

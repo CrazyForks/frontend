@@ -4,12 +4,14 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../config/app_config.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../l10n/l10n_holder.dart';
 import '../../../../core/storage/preference_sync_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../desktop_lyric/android_floating_lyric_controller.dart';
 import '../../../desktop_lyric/desktop_lyric_controller.dart';
 import '../../../desktop_lyric/desktop_lyric_font_size.dart';
 import '../../data/cache_api.dart';
@@ -958,19 +960,55 @@ final notificationLyricInTitleProvider =
     );
 
 // ============================================================================
-// 桌面歌词悬浮窗 Provider（仅 Windows，纯本地设置，songloft-org/songloft#318）
+// 悬浮歌词窗口 Provider（Windows 桌面窗口 / Android 系统悬浮窗共用一套开关，
+// 纯本地设置，songloft-org/songloft#318）
 // ============================================================================
 
-bool get _desktopLyricSupported => !kIsWeb && Platform.isWindows;
+bool get _desktopLyricSupported =>
+    !kIsWeb && (Platform.isWindows || Platform.isAndroid);
 
 /// 悬浮窗已打开时，把当前锁定/字号/透明度整体推给它实时生效。
 Future<void> _pushDesktopLyricConfig(Ref ref) async {
   if (!_desktopLyricSupported) return;
-  await ref.read(desktopLyricControllerProvider).pushConfig(
-    locked: ref.read(desktopLyricLockedProvider),
-    fontSize: ref.read(desktopLyricFontSizeProvider),
-    opacity: ref.read(desktopLyricOpacityProvider),
-  );
+  final locked = ref.read(desktopLyricLockedProvider);
+  final fontSize = ref.read(desktopLyricFontSizeProvider);
+  final opacity = ref.read(desktopLyricOpacityProvider);
+  if (!kIsWeb && Platform.isAndroid) {
+    await ref
+        .read(androidFloatingLyricControllerProvider)
+        .pushConfig(locked: locked, fontSize: fontSize, opacity: opacity);
+  } else {
+    await ref
+        .read(desktopLyricControllerProvider)
+        .pushConfig(locked: locked, fontSize: fontSize, opacity: opacity);
+  }
+}
+
+/// 打开悬浮窗（按平台分发）。**Android 的权限申请只发生在这里**——也就是
+/// 用户真的把设置页开关打开的这一刻，绝不在启动时或其它任何地方主动申请。
+/// 返回 false 表示没打开成功（Android 用户拒绝了权限，或当前平台不支持）。
+Future<bool> _openDesktopLyric(Ref ref) async {
+  if (!kIsWeb && Platform.isAndroid) {
+    var granted = (await Permission.systemAlertWindow.status).isGranted;
+    if (!granted) {
+      granted = (await Permission.systemAlertWindow.request()).isGranted;
+    }
+    if (!granted) return false;
+    return ref.read(androidFloatingLyricControllerProvider).open();
+  }
+  if (!kIsWeb && Platform.isWindows) {
+    await ref.read(desktopLyricControllerProvider).open();
+    return true;
+  }
+  return false;
+}
+
+Future<void> _closeDesktopLyric(Ref ref) async {
+  if (!kIsWeb && Platform.isAndroid) {
+    await ref.read(androidFloatingLyricControllerProvider).close();
+  } else if (!kIsWeb && Platform.isWindows) {
+    await ref.read(desktopLyricControllerProvider).close();
+  }
 }
 
 /// 桌面歌词总开关
@@ -985,28 +1023,57 @@ class DesktopLyricEnabledNotifier extends Notifier<bool> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       final enabled = prefs.getDesktopLyricEnabled();
-      state = enabled;
-      // 上次退出前是开启状态，启动时自动恢复悬浮窗
-      if (enabled && _desktopLyricSupported) {
-        await ref.read(desktopLyricControllerProvider).open();
+      if (!enabled || !_desktopLyricSupported) {
+        state = enabled;
+        return;
       }
+      if (!kIsWeb && Platform.isAndroid) {
+        // 启动时只检查权限状态，绝不主动申请；权限已被用户在系统设置里
+        // 收回的话就静默关掉开关，不弹权限申请打扰用户。
+        final granted = (await Permission.systemAlertWindow.status).isGranted;
+        if (!granted) {
+          state = false;
+          await prefs.setDesktopLyricEnabled(false);
+          return;
+        }
+        final opened = await ref
+            .read(androidFloatingLyricControllerProvider)
+            .open();
+        state = opened;
+        if (!opened) {
+          // 权限够但悬浮窗没建成功（部分厂商 ROM 限制等），别让开关显示假的开启状态
+          await prefs.setDesktopLyricEnabled(false);
+        }
+        return;
+      }
+      // Windows：上次退出前是开启状态，启动时自动恢复悬浮窗
+      state = true;
+      await ref.read(desktopLyricControllerProvider).open();
     } catch (_) {
       state = false;
     }
   }
 
   Future<void> setEnabled(bool value) async {
-    state = value;
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
-      await prefs.setDesktopLyricEnabled(value);
-      // 注意：本地设置，刻意不调用 pushPreferencesToServer
-      if (_desktopLyricSupported) {
-        final controller = ref.read(desktopLyricControllerProvider);
-        if (value) {
-          await controller.open();
-        } else {
-          await controller.close();
+      if (value) {
+        if (_desktopLyricSupported) {
+          final opened = await _openDesktopLyric(ref);
+          if (!opened) {
+            // Android 用户拒绝了悬浮窗权限：开关维持关闭，不落盘
+            state = false;
+            return;
+          }
+        }
+        state = true;
+        await prefs.setDesktopLyricEnabled(true);
+      } else {
+        state = false;
+        await prefs.setDesktopLyricEnabled(false);
+        // 注意：本地设置，刻意不调用 pushPreferencesToServer
+        if (_desktopLyricSupported) {
+          await _closeDesktopLyric(ref);
         }
       }
     } catch (_) {}

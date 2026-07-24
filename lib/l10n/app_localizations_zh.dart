@@ -3137,7 +3137,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDesktopLyricLockTitle => '锁定歌词位置';
 
   @override
-  String get settingsDesktopLyricLockDesc => '锁定后悬浮窗不可拖动，鼠标点击会穿透到下层窗口';
+  String get settingsDesktopLyricLockDesc => '锁定后悬浮窗不可拖动，点击会穿透到下层窗口';
 
   @override
   String get settingsDesktopLyricFontSizeTitle => '歌词字号';

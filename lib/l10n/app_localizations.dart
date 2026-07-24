@@ -5681,7 +5681,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsDesktopLyricLockDesc.
   ///
   /// In zh, this message translates to:
-  /// **'锁定后悬浮窗不可拖动，鼠标点击会穿透到下层窗口'**
+  /// **'锁定后悬浮窗不可拖动，点击会穿透到下层窗口'**
   String get settingsDesktopLyricLockDesc;
 
   /// No description provided for @settingsDesktopLyricFontSizeTitle.

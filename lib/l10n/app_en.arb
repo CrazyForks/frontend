@@ -1986,7 +1986,7 @@
   "settingsDesktopLyricTitle": "Desktop Lyrics",
   "settingsDesktopLyricDesc": "Show a floating lyrics window on the desktop that scrolls with playback",
   "settingsDesktopLyricLockTitle": "Lock Lyrics Position",
-  "settingsDesktopLyricLockDesc": "When locked, the window can't be dragged and mouse clicks pass through to windows below",
+  "settingsDesktopLyricLockDesc": "When locked, the window can't be dragged and taps pass through to whatever is below",
   "settingsDesktopLyricFontSizeTitle": "Lyrics Font Size",
   "settingsDesktopLyricFontSizeSmall": "Small",
   "settingsDesktopLyricFontSizeMedium": "Medium",

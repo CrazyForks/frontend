@@ -33,5 +33,8 @@ class MainActivity : AudioServiceActivity() {
 
         // 注册内嵌后端 MethodChannel（反射调用 .aar，未打包时自动降级）
         SongloftBackendPlugin(applicationContext, flutterEngine)
+
+        // 悬浮歌词窗口（songloft-org/songloft#318）
+        FloatingLyricPlugin(applicationContext, flutterEngine)
     }
 }
