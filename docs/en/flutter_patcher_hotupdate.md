@@ -19,7 +19,7 @@ This doc describes songloft-player's **frontend self-hosted Android hot update**
 ## Core model: baseline-free + auto-publish + compatibility key
 
 - **Baseline-free**: the client fetches the **latest of its channel** — dev → rolling tag `dev`; stable → GitHub `/releases/latest` (dev is a prerelease, so latest returns the newest stable). Resolved by `lib/core/updater/channel_release_resolver.dart`; any non-latest → latest.
-- **Auto-publish**: `build-and-release.yml`'s `build-android` job runs `dart run flutter_patcher:pack` on every release, producing `patch-<abi>.zip` + `manifest-<abi>.json` uploaded with the release (`arm64-v8a` / `armeabi-v7a` only; `x86_64` produces no patch). **The manual `patch-release.yml` is gone.**
+- **Auto-publish**: `build-and-release.yml`'s `build-android` job runs `dart run flutter_patcher:pack` on every release, producing `patch-<abi>.zip` + `manifest-<abi>.json` uploaded with the release (`arm64-v8a` / `armeabi-v7a` / `x86_64`). **The manual `patch-release.yml` is gone.**
 - **Comparison**: dev by **git commit hash**; stable by **version number** (semver, `lib/core/updater/version_compare.dart`). Already-applied (`flutter_patcher.currentVersion == patchLabel`) is skipped.
 - **Compatibility key instead of a versionCode baseline**: `libapp.so` inherently binds to the host APK's **versionCode** (engine binding). This project's pubspec `+N` is **constant** (CI does not bump it per build), so all dev/stable builds share one versionCode and cross-version hot update works naturally — versionCode is an **automatic compatibility proxy, not a hand-picked baseline**. The client additionally compares `AppConfig.flutterBinding` (= CI `FLUTTER_VERSION`) with the manifest's `flutterBinding`: different → not hot-patchable (guards against same versionCode but a changed Flutter engine crashing) → the "incompatible / full-APK" branch. Only a deliberate versionCode bump (usually alongside engine/native changes) forces the full APK.
 
@@ -46,7 +46,7 @@ Patches are uploaded as assets with the corresponding Release; the repo is decid
 
 ## Publishing (`build-and-release.yml`'s `build-android`, automatic)
 
-Every release (tag `dev` or `v<x.y.z>`) automatically runs: `flutter build apk --release --split-per-abi` → for `arm64-v8a` / `armeabi-v7a` each `dart run flutter_patcher:pack --apk <abi apk> --version <semver>-<commit> --target-version-code <vc> --abi <abi>` → produces `patch-<abi>.zip` + `manifest-<abi>.json` → uploaded with the release. **No manual workflow, no cherry-pick, no `patch_label` input.**
+Every release (tag `dev` or `v<x.y.z>`) automatically runs: `flutter build apk --release --split-per-abi` → for `arm64-v8a` / `armeabi-v7a` / `x86_64` each `dart run flutter_patcher:pack --apk <abi apk> --version <semver>-<commit> --target-version-code <vc> --abi <abi>` → produces `patch-<abi>.zip` + `manifest-<abi>.json` → uploaded with the release. **No manual workflow, no cherry-pick, no `patch_label` input.**
 
 ## Release discipline
 

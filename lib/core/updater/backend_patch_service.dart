@@ -30,7 +30,7 @@ class BackendPatchInfo {
   /// 补丁 .so 的构建时间（dev 回退比较）。
   final String buildTime;
 
-  /// 目标 ABI（arm64-v8a / armeabi-v7a）。
+  /// 目标 ABI（arm64-v8a / armeabi-v7a / x86_64）。
   final String abi;
 
   /// `libgojni-<abi>.so` 的原始（未套代理）下载地址。

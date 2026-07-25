@@ -341,7 +341,7 @@ jobs:
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk apk-output/songloft-armeabi-v7a.apk
           cp build/app/outputs/flutter-apk/app-x86_64-release.apk apk-output/songloft-x86_64.apk
       # 无基线前端热更:每次发版自动产出本渠道最新的 libapp.so 补丁,随 release 上传;
-      # 客户端查本渠道最新即更新(仅 arm64-v8a/armeabi-v7a)。标准版无内嵌后端,故只有前端补丁。
+      # 客户端查本渠道最新即更新(arm64-v8a/armeabi-v7a/x86_64)。标准版无内嵌后端,故只有前端补丁。
       - name: Produce frontend hot-update patch assets
         env:
           SEMVER: ${{ steps.version.outputs.version }}
@@ -351,7 +351,7 @@ jobs:
           set -e
           VERSION_CODE=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f2)
           TAG=$([[ "$GITHUB_REF" == refs/tags/v* ]] && echo "${GITHUB_REF#refs/tags/}" || echo "dev")
-          for abi in arm64-v8a armeabi-v7a; do
+          for abi in arm64-v8a armeabi-v7a x86_64; do
             apk="build/app/outputs/flutter-apk/app-${abi}-release.apk"
             [ -f "$apk" ] || { echo "跳过 $abi(无 APK)"; continue; }
             LABEL="${SEMVER}-${GIT_COMMIT}"
@@ -376,6 +376,22 @@ jobs:
           EOF
             echo "前端补丁 $abi: zip_md5=$ZIP_MD5 label=$LABEL"
           done
+      # version.json:设置页「检查客户端更新」dev 渠道靠它拿 git_commit / build_time
+      # 做精确比较(frontend_version_api._fetchDevVersionInfo),缺失会导致 dev 客户端
+      # 永远显示「已是最新」。格式对齐父仓库 release.yml 的 version.json。
+      - name: Generate version.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_TIME: ${{ steps.version.outputs.build_time }}
+        run: |
+          cat > apk-output/version.json <<EOF
+          {
+            "version": "${VERSION}",
+            "git_commit": "${GIT_COMMIT}",
+            "build_time": "${BUILD_TIME}"
+          }
+          EOF
+          cat apk-output/version.json
       - uses: actions/upload-artifact@v4
         with:
           name: songloft-android-apk
@@ -383,6 +399,7 @@ jobs:
             apk-output/*.apk
             apk-output/patch-*.zip
             apk-output/manifest-*.json
+            apk-output/version.json
 
   build-ios:
     name: iOS (No Codesign)
@@ -509,7 +526,7 @@ jobs:
         run: |
           mkdir -p final-assets
           if [ -d release-assets ]; then
-            find release-assets -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.apk' -o -name '*.ipa' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*.msix' -o -name 'manifest-*.json' \) -exec cp {} final-assets/ \;
+            find release-assets -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.apk' -o -name '*.ipa' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*.msix' -o -name 'manifest-*.json' -o -name 'version.json' \) -exec cp {} final-assets/ \;
           fi
           echo "=== Release Assets ==="
           ls -lh final-assets/ || echo "(no assets)"
