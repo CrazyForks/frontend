@@ -92,6 +92,16 @@ class UrlHelper {
     return '$result${result.contains('?') ? '&' : '?'}media=video';
   }
 
+  /// 构建 Web 视频 HLS 转码播放 URL。
+  ///
+  /// 当 Web 端视频格式不被浏览器原生支持时（mpg/flv/wmv/rmvb/avi/mkv 等），
+  /// 使用后端实时转码为 HLS 的端点。URL 以 .m3u8 结尾，前端 hls.js 自动识别。
+  /// [songId] 歌曲 ID，用于构建 `/api/v1/songs/{id}/video-hls/playlist.m3u8` 路径。
+  static String buildWebVideoHlsUrl(int songId) {
+    final url = '/api/v1/songs/$songId/video-hls/playlist.m3u8';
+    return buildResourceUrl(url);
+  }
+
   /// 构建封面图片 URL（兼容旧接口，内部调用 buildResourceUrl）
   ///
   /// [width] 非空时（且仅 Web 生效），给「本机后端封面端点」追加 `?w=<物理像素>` 服务端

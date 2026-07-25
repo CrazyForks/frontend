@@ -5,14 +5,43 @@ import 'package:flutter/foundation.dart';
 class AudioFormatHelper {
   AudioFormatHelper._();
 
+  /// 判断视频格式是否为 Web 浏览器原生支持（可直接用 <video> 播放）。
+  /// 不支持的格式需要后端 HLS 转码。
+  static bool isWebCompatibleVideo(String? format, String? filePath) {
+    var ext = (format ?? '').toLowerCase();
+    // 优先从文件路径取扩展名（更可靠）
+    if (filePath != null && filePath.contains('.')) {
+      ext = filePath.split('.').last.toLowerCase();
+    }
+    return const {'mp4', 'webm', 'mov'}.contains(ext);
+  }
+
   static const _webFormats = {
-    'mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus',
+    'mp3',
+    'flac',
+    'ogg',
+    'm4a',
+    'aac',
+    'wav',
+    'opus',
   };
   static const _iosFormats = {
-    'mp3', 'flac', 'm4a', 'aac', 'wav', 'alac', 'aiff',
+    'mp3',
+    'flac',
+    'm4a',
+    'aac',
+    'wav',
+    'alac',
+    'aiff',
   };
   static const _androidFormats = {
-    'mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus',
+    'mp3',
+    'flac',
+    'ogg',
+    'm4a',
+    'aac',
+    'wav',
+    'opus',
   };
 
   static String? getTranscodeFormat(String? songFormat) {
@@ -24,6 +53,24 @@ class AudioFormatHelper {
     // iOS/Android，均走 media_kit/libmpv 后端）不转码，直出原容器以保留多音轨（原唱/伴奏）。
     // 仅 Web（浏览器不支持 mka 容器、无法原生切轨）转码为 mp3 播放首条音轨，切轨在 Web 不可用。
     if (fmt == 'mka') {
+      return kIsWeb ? 'mp3' : null;
+    }
+    // 视频容器（音频抽取场景，isVideo=false 才进入此路径）：所有原生平台统一使用
+    // media_kit/libmpv 后端，可直接解码任意容器；仅 Web 浏览器不支持这些容器，转码为 mp3。
+    if (const {
+      'mpg',
+      'flv',
+      'wmv',
+      'rmvb',
+      'rm',
+      '3gp',
+      'm4v',
+      'mkv',
+      'matroska',
+      'webm',
+      'avi',
+      'ts',
+    }.contains(fmt)) {
       return kIsWeb ? 'mp3' : null;
     }
     final supported = _getPlatformFormats();
@@ -53,10 +100,12 @@ class AudioFormatHelper {
       case 'mp4':
       case 'm4a':
       case 'aac':
+      case 'm4b': // 有声书，与 m4a 同族容器/编码
       case 'mov': // QuickTime/ISO-BMFF 同族容器（如 bilibili 下载源），按 m4a 处理
         return 'm4a';
       case 'ogg':
       case 'vorbis':
+      case 'oga': // OGG 音频变体扩展名
         return 'ogg';
       case 'flac':
         return 'flac';
@@ -70,10 +119,29 @@ class AudioFormatHelper {
         return 'ape';
       case 'opus':
         return 'opus';
+      case 'aif':
+      case 'aiff':
+        return 'aiff';
       // Matroska 音频容器（songloft-org/songloft#297）：原生平台由 libmpv 直接播放并支持
       // 多音轨切换，Web 转码为 mp3。分平台处理见 getTranscodeFormat 的 mka 分支。
       case 'mka':
         return 'mka';
+      // 视频容器（音频抽取场景，isVideo=false 时才可能进入此路径）：
+      // 原生平台由 libmpv 直接播放（_getPlatformFormats 返回空集 → 不转码）；
+      // Web/iOS/Android 不原生支持 → 触发后端转码为 mp3。
+      case 'mpg':
+      case 'flv':
+      case 'wmv':
+      case 'rmvb':
+      case 'rm':
+      case '3gp':
+      case 'm4v':
+      case 'mkv':
+      case 'matroska':
+      case 'webm':
+      case 'avi':
+      case 'ts':
+        return fmt; // 保持原格式名，不在任何平台支持集中 → 自动触发转码
       default:
         return null;
     }

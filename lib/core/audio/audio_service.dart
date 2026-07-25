@@ -37,6 +37,18 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 到 PlayerState，播放页「歌曲信息」据此展示。
   PlaybackSource lastPlaybackSource = PlaybackSource.unknown;
 
+  /// Web HLS 视频主控模式：video 元素接管播放，just_audio 不加载音源。
+  bool hlsVideoPrimaryMode = false;
+
+  /// Web HLS 视频的 URL（供 video 元素使用）。
+  String? hlsVideoUrl;
+
+  /// 回调：启动 Web HLS 视频播放（由 PlayerNotifier 注入，调用 WebVideoPlaybackNotifier）。
+  void Function(String url)? onStartHlsVideo;
+
+  /// 回调：停止 Web HLS 视频播放。
+  VoidCallback? onStopHlsVideo;
+
   /// 通知栏回调（由 PlayerNotifier 设置）
   VoidCallback? onSkipToNext;
   VoidCallback? onSkipToPrevious;
@@ -470,37 +482,81 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       // Web 多音轨容器（mka）：默认播放与切换统一走后端 ?track= 抽轨（首轨=0），
       // 抽出的 AAC 无损 remux 成 m4a、Web 原生可播；避免「默认走 mp3、切换走 m4a」的格式割裂。
       // 原生端 audioTrack 恒为 null（由 libmpv 直接切轨），effectiveTrack 保持 null。
-      final effectiveTrack = kIsWeb && !song.isVideo
-          ? (audioTrack ??
-              (AudioFormatHelper.isWebMultiTrackContainer(song.format)
-                  ? 0
-                  : null))
-          : null;
+      final effectiveTrack =
+          kIsWeb && !song.isVideo
+              ? (audioTrack ??
+                  (AudioFormatHelper.isWebMultiTrackContainer(song.format)
+                      ? 0
+                      : null))
+              : null;
 
       // 原生平台无法携带 Authorization Header,UrlHelper 会自动拼接 baseUrl + access_token。
       // 视频歌曲用 buildVideoUrl（media=video）：后端直出原容器，保留画面供 media_kit 渲染，
       // 不做平台音频转码（转码 -vn 会丢画面）。
-      final songUrl = song.isVideo
-          ? UrlHelper.buildVideoUrl(song.url!)
-          : UrlHelper.buildSongUrl(
-              song.url!,
-              songFormat: song.format,
-              quality: quality,
-              hlsDirect: isDesktopLive,
-              audioTrack: effectiveTrack,
-            );
+      // Web 端视频：若格式浏览器原生支持（mp4/webm）走直出；否则走后端 HLS 转码端点，
+      // URL 以 .m3u8 结尾，songloft_web_audio_player 自动用 hls.js 处理。
+      final String songUrl;
+      if (song.isVideo) {
+        if (kIsWeb &&
+            !AudioFormatHelper.isWebCompatibleVideo(
+              song.format,
+              song.filePath,
+            )) {
+          songUrl = UrlHelper.buildWebVideoHlsUrl(song.id);
+        } else {
+          songUrl = UrlHelper.buildVideoUrl(song.url!);
+        }
+      } else {
+        songUrl = UrlHelper.buildSongUrl(
+          song.url!,
+          songFormat: song.format,
+          quality: quality,
+          hlsDirect: isDesktopLive,
+          audioTrack: effectiveTrack,
+        );
+      }
 
       debugPrint('[Player] SongloftAudioHandler: song url: $songUrl');
       final liveHeaders = _buildLiveStreamHeaders(song);
+
+      // Web HLS 视频主控模式：video 元素接管音视频播放，不加载 just_audio。
+      // 单 video 元素同时处理音频和画面，避免双元素同步问题和 idle 状态问题。
+      if (kIsWeb &&
+          song.isVideo &&
+          !AudioFormatHelper.isWebCompatibleVideo(song.format, song.filePath)) {
+        // 先 stop 释放之前的 audio 源（如果有）
+        await _player.stop();
+        hlsVideoPrimaryMode = true;
+        hlsVideoUrl = songUrl;
+        _updateNowPlaying(song);
+        // 通知后端当前歌曲激活
+        try {
+          notifySongActivated?.call(song.id);
+        } catch (e) {
+          debugPrint('[Player] notifySongActivated error (ignored): $e');
+        }
+        // 启动 video 元素播放（立即创建 DOM 元素 + hls.js，无需等 widget 挂载）
+        onStartHlsVideo?.call(songUrl);
+        debugPrint(
+          '[Player] SongloftAudioHandler: HLS video primary mode, skipping just_audio',
+        );
+        return;
+      }
+
+      // 非 HLS 视频路径：清除 HLS video primary 标志
+      hlsVideoPrimaryMode = false;
+      hlsVideoUrl = null;
+      onStopHlsVideo?.call();
 
       // 客户端本地缓存优先（songloft-org/songloft#312）：用户手动缓存过的歌直接播
       // 本机文件，离线可播、零流量。直播/Web 不缓存（resolvePlayablePath 内部 kIsWeb
       // 返回 null）。命中即用 file:// 源，绕过下方远端流串/边播边缓存分支。
       await SongCacheService().load();
       final cachedPath = await SongCacheService().resolvePlayablePath(song.id);
-      lastPlaybackSource = cachedPath != null
-          ? PlaybackSource.localCache
-          : PlaybackSource.remoteStream;
+      lastPlaybackSource =
+          cachedPath != null
+              ? PlaybackSource.localCache
+              : PlaybackSource.remoteStream;
 
       // Web 平台 / 电台直播流使用 AudioSource.uri（直播流无法缓存）。
       // Windows 也走 AudioSource.uri：LockCachingAudioSource 会把远端音频缓存到
@@ -750,7 +806,9 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       mediaItem.add(current.copyWith(title: lyricLine, artist: artist));
     } else {
       // 歌名放标题，副标题显示纯歌词行
-      mediaItem.add(current.copyWith(title: _originalTitle!, artist: lyricLine));
+      mediaItem.add(
+        current.copyWith(title: _originalTitle!, artist: lyricLine),
+      );
     }
   }
 

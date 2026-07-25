@@ -23,6 +23,7 @@ import '../../../../l10n/l10n_holder.dart';
 import '../../../../main.dart';
 import '../../../../shared/models/song.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import 'web_video_playback_provider.dart';
 import '../../../library/data/songs_api.dart';
 import '../../../library/presentation/providers/songs_provider.dart';
 import '../../../playlist/data/playlist_api.dart';
@@ -90,22 +91,28 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _audioHandler.onSkipToPrevious = () => playPrev();
     _audioHandler.onSongCompleted = _onSongCompleted;
 
+    // Web HLS 视频回调：playSong 中触发 → 直接创建 video DOM 元素开始播放
+    if (kIsWeb) {
+      _audioHandler.onStartHlsVideo = (url) {
+        ref.read(webVideoPlaybackProvider.notifier).startPlayback(url);
+      };
+      _audioHandler.onStopHlsVideo = () {
+        ref.read(webVideoPlaybackProvider.notifier).stopPlayback();
+      };
+    }
+
     // 切歌前主动通知后端 cancel 旧 song 的进行中工作（issue #79）。
     // fire-and-forget：不阻塞 setAudioSource，失败也不影响播放主路径。
     _audioHandler.notifySongActivated = (int songId) {
       final dio = ref.read(dioProvider);
       unawaited(
-        dio
-            .post('/api/v1/songs/$songId/activate')
-            .catchError(
-              (e) {
-                debugPrint('[Player] activate notify failed (ignored): $e');
-                return Response(
-                  requestOptions: RequestOptions(path: ''),
-                  statusCode: 0,
-                );
-              },
-            ),
+        dio.post('/api/v1/songs/$songId/activate').catchError((e) {
+          debugPrint('[Player] activate notify failed (ignored): $e');
+          return Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 0,
+          );
+        }),
       );
     };
 
@@ -120,6 +127,27 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
     _initListeners();
     _initLiveActivityListeners();
+    // Web HLS 视频主控模式：监听 video 元素的播放状态，合并到 PlayerState。
+    if (kIsWeb) {
+      ref.listen<WebVideoPlaybackState>(webVideoPlaybackProvider, (prev, next) {
+        if (!next.isActive) return;
+        state = state.copyWith(
+          isPlaying: next.isPlaying,
+          isBuffering: next.isBuffering,
+          currentTime: next.position,
+          duration: next.duration,
+        );
+        // 视频播放结束 → 触发歌曲完成
+        if (prev != null &&
+            prev.isPlaying &&
+            !next.isPlaying &&
+            next.position > Duration.zero &&
+            next.duration > Duration.zero &&
+            (next.duration - next.position).inSeconds < 2) {
+          _onSongCompleted();
+        }
+      });
+    }
     ref.onDispose(() {
       _disposed = true;
       _positionSubscription?.cancel();
@@ -286,7 +314,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         isBuffering:
             playerState.processingState == ja.ProcessingState.loading ||
             (playerState.processingState == ja.ProcessingState.buffering &&
-            !isLive),
+                !isLive),
       );
       if (wasPlaying != playerState.playing) {
         _liveActivity.updatePlaybackState(
@@ -343,21 +371,20 @@ class PlayerNotifier extends Notifier<PlayerState> {
       _liveActivity.startActivity(
         title: song.title,
         artist: song.artist ?? '',
-        lyricLine: lyricState.currentLyricText.isNotEmpty
-            ? lyricState.currentLyricText
-            : null,
-        artUrl: song.coverUrl != null
-            ? UrlHelper.buildCoverUrl(song.coverUrl!)
-            : null,
+        lyricLine:
+            lyricState.currentLyricText.isNotEmpty
+                ? lyricState.currentLyricText
+                : null,
+        artUrl:
+            song.coverUrl != null
+                ? UrlHelper.buildCoverUrl(song.coverUrl!)
+                : null,
       );
     });
   }
 
   void _notifyPlayEvent(int songId, String type) {
-    ref
-        .read(songsApiProvider)
-        .songPlayed(songId, type: type)
-        .catchError((e) {
+    ref.read(songsApiProvider).songPlayed(songId, type: type).catchError((e) {
       debugPrint('[Player] playEvent($type) notify failed: $e');
     });
   }
@@ -383,9 +410,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         return;
       }
       debugPrint('[Player] Sleep timer: $next songs remaining');
-      state = state.copyWith(
-        sleepTimer: timer.copyWith(remainingSongs: next),
-      );
+      state = state.copyWith(sleepTimer: timer.copyWith(remainingSongs: next));
       // 不 return：继续走 playMode 分支让队列推进到下一首
     }
 
@@ -569,6 +594,19 @@ class PlayerNotifier extends Notifier<PlayerState> {
       return;
     }
 
+    // Web HLS 视频主控模式：控制 video 元素而非 just_audio
+    if (kIsWeb && _audioHandler.hlsVideoPrimaryMode) {
+      final vp = ref.read(webVideoPlaybackProvider.notifier);
+      if (state.isPlaying) {
+        debugPrint('[Player] togglePlay: pausing (HLS video primary)');
+        vp.pause();
+      } else {
+        debugPrint('[Player] togglePlay: playing (HLS video primary)');
+        vp.play();
+      }
+      return;
+    }
+
     if (state.isPlaying) {
       if (state.currentSong?.isLive ?? false) {
         debugPrint('[Player] togglePlay: stopping live stream');
@@ -584,11 +622,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
       //   开头重播（ExoPlayer STATE_ENDED 下 setPlayWhenReady 不会重启），
       //   且切换过音质后需要用新 URL 重新加载
       final ps = _audioHandler.processingState;
-      if (ps == ja.ProcessingState.idle ||
-          ps == ja.ProcessingState.completed) {
-        debugPrint(
-          '[Player] togglePlay: player $ps, re-loading current song',
-        );
+      if (ps == ja.ProcessingState.idle || ps == ja.ProcessingState.completed) {
+        debugPrint('[Player] togglePlay: player $ps, re-loading current song');
         _consecutiveFailures = 0;
         final gen = ++_playGeneration;
         await _playCurrent(gen);
@@ -641,9 +676,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
     if (state.playMode == PlayMode.random) {
       // 投屏期间列表可能变化，预选索引可能失效，越界则重新随机
       final pre = _preSelectedNextIndex;
-      nextIndex = (pre != null && pre >= 0 && pre < state.playlist.length)
-          ? pre
-          : _getRandomIndex();
+      nextIndex =
+          (pre != null && pre >= 0 && pre < state.playlist.length)
+              ? pre
+              : _getRandomIndex();
     } else {
       nextIndex = state.currentIndex + 1;
       if (nextIndex >= state.playlist.length) {
@@ -712,6 +748,11 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 跳转进度
   Future<void> seek(Duration position) async {
+    // Web HLS 视频主控模式：seek video 元素
+    if (kIsWeb && _audioHandler.hlsVideoPrimaryMode) {
+      ref.read(webVideoPlaybackProvider.notifier).seek(position);
+      return;
+    }
     await _audioHandler.seek(position);
   }
 
@@ -930,9 +971,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
       }
 
       // playPlaylist 内部会递增 _loadGeneration，取消之前的后台加载
-      final startIndex = state.playMode == PlayMode.random
-          ? _random.nextInt(firstPageSongs.length)
-          : 0;
+      final startIndex =
+          state.playMode == PlayMode.random
+              ? _random.nextInt(firstPageSongs.length)
+              : 0;
       await playPlaylist(
         firstPageSongs,
         startIndex: startIndex,
@@ -1282,12 +1324,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
       }
 
       // playPlaylist 内部会递增 _loadGeneration，取消之前的后台加载
-      final effectiveStartIndex = startIndex == 0 &&
-              state.playMode == PlayMode.random
-          ? _random.nextInt(firstPageSongs.length)
-          : startIndex;
-      final safeStartIndex =
-          effectiveStartIndex.clamp(0, firstPageSongs.length - 1);
+      final effectiveStartIndex =
+          startIndex == 0 && state.playMode == PlayMode.random
+              ? _random.nextInt(firstPageSongs.length)
+              : startIndex;
+      final safeStartIndex = effectiveStartIndex.clamp(
+        0,
+        firstPageSongs.length - 1,
+      );
       await playPlaylist(firstPageSongs, startIndex: safeStartIndex);
 
       if (total > firstPageSongs.length) {
@@ -1608,20 +1652,19 @@ class PlayerNotifier extends Notifier<PlayerState> {
       if (_isSuperseded(gen, 'retry-loop-top')) return;
       try {
         if (retry > 0) {
-          debugPrint(
-            '[Player] Retry $retry/$maxRetry for: ${song.title}',
-          );
+          debugPrint('[Player] Retry $retry/$maxRetry for: ${song.title}');
           state = state.copyWith(isRetrying: true);
           // 网络歌曲：首次重试时提示"正在缓存"，让用户知道在等后台缓存而非卡死。
           if (isNetworkSong && retry == 1) {
             state = state.copyWith(infoMessage: l10n.playerCaching);
           }
-          final delayMs = isNetworkSong
-              ? (_networkRetryBaseDelayMs * retry).clamp(
-                  _networkRetryBaseDelayMs,
-                  _networkRetryMaxDelayMs,
-                )
-              : _retryDelayMs;
+          final delayMs =
+              isNetworkSong
+                  ? (_networkRetryBaseDelayMs * retry).clamp(
+                    _networkRetryBaseDelayMs,
+                    _networkRetryMaxDelayMs,
+                  )
+                  : _retryDelayMs;
           await Future<void>.delayed(Duration(milliseconds: delayMs));
           if (_isSuperseded(gen, 'retry-delay')) return;
         }
@@ -1792,8 +1835,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     final isLocal = nextSong.type == 'local';
     final prefs = await ref.read(appPreferencesProvider.future);
     final quality = prefs.getAudioQuality();
-    final needsQualityTranscode =
-        quality != 'original' && quality.isNotEmpty;
+    final needsQualityTranscode = quality != 'original' && quality.isNotEmpty;
 
     // 本地歌曲且无需转码且无音质转码 → 无意义预热（本地文件随时可读）
     if (isLocal && targetFormat == null && !needsQualityTranscode) return;
@@ -1957,5 +1999,6 @@ class SubtitleEnabledNotifier extends Notifier<bool> {
   void toggle() => state = !state;
 }
 
-final subtitleEnabledProvider =
-    NotifierProvider<SubtitleEnabledNotifier, bool>(SubtitleEnabledNotifier.new);
+final subtitleEnabledProvider = NotifierProvider<SubtitleEnabledNotifier, bool>(
+  SubtitleEnabledNotifier.new,
+);

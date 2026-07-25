@@ -61,6 +61,13 @@ VideoMime _videoMime(Song song) {
     case 'mpegts':
     case 'mp2t':
       return VideoMime.ts;
+    case 'mpg':
+    case 'mpeg':
+      return VideoMime.mpeg;
+    case 'flv':
+      return VideoMime.flv;
+    case '3gp':
+      return VideoMime.any; // dlna_dart 无 3gpp 专用类型，用通用 MIME
     default:
       return VideoMime.any;
   }
@@ -96,8 +103,9 @@ final dlnaServiceProvider = Provider<DlnaService>((ref) {
   return service;
 });
 
-final dlnaStateProvider =
-    NotifierProvider<DlnaNotifier, DlnaState>(DlnaNotifier.new);
+final dlnaStateProvider = NotifierProvider<DlnaNotifier, DlnaState>(
+  DlnaNotifier.new,
+);
 
 class DlnaNotifier extends Notifier<DlnaState> {
   StreamSubscription? _devicesSub;
@@ -128,10 +136,7 @@ class DlnaNotifier extends Notifier<DlnaState> {
         state = state.copyWith(devices: devices);
       });
     } catch (e) {
-      state = state.copyWith(
-        isDiscovering: false,
-        error: () => e.toString(),
-      );
+      state = state.copyWith(isDiscovering: false, error: () => e.toString());
     }
   }
 
@@ -168,8 +173,9 @@ class DlnaNotifier extends Notifier<DlnaState> {
       });
 
       _completionSub?.cancel();
-      _completionSub =
-          _service.completionStream.listen((_) => _onDeviceCompleted());
+      _completionSub = _service.completionStream.listen(
+        (_) => _onDeviceCompleted(),
+      );
 
       _listenSongChanges();
 
