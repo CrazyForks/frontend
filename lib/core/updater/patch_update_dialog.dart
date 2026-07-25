@@ -63,6 +63,12 @@ class PatchUpdateDialog extends ConsumerStatefulWidget {
     await ref.read(runModeProvider.notifier).ensureLoaded();
     final isLocalMode = ref.read(runModeProvider) == RunMode.local;
 
+    debugPrint(
+      '[Updater] maybeShow: proxy=${proxyOrNull ?? "(直连)"} '
+      'frontend=${frontendService.isSupported} '
+      'backend=${backendService.isSupported}(local=$isLocalMode)',
+    );
+
     final results = await Future.wait<Object?>([
       frontendService.isSupported
           ? frontendService.checkPatch(githubProxy: proxyOrNull)
@@ -78,14 +84,20 @@ class PatchUpdateDialog extends ConsumerStatefulWidget {
     // 过滤「忽略此版本」
     if (frontendPatch != null &&
         frontendPatch.version == prefs.getIgnoredPatchVersion()) {
+      debugPrint('[Updater] maybeShow: 前端补丁 ${frontendPatch.version} 已被忽略');
       frontendPatch = null;
     }
     if (backendPatch != null &&
         backendPatch.patchLabel == prefs.getIgnoredBackendPatchVersion()) {
+      debugPrint('[Updater] maybeShow: 后端补丁 ${backendPatch.patchLabel} 已被忽略');
       backendPatch = null;
     }
 
     if ((frontendPatch != null || backendPatch != null) && context.mounted) {
+      debugPrint(
+        '[Updater] maybeShow: 弹出更新对话框(frontend=${frontendPatch?.version}, '
+        'backend=${backendPatch?.patchLabel})',
+      );
       await showDialog<void>(
         context: context,
         barrierDismissible: true, // 允许点外部关闭
@@ -97,6 +109,7 @@ class PatchUpdateDialog extends ConsumerStatefulWidget {
       );
       return;
     }
+    debugPrint('[Updater] maybeShow: 无可热更补丁,转整包版本检查');
 
     // —— 同渠道整包新版本(不可热更)→ 引导下 APK ——
     try {

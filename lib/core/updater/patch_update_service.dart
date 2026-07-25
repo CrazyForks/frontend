@@ -61,12 +61,23 @@ class PatchUpdateService {
         'manifest-$abi.json',
         githubProxy: githubProxy,
       );
-      if (rawUrl == null) return null;
+      if (rawUrl == null) {
+        debugPrint('[Patcher] checkPatch: 渠道 release 无 manifest-$abi.json,跳过');
+        return null;
+      }
 
-      final resp = await _dio.get<dynamic>(applyProxy(rawUrl, githubProxy));
+      final url = applyProxy(rawUrl, githubProxy);
+      debugPrint('[Patcher] checkPatch: 拉取 manifest $url');
+      final resp = await _dio.get<dynamic>(url);
       final map = _asMap(resp.data);
-      if (map == null) return null;
-      if (map['hasUpdate'] != true && map['has_update'] != true) return null;
+      if (map == null) {
+        debugPrint('[Patcher] checkPatch: manifest 解析失败,跳过');
+        return null;
+      }
+      if (map['hasUpdate'] != true && map['has_update'] != true) {
+        debugPrint('[Patcher] checkPatch: manifest hasUpdate=false,跳过');
+        return null;
+      }
 
       final p = map['patch'];
       final patch = p is Map ? Map<String, dynamic>.from(p) : map;
@@ -99,6 +110,10 @@ class PatchUpdateService {
       // versionCode 取自各自构建,非手工挑基线。
       final deviceVc = await FlutterPatcher.appVersionCode;
       if (manifestVc != null && deviceVc != null && manifestVc != deviceVc) {
+        debugPrint(
+          '[Patcher] checkPatch: versionCode 不匹配(manifest=$manifestVc, '
+          'device=$deviceVc),不热更 → 整包',
+        );
         return null;
       }
 
@@ -108,6 +123,10 @@ class PatchUpdateService {
       if (appBinding.isNotEmpty &&
           manifestBinding.isNotEmpty &&
           appBinding != manifestBinding) {
+        debugPrint(
+          '[Patcher] checkPatch: flutterBinding 不匹配(manifest=$manifestBinding, '
+          'app=$appBinding),不热更 → 整包',
+        );
         return null;
       }
 
@@ -124,14 +143,23 @@ class PatchUpdateService {
           localBuildTime: parseBuildTime(AppConfig.frontendBuildTime),
           remoteBuildTime: null,
         );
-        if (!newer) return null;
+        if (!newer) {
+          debugPrint(
+            '[Patcher] checkPatch: 已是最新(local=${AppConfig.frontendGitCommit}/'
+            '${AppConfig.frontendVersion}, remote=$gitCommit/$semanticVersion)',
+          );
+          return null;
+        }
       }
 
       // 已应用过同一补丁（currentVersion == patchLabel）→ 不再重复提示。
       final current = await FlutterPatcher.currentVersion;
       if (current != null && current.isNotEmpty && current == patchLabel) {
+        debugPrint('[Patcher] checkPatch: 补丁 $patchLabel 已应用,跳过');
         return null;
       }
+
+      debugPrint('[Patcher] checkPatch: 发现可热更补丁 $patchLabel');
 
       // 保留 manifest 的 targetVersionCode（= 构建时的 versionCode），flutter_patcher 按其
       // 绑定;上面已确保它与当前设备一致。

@@ -140,28 +140,54 @@ class BackendPatchService {
     try {
       // 后端未运行时无从比较，直接跳过（本地模式尚未启动等）。
       final running = await _fetchRunningVersion();
-      if (running == null) return null;
+      if (running == null) {
+        debugPrint('[BackendPatch] checkPatch: 后端 /version 不可达,跳过');
+        return null;
+      }
 
       final abi = await FlutterPatcher.deviceAbi;
-      if (abi.isEmpty) return null;
+      if (abi.isEmpty) {
+        debugPrint('[BackendPatch] checkPatch: deviceAbi 为空,跳过');
+        return null;
+      }
 
       final rawUrl = await _resolver.assetUrl(
         'backend-manifest-$abi.json',
         githubProxy: githubProxy,
       );
-      if (rawUrl == null) return null;
-      final resp = await _githubDio.get<dynamic>(
-        PatchUpdateService.applyProxy(rawUrl, githubProxy),
-      );
+      if (rawUrl == null) {
+        debugPrint(
+          '[BackendPatch] checkPatch: 渠道 release 无 backend-manifest-$abi.json,跳过',
+        );
+        return null;
+      }
+      final url = PatchUpdateService.applyProxy(rawUrl, githubProxy);
+      debugPrint('[BackendPatch] checkPatch: 拉取 manifest $url');
+      final resp = await _githubDio.get<dynamic>(url);
       final map = _asMap(resp.data);
-      if (map == null) return null;
-      if (map['hasUpdate'] != true && map['has_update'] != true) return null;
+      if (map == null) {
+        debugPrint('[BackendPatch] checkPatch: manifest 解析失败,跳过');
+        return null;
+      }
+      if (map['hasUpdate'] != true && map['has_update'] != true) {
+        debugPrint('[BackendPatch] checkPatch: manifest hasUpdate=false,跳过');
+        return null;
+      }
 
       final info = BackendPatchInfo.fromManifest(map);
-      if (info == null) return null;
+      if (info == null) {
+        debugPrint('[BackendPatch] checkPatch: manifest 缺 backend 字段,跳过');
+        return null;
+      }
 
       // ABI 匹配（唯一硬前置；不再绑定 versionCode）。
-      if (info.abi.isNotEmpty && info.abi != abi) return null;
+      if (info.abi.isNotEmpty && info.abi != abi) {
+        debugPrint(
+          '[BackendPatch] checkPatch: ABI 不匹配(manifest=${info.abi}, '
+          'device=$abi),跳过',
+        );
+        return null;
+      }
 
       // 分渠道比较是否更新。
       const isDev = AppConfig.frontendVersion == 'dev';
@@ -174,14 +200,26 @@ class BackendPatchService {
         localBuildTime: parseBuildTime(running.buildTime),
         remoteBuildTime: parseBuildTime(info.buildTime),
       );
-      if (!newer) return null;
+      if (!newer) {
+        debugPrint(
+          '[BackendPatch] checkPatch: 已是最新(local=${running.gitCommit}/'
+          '${running.version}, remote=${info.gitCommit}/${info.version})',
+        );
+        return null;
+      }
 
       // 已下载并 stage 过同一补丁(仅差冷重启生效)→ 不重复提示。运行中后端仍是旧版
       // 会让上面的版本比较判为「有更新」,但补丁其实已落地;confirmed 态由版本比较
       // 自然兜底(git_commit 已一致),这里只拦 staged/pending。
       final staged = await EmbeddedBackendService.getActiveBackendPatch();
-      if (staged != null && _isSameStagedPatch(staged, info)) return null;
+      if (staged != null && _isSameStagedPatch(staged, info)) {
+        debugPrint(
+          '[BackendPatch] checkPatch: 补丁 ${info.patchLabel} 已 stage 待重启,跳过',
+        );
+        return null;
+      }
 
+      debugPrint('[BackendPatch] checkPatch: 发现可热更后端补丁 ${info.patchLabel}');
       return info;
     } catch (e) {
       debugPrint('[BackendPatch] checkPatch 失败: $e');
