@@ -44,9 +44,6 @@ external void _hlsDestroy(HTMLAudioElement element);
 @JS('SongloftHls.setAudioTrack')
 external void _hlsSetAudioTrack(HTMLAudioElement element, int index);
 
-@JS('SongloftHls.getAudioTrack')
-external int _hlsGetAudioTrack(HTMLAudioElement element);
-
 /// The web implementation of [JustAudioPlatform].
 class SongloftWebJustAudioPlugin extends JustAudioPlatform {
   final Map<String, JustAudioPlayer> players = {};

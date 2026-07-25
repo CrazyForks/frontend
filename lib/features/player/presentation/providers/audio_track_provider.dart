@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:js_interop';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:web/web.dart' as web;
 
 import '../../../../core/audio/audio_backend.dart';
 import '../../../../core/audio/songloft_just_audio_platform.dart';
@@ -15,10 +13,6 @@ import '../../../library/data/songs_api.dart';
 import '../../../library/presentation/providers/songs_provider.dart';
 import 'player_provider.dart';
 import 'web_video_playback_provider.dart';
-
-// hls.js 音轨切换 JS 桥接（操作 video 元素上的 hls.js 实例）
-@JS('SongloftHls.setAudioTrack')
-external void _hlsSetAudioTrack(web.HTMLVideoElement element, int index);
 
 /// 音轨切换状态（songloft-org/songloft#297、#298）。
 ///
@@ -198,11 +192,7 @@ class AudioTrackNotifier extends Notifier<AudioTrackState> {
       // HLS 视频：使用 hls.js 内置音轨切换（即时，无需重载）
       if (song.isVideo &&
           !AudioFormatHelper.isWebCompatibleVideo(song.format, song.filePath)) {
-        final videoEl =
-            ref.read(webVideoPlaybackProvider.notifier).videoElement;
-        if (videoEl != null) {
-          _hlsSetAudioTrack(videoEl, idx);
-        }
+        ref.read(webVideoPlaybackProvider.notifier).setAudioTrack(idx);
         state = AudioTrackState(tracks: state.tracks, selected: track);
         return;
       }
