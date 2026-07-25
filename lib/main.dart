@@ -25,6 +25,8 @@ import 'core/audio/web_audio_platform.dart';
 import 'core/backend/embedded_backend_service.dart';
 import 'core/env/tv_detector.dart';
 import 'core/network/dio_insecure.dart' show applyGlobalInsecureHttpOverrides;
+
+import 'core/platform/home_widget_service.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/secure_storage.dart';
 import 'core/tracely/tracely_client.dart';
@@ -80,6 +82,9 @@ void main(List<String> args) async {
   PaintingBinding.instance.imageCache
     ..maximumSize = 2000
     ..maximumSizeBytes = 200 << 20; // 200 MiB
+
+  // 初始化桌面小组件服务（Android App Widget / iOS WidgetKit）
+  await HomeWidgetService().init();
 
   // 初始化文件日志并拦截 debugPrint，使所有日志同时写入控制台和文件。
   // 必须在所有 debugPrint 调用之前完成，确保捕获完整的启动日志。

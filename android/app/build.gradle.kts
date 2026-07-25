@@ -81,6 +81,8 @@ dependencies {
     // gomobile bind 生成的 Go 后端 .aar（本地模式使用）
     // 文件由 `make build-go-mobile-android` 生成到 libs/ 目录
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
+    // 桌面小组件封面加载
+    implementation("com.github.bumptech.glide:glide:4.16.0")
 }
 
 flutter {

@@ -36,5 +36,8 @@ class MainActivity : AudioServiceActivity() {
 
         // 悬浮歌词窗口（songloft-org/songloft#318）
         FloatingLyricPlugin(applicationContext, flutterEngine)
+
+        // 注册桌面小部件 MethodChannel
+        WidgetActionPlugin(applicationContext, flutterEngine)
     }
 }

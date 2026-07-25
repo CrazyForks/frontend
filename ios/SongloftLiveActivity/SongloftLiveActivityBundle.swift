@@ -5,5 +5,6 @@ import SwiftUI
 struct SongloftLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         SongloftLiveActivityWidget()
+        SongloftNowPlayingWidget()
     }
 }

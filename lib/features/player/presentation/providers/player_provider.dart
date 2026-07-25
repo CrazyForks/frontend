@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart' as ja;
@@ -11,6 +12,7 @@ import 'package:volume_controller/volume_controller.dart';
 import '../../../../core/audio/audio_service.dart';
 import '../../../../core/audio/media_browse_data_source.dart';
 import '../../../../core/platform/live_activity_service.dart';
+import '../../../../core/platform/home_widget_service.dart';
 import '../../../../core/storage/app_preferences.dart';
 import '../../../../core/storage/preference_sync_service.dart';
 import '../../../../core/utils/audio_format_helper.dart';
@@ -25,6 +27,7 @@ import '../../../../shared/models/song.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import 'web_video_playback_provider.dart';
 import '../../../library/data/songs_api.dart';
+import '../../../library/presentation/providers/favorite_provider.dart';
 import '../../../library/presentation/providers/songs_provider.dart';
 import '../../../playlist/data/playlist_api.dart';
 import '../../../playlist/presentation/providers/playlist_provider.dart';
@@ -90,6 +93,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _audioHandler.onSkipToNext = () => playNext();
     _audioHandler.onSkipToPrevious = () => playPrev();
     _audioHandler.onSongCompleted = _onSongCompleted;
+    _audioHandler.onToggleFavorite = _toggleFavoriteFromNotification;
 
     // Web HLS 视频回调：playSong 中触发 → 直接创建 video DOM 元素开始播放
     if (kIsWeb) {
@@ -287,6 +291,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 初始化监听器
   void _initListeners() {
+    _initWidgetActionChannel();
+
     // 监听播放位置
     _positionSubscription = _audioHandler.positionStream.listen((position) {
       state = state.copyWith(currentTime: position);
@@ -321,6 +327,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
           isPlaying: playerState.playing,
           progress: state.progress,
         );
+        HomeWidgetService().updatePlaybackState(playerState.playing);
+        if (playerState.playing) {
+          HomeWidgetService().startProgressUpdates(
+            currentPosition: () => _audioHandler.playbackState.value.position,
+            currentDuration: () => _audioHandler.mediaItem.value?.duration ?? Duration.zero,
+          );
+        } else {
+          HomeWidgetService().stopProgressUpdates();
+        }
       }
     });
     // 歌曲结束通过 _audioHandler.onSongCompleted 回调处理
@@ -338,6 +353,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
         }
       });
     }
+
+    // 监听收藏状态变化，同步通知栏图标
+    ref.listen(favoriteProvider, (_, _) {
+      _updateNotificationFavorite();
+      _syncHomeWidgetFavorite();
+    });
   }
 
   /// 初始化 Live Activity 服务
@@ -381,6 +402,38 @@ class PlayerNotifier extends Notifier<PlayerState> {
                 : null,
       );
     });
+  }
+
+  void _syncHomeWidgetSong(Song? song) {
+    final widget = HomeWidgetService();
+    if (song == null) {
+      widget.clearNowPlaying();
+      return;
+    }
+    final favState = ref.read(favoriteProvider);
+    final isRadio = song.type == 'radio';
+    final isFav = isRadio
+        ? favState.favoriteRadioIds.contains(song.id)
+        : favState.favoriteSongIds.contains(song.id);
+    widget.updateNowPlaying(
+      title: song.title,
+      artist: song.artist ?? '',
+      artUrl: song.coverUrl != null
+          ? UrlHelper.buildCoverUrl(song.coverUrl!)
+          : null,
+      isPlaying: state.isPlaying,
+      isFavorite: isFav,
+      position: Duration.zero,
+      duration: Duration(milliseconds: (song.duration * 1000).toInt()),
+    );
+    if (state.isPlaying) {
+      widget.startProgressUpdates(
+        currentPosition: () => _audioHandler.playbackState.value.position,
+        currentDuration: () => _audioHandler.mediaItem.value?.duration ?? Duration.zero,
+      );
+    } else {
+      widget.stopProgressUpdates();
+    }
   }
 
   void _notifyPlayEvent(int songId, String type) {
@@ -504,6 +557,61 @@ class PlayerNotifier extends Notifier<PlayerState> {
         _savePlaybackState();
       }
     }
+  }
+
+  void _toggleFavoriteFromNotification() {
+    final song = state.currentSong;
+    if (song == null) return;
+    debugPrint('[Player] Toggle favorite from notification: ${song.id}');
+    unawaited(_toggleSongFavorite(song.id, song.type));
+  }
+
+  Future<void> _toggleSongFavorite(int songId, String songType) async {
+    try {
+      final notifier = ref.read(favoriteProvider.notifier);
+      final isRadio = songType == 'radio';
+      if (isRadio) {
+        await notifier.toggleRadioFavorite(songId);
+      } else {
+        await notifier.toggleFavorite(songId);
+      }
+      _updateNotificationFavorite();
+    } catch (e) {
+      debugPrint('[Player] Toggle favorite failed: $e');
+    }
+  }
+
+  void _updateNotificationFavorite() {
+    final song = state.currentSong;
+    if (song == null) return;
+    final favState = ref.read(favoriteProvider);
+    final isRadio = song.type == 'radio';
+    final isFav = isRadio
+        ? favState.favoriteRadioIds.contains(song.id)
+        : favState.favoriteSongIds.contains(song.id);
+    _audioHandler.setFavorited(isFav);
+  }
+
+  void _syncHomeWidgetFavorite() {
+    final song = state.currentSong;
+    if (song == null) return;
+    final favState = ref.read(favoriteProvider);
+    final isRadio = song.type == 'radio';
+    final isFav = isRadio
+        ? favState.favoriteRadioIds.contains(song.id)
+        : favState.favoriteSongIds.contains(song.id);
+    HomeWidgetService().updateFavoriteState(isFav);
+  }
+
+  static const _widgetActionChannel = MethodChannel('com.songloft/widget_action');
+
+  void _initWidgetActionChannel() {
+    if (!PlatformUtils.isAndroid) return;
+    _widgetActionChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onWidgetAction' && call.arguments == 'favorite') {
+        _toggleFavoriteFromNotification();
+      }
+    });
   }
 
   /// 播放歌单
@@ -876,6 +984,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     );
     if (newSong == null) {
       _syncLiveActivitySong(null);
+      _syncHomeWidgetSong(null);
     }
     _savePlaybackState();
   }
@@ -938,6 +1047,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       clearSourcePlaylistId: true,
     );
     _syncLiveActivitySong(null);
+    _syncHomeWidgetSong(null);
     _savePlaybackState();
   }
 
@@ -1599,6 +1709,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       currentSong: state.playlist[index],
       currentTime: Duration.zero,
     );
+    _updateNotificationFavorite();
 
     await _playCurrent(gen);
     if (gen != _playGeneration) return; // 已被新切歌取代，savePlaybackState 也跳过
@@ -1632,6 +1743,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
     if (previousSong?.id != song.id) {
       _syncLiveActivitySong(song);
+      _syncHomeWidgetSong(song);
     }
 
     debugPrint(

@@ -49,10 +49,13 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 回调：停止 Web HLS 视频播放。
   VoidCallback? onStopHlsVideo;
 
+  bool _isCurrentSongFavorited = false;
+
   /// 通知栏回调（由 PlayerNotifier 设置）
   VoidCallback? onSkipToNext;
   VoidCallback? onSkipToPrevious;
   VoidCallback? onSongCompleted;
+  VoidCallback? onToggleFavorite;
 
   /// Android Auto 媒体浏览数据源（由 PlayerNotifier 注入）
   MediaBrowseDataSource? mediaBrowseDataSource;
@@ -189,6 +192,25 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
     return state;
   }
 
+  static const MediaControl _favoriteControl = MediaControl(
+    androidIcon: 'drawable/ic_media_control_favorite',
+    label: 'Favorite',
+    action: MediaAction.setRating,
+    customAction: CustomMediaAction(name: 'toggleFavorite'),
+  );
+
+  static const MediaControl _unfavoriteControl = MediaControl(
+    androidIcon: 'drawable/ic_media_control_favorite_filled',
+    label: 'Unfavorite',
+    action: MediaAction.setRating,
+    customAction: CustomMediaAction(name: 'toggleFavorite'),
+  );
+
+  void setFavorited(bool favorited) {
+    _isCurrentSongFavorited = favorited;
+    _broadcastState();
+  }
+
   /// 依据 `_player` 当前快照构建一份 audio_service [PlaybackState]。
   /// 抽出成独立方法，供 playbackEventStream 转换与 play/pause 等动作后的主动重播共用。
   PlaybackState _buildPlaybackState() {
@@ -196,6 +218,7 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       controls: [
         MediaControl.skipToPrevious,
         if (_player.playing) MediaControl.pause else MediaControl.play,
+        _isCurrentSongFavorited ? _unfavoriteControl : _favoriteControl,
         MediaControl.skipToNext,
       ],
       // 显式声明 play/pause/skip 系统动作：Android 13+ 通知与灵动岛/锁屏的媒体控件由系统
@@ -212,7 +235,7 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
         MediaAction.skipToNext,
         MediaAction.skipToPrevious,
       },
-      androidCompactActionIndices: const [0, 1, 2],
+      androidCompactActionIndices: const [0, 1, 3],
       processingState:
           const {
             ja.ProcessingState.idle: AudioProcessingState.idle,
@@ -301,6 +324,20 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       '[AudioService] ⏮️ skipToPrevious() 被调用 (callback=${onSkipToPrevious != null})',
     );
     onSkipToPrevious?.call();
+  }
+
+  @override
+  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
+    debugPrint('[AudioService] customAction: $name');
+    if (name == 'toggleFavorite') {
+      onToggleFavorite?.call();
+    }
+  }
+
+  @override
+  Future<void> setRating(Rating rating, [Map<String, dynamic>? extras]) async {
+    debugPrint('[AudioService] setRating 被调用 (favorite toggle)');
+    onToggleFavorite?.call();
   }
 
   // ====================== Android Auto 媒体浏览 ======================

@@ -76,6 +76,34 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+        <!-- 桌面小组件：正在播放 -->
+        <receiver
+            android:name=".SongloftNowPlayingWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.songloft.songloft_flutter.ACTION_PLAY_PAUSE" />
+                <action android:name="com.songloft.songloft_flutter.ACTION_PREV" />
+                <action android:name="com.songloft.songloft_flutter.ACTION_NEXT" />
+                <action android:name="com.songloft.songloft_flutter.ACTION_FAVORITE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/now_playing_widget_info" />
+        </receiver>
+        <!-- 小组件按钮 → MediaSession 控制 -->
+        <receiver
+            android:name=".WidgetMediaActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.songloft.songloft_flutter.ACTION_PLAY_PAUSE" />
+                <action android:name="com.songloft.songloft_flutter.ACTION_PREV" />
+                <action android:name="com.songloft.songloft_flutter.ACTION_NEXT" />
+                <action android:name="com.songloft.songloft_flutter.ACTION_FAVORITE" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
