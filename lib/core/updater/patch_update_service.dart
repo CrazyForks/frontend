@@ -16,8 +16,10 @@ import 'version_compare.dart';
 ///   `/releases/latest`），由 [ChannelReleaseResolver] 解析,任意非最新 → 最新。
 /// - **兼容键取代 versionCode**：libapp.so（Dart AOT）真正绑定的是 **Flutter 引擎版本**,
 ///   用编译期 [AppConfig.flutterBinding] 与 manifest 的 `flutterBinding` 比对;相同即兼容,
-///   返回的 [PatchInfo] 保留 manifest 的 `targetVersionCode`（本项目 versionCode 恒定,
-///   已校验其与当前设备一致,故等价于绑定当前设备）;不同 → 不热更（交整包分支引导下 APK）。
+///   返回的 [PatchInfo] 保留 manifest 的 `targetVersionCode`（CI 用 aapt 从分 ABI APK 读的
+///   **真实值**——`--split-per-abi` 下 gradle 会改写为「ABI偏移×1000+pubspec基础值」,
+///   pubspec `+N` 恒定时同 ABI 的新旧构建值相同,已校验其与当前设备一致,故等价于绑定
+///   当前设备）;不同 → 不热更（交整包分支引导下 APK）。
 /// - 比较：dev 比 git commit hash;stable 比版本号（[isRemoteNewer]）。已应用同补丁
 ///   （`currentVersion == patchLabel`）跳过。
 /// - **代理**：抓 manifest 与下载 patch 都套用户所选代理前缀。仅 Android;其余平台
@@ -105,9 +107,10 @@ class PatchUpdateService {
                   : null);
 
       // versionCode 兼容闸:libapp.so 与宿主 APK 的 versionCode 必须一致(flutter_patcher
-      // 冷启会丢弃不匹配的补丁)。本项目 versionCode 恒定(pubspec +N 不随构建 bump),故此
-      // 闸通常恒真,任意非最新 → 最新都能过;仅当有意 bump 了 versionCode 时才拦(→整包)。
-      // versionCode 取自各自构建,非手工挑基线。
+      // 冷启会丢弃不匹配的补丁)。--split-per-abi 下 gradle 把各 ABI APK 的 versionCode
+      // 改写为「ABI偏移×1000+pubspec基础值」(如 arm64-v8a=2001),manifest 由 CI 用 aapt
+      // 读分 ABI APK 的真实值;pubspec +N 恒定时同 ABI 新旧构建同值,此闸恒真,任意非
+      // 最新 → 最新都能过;仅当有意 bump 了 pubspec +N 时才拦(→整包)。
       final deviceVc = await FlutterPatcher.appVersionCode;
       if (manifestVc != null && deviceVc != null && manifestVc != deviceVc) {
         debugPrint(
