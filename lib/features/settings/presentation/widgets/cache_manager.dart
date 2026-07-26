@@ -28,14 +28,27 @@ String _formatSize(int bytes) {
   return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
 }
 
-/// 缓存大小档位选项
-const _cacheSizeOptions = [
+/// 本地缓存大小档位选项（客户端设备磁盘，保持克制）
+const _localCacheSizeOptions = [
   (value: 100 * 1024 * 1024, label: '100 MB'),
   (value: 500 * 1024 * 1024, label: '500 MB'),
   (value: 1024 * 1024 * 1024, label: '1 GB'),
   (value: 2 * 1024 * 1024 * 1024, label: '2 GB'),
   (value: 5 * 1024 * 1024 * 1024, label: '5 GB'),
   (value: 10 * 1024 * 1024 * 1024, label: '10 GB'),
+];
+
+/// 服务端缓存大小档位选项（服务器磁盘，可放大到更高上限）
+const _serverCacheSizeOptions = [
+  (value: 100 * 1024 * 1024, label: '100 MB'),
+  (value: 500 * 1024 * 1024, label: '500 MB'),
+  (value: 1024 * 1024 * 1024, label: '1 GB'),
+  (value: 2 * 1024 * 1024 * 1024, label: '2 GB'),
+  (value: 5 * 1024 * 1024 * 1024, label: '5 GB'),
+  (value: 10 * 1024 * 1024 * 1024, label: '10 GB'),
+  (value: 20 * 1024 * 1024 * 1024, label: '20 GB'),
+  (value: 50 * 1024 * 1024 * 1024, label: '50 GB'),
+  (value: 100 * 1024 * 1024 * 1024, label: '100 GB'),
 ];
 
 /// 缓存管理 Widget
@@ -76,7 +89,7 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
       final maxSize = prefs.getLocalCacheMaxSize();
       if (mounted) {
         setState(() {
-          _localCacheMaxSizeIndex = _findSizeIndex(maxSize);
+          _localCacheMaxSizeIndex = _findSizeIndex(maxSize, _localCacheSizeOptions);
           _localConfigLoaded = true;
         });
       }
@@ -89,7 +102,7 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
   Future<void> _saveLocalCacheMaxSize(int index) async {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
-      final maxSize = _cacheSizeOptions[index].value;
+      final maxSize = _localCacheSizeOptions[index].value;
       await prefs.setLocalCacheMaxSize(maxSize);
       pushPreferencesToServer(ref.read(dioProvider));
     } catch (e) {
@@ -441,10 +454,10 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
     );
   }
 
-  /// 根据 maxSize 值找到对应的档位索引
-  int _findSizeIndex(int maxSize) {
-    for (int i = 0; i < _cacheSizeOptions.length; i++) {
-      if (_cacheSizeOptions[i].value == maxSize) return i;
+  /// 根据 maxSize 值在给定档位数组中找到对应的档位索引
+  int _findSizeIndex(int maxSize, List<({int value, String label})> options) {
+    for (int i = 0; i < options.length; i++) {
+      if (options[i].value == maxSize) return i;
     }
     // 默认 1 GB（索引 2）
     return 2;
@@ -808,7 +821,8 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
               // 最大缓存大小滑动条
               configAsync.when(
                 data: (config) {
-                  int currentIndex = _findSizeIndex(config.maxSize);
+                  int currentIndex =
+                      _findSizeIndex(config.maxSize, _serverCacheSizeOptions);
                   return StatefulBuilder(
                     builder: (context, setSliderState) {
                       return Column(
@@ -816,17 +830,17 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
                         children: [
                           Text(
                             l10n.settingsCacheMaxSize(
-                                _cacheSizeOptions[currentIndex].label),
+                                _serverCacheSizeOptions[currentIndex].label),
                             style: theme.textTheme.bodyMedium,
                           ),
                           Slider(
                             value: currentIndex.toDouble(),
                             min: 0,
-                            max: (_cacheSizeOptions.length - 1).toDouble(),
-                            divisions: _cacheSizeOptions.length - 1,
-                            label: _cacheSizeOptions[currentIndex].label,
+                            max: (_serverCacheSizeOptions.length - 1).toDouble(),
+                            divisions: _serverCacheSizeOptions.length - 1,
+                            label: _serverCacheSizeOptions[currentIndex].label,
                             semanticFormatterCallback: (value) {
-                              return _cacheSizeOptions[value.round()].label;
+                              return _serverCacheSizeOptions[value.round()].label;
                             },
                             onChanged: (value) {
                               setSliderState(() {
@@ -835,7 +849,7 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
                             },
                             onChangeEnd: (value) {
                               final newMaxSize =
-                                  _cacheSizeOptions[value.round()].value;
+                                  _serverCacheSizeOptions[value.round()].value;
                               _updateServerCacheConfig(newMaxSize);
                             },
                           ),
@@ -955,17 +969,17 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
               if (_localConfigLoaded) ...[
                 Text(
                   l10n.settingsCacheMaxLocalSize(
-                      _cacheSizeOptions[_localCacheMaxSizeIndex].label),
+                      _localCacheSizeOptions[_localCacheMaxSizeIndex].label),
                   style: theme.textTheme.bodyMedium,
                 ),
                 Slider(
                   value: _localCacheMaxSizeIndex.toDouble(),
                   min: 0,
-                  max: (_cacheSizeOptions.length - 1).toDouble(),
-                  divisions: _cacheSizeOptions.length - 1,
-                  label: _cacheSizeOptions[_localCacheMaxSizeIndex].label,
+                  max: (_localCacheSizeOptions.length - 1).toDouble(),
+                  divisions: _localCacheSizeOptions.length - 1,
+                  label: _localCacheSizeOptions[_localCacheMaxSizeIndex].label,
                   semanticFormatterCallback: (value) {
-                    return _cacheSizeOptions[value.round()].label;
+                    return _localCacheSizeOptions[value.round()].label;
                   },
                   onChanged: (value) {
                     setState(() {
