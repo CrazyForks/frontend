@@ -121,8 +121,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.cancelCalls, 1);
-    // 取消后回到状态阶段
+    // 取消后确定性地回到状态阶段（轮询已先停，不会被抢去结果页）
     expect(find.text('停止计算'), findsNothing);
+    expect(find.text('指纹统计'), findsOneWidget);
   });
 
   testWidgets('存在无法计算的歌曲时显示计数与不自动重试的说明', (tester) async {

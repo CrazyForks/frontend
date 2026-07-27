@@ -118,11 +118,16 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
 
   /// 中断正在运行的指纹计算。已算出的指纹会保留，未算的下次再算。
   Future<void> _cancelCompute() async {
-    setState(() => _cancelling = true);
+    // 先停轮询再发请求：否则等待响应期间定时器可能读到 cancelled（isFinished）
+    // 抢先跳去结果页，落点变成不确定的。
+    _pollTimer?.cancel();
+    setState(() {
+      _cancelling = true;
+      _error = null;
+    });
     try {
       await ref.read(scanApiProvider).cancelFingerprintCompute();
       if (!mounted) return;
-      _pollTimer?.cancel();
       setState(() {
         _cancelling = false;
         _phase = _PagePhase.status;
@@ -130,10 +135,13 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
       await _loadStatus();
     } catch (e) {
       if (!mounted) return;
+      // 取消请求失败（超时 / 5xx）时任务很可能还在跑，必须把轮询接回去，
+      // 否则进度条会永久冻在最后一次读数上，除了退出页面无法恢复。
       setState(() {
         _cancelling = false;
         _error = '$e';
       });
+      _startPolling();
     }
   }
 
