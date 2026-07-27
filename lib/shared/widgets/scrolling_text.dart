@@ -33,6 +33,11 @@ class _ScrollingTextState extends State<ScrollingText>
   bool _isOverflowing = false;
   bool _isScrolling = false;
 
+  // 代计数器：文本/宽度变化时 +1，使仍停留在 await 中的旧滚动循环失效退出，
+  // 避免新旧两个循环同时驱动同一个 controller
+  int _generation = 0;
+  double _lastMaxWidth = 0;
+
   @override
   void initState() {
     super.initState();
@@ -46,12 +51,19 @@ class _ScrollingTextState extends State<ScrollingText>
   void didUpdateWidget(ScrollingText oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.text != widget.text) {
-      _isScrolling = false;
-      _scrollController.jumpTo(0);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkOverflow();
-      });
+      _restart();
     }
+  }
+
+  void _restart() {
+    _generation++;
+    _isScrolling = false;
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkOverflow();
+    });
   }
 
   @override
@@ -61,17 +73,17 @@ class _ScrollingTextState extends State<ScrollingText>
   }
 
   void _checkOverflow() {
-    if (!mounted) return;
-    
+    if (!mounted || !_scrollController.hasClients) return;
+
     final maxScrollExtent = _scrollController.position.maxScrollExtent;
     final overflow = maxScrollExtent > 0;
-    
+
     if (overflow != _isOverflowing) {
       setState(() {
         _isOverflowing = overflow;
       });
     }
-    
+
     if (_isOverflowing && !_isScrolling) {
       _startScrolling();
     }
@@ -80,11 +92,17 @@ class _ScrollingTextState extends State<ScrollingText>
   Future<void> _startScrolling() async {
     if (!mounted || !_isOverflowing) return;
     _isScrolling = true;
+    final generation = _generation;
+    bool alive() =>
+        mounted &&
+        _isScrolling &&
+        generation == _generation &&
+        _scrollController.hasClients;
 
-    while (mounted && _isOverflowing && _isScrolling) {
+    while (alive() && _isOverflowing) {
       // 暂停在开头
       await Future.delayed(widget.pauseDuration);
-      if (!mounted || !_isScrolling) return;
+      if (!alive()) return;
 
       // 计算滚动时长
       final maxScrollExtent = _scrollController.position.maxScrollExtent;
@@ -98,11 +116,11 @@ class _ScrollingTextState extends State<ScrollingText>
         duration: duration,
         curve: Curves.linear,
       );
-      if (!mounted || !_isScrolling) return;
+      if (!alive()) return;
 
       // 暂停在末尾
       await Future.delayed(widget.pauseDuration);
-      if (!mounted || !_isScrolling) return;
+      if (!alive()) return;
 
       // 滚动回开头
       await _scrollController.animateTo(
@@ -117,6 +135,12 @@ class _ScrollingTextState extends State<ScrollingText>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (constraints.maxWidth != _lastMaxWidth) {
+          _lastMaxWidth = constraints.maxWidth;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _restart();
+          });
+        }
         return SingleChildScrollView(
           controller: _scrollController,
           scrollDirection: Axis.horizontal,
