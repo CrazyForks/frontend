@@ -52,6 +52,7 @@ Every release (tag `dev` or `v<x.y.z>`) automatically runs: `flutter build apk -
 
 - **Dart-only change** → ships with the next release automatically; old builds hot-update, effective on cold restart (no separate patch tag);
 - **Native / plugin-native / engine change** → if the Flutter engine changes, the `flutterBinding` key mismatches and old builds auto-fall to the full-APK branch; a deliberate versionCode bump goes full APK the same way, and users are guided to download the APK.
+- **Dart referencing native resources (`res/`) is a hidden boundary crossing**: strings like `androidIcon: 'drawable/xxx'` in Dart are **resource names** nobody checks at compile time, and the native-contract hash gate can't catch them either (it only covers the MethodChannel surface) — yet `res/` stays frozen in the old APK. After a hot update, referencing a resource the old APK lacks makes `getIdentifier()` return 0 and the native notification build throws. **Only reference resources that have long shipped in historical APKs and whose content has no theme-attribute (`?attr/...`) dependency; a newly added resource requires a full APK.** (songloft-org/songloft#329; statically backstopped by `test/core/audio/notification_icon_contract_test.dart`)
 
 ## Verification
 

@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:just_audio/just_audio.dart' as ja;
 
 import '../../config/app_config.dart';
@@ -78,6 +79,7 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   late final StreamSubscription<PlaybackState> _playbackLogSub;
   late final StreamSubscription<ja.ProcessingState> _processingStateSub;
   late final StreamSubscription<bool> _playingStateSub;
+  late final StreamSubscription<Object> _asyncErrorSub;
   StreamSubscription<AudioInterruptionEvent>? _interruptionSub;
   bool _disposed = false;
 
@@ -133,6 +135,19 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
         debugPrint('[AudioService] processingStateStream error: $error');
       },
     );
+
+    // audio_service 在把 mediaItem / playbackState 推给原生侧时，**任何**原生异常都只是
+    // 被静默投进 AudioService.asyncError（见 _observePlaybackState）。而原生 setState 里同步
+    // 做了 startForeground(buildNotification())：一旦通知构建抛错（图标资源解析不了、紧凑
+    // 视图索引越界等），通知栏播放器不显示、前台服务建不起来、播放一会被系统回收，而
+    // Dart 侧日志里一片干净——songloft-org/songloft#329 前两轮排查就是这么被瞒过去的。补上落日志，
+    // 并对平台异常做自愈（摘掉收藏按钮再重播状态）。
+    _asyncErrorSub = AudioService.asyncError.listen((error) {
+      debugPrint('[AudioService] ⚠️ 原生异步错误（通知/媒体会话可能未建立）: $error');
+      if (error is PlatformException) {
+        _disableFavoriteControl();
+      }
+    });
 
     // 异步初始化 AudioSession（不影响核心功能）
     _initFuture = _initAudioSession();
@@ -192,19 +207,48 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
     return state;
   }
 
+  // 通知栏「收藏」按钮的图标：**刻意复用桌面小组件的 ic_widget_favorite***，不要另建
+  // 一套通知专用图标（songloft-org/songloft#329）：
+  //   1. drawable 是**原生资源**，安卓热更只换 libapp.so，`res/` 永远随旧 APK 冻结
+  //      （见 docs/cn/flutter_patcher_hotupdate.md）。Dart 侧引用的资源名必须在**所有可能
+  //      的宿主 APK** 里都已存在，否则热更后 getIdentifier() 返回 0，原生
+  //      PlaybackStateCompat.CustomAction.Builder 直接抛 IllegalArgumentException。
+  //   2. 图标由 SystemUI 在**它自己的上下文**里渲染，不能引用应用主题属性
+  //      （`?attr/colorControlNormal` → Resources$NotFoundException）。
+  // 违反任一条的后果都不是"图标丢了"，而是整条媒体通知不显示 + 前台服务建不起来 →
+  // 通知栏播放器看不到、播放一会被系统回收。
+  // ic_widget_favorite* 自 fd56c02（小组件那次）起就在 APK 里，且是纯硬编码 fillColor。
+  // 改这两个常量前先跑 test/core/audio/notification_icon_contract_test.dart。
   static const MediaControl _favoriteControl = MediaControl(
-    androidIcon: 'drawable/ic_media_control_favorite',
+    androidIcon: 'drawable/ic_widget_favorite',
     label: 'Favorite',
     action: MediaAction.setRating,
     customAction: CustomMediaAction(name: 'toggleFavorite'),
   );
 
   static const MediaControl _unfavoriteControl = MediaControl(
-    androidIcon: 'drawable/ic_media_control_favorite_filled',
+    androidIcon: 'drawable/ic_widget_favorite_filled',
     label: 'Unfavorite',
     action: MediaAction.setRating,
     customAction: CustomMediaAction(name: 'toggleFavorite'),
   );
+
+  /// 通知栏收藏按钮是否仍然可用。原生侧构建通知抛错（多为宿主 APK 里这张 drawable
+  /// 解析不了）时置 false：宁可少一个按钮，也不能让整条通知连着前台服务一起挂掉
+  /// （songloft-org/songloft#329）。
+  bool _favoriteControlSupported = true;
+
+  /// 摘除通知栏收藏按钮并立刻重播一次状态，让通知/前台服务恢复。
+  /// 由 [AudioService.asyncError] 的监听方在原生 setState/setMediaItem 抛错时调用。
+  void _disableFavoriteControl() {
+    if (!_favoriteControlSupported) return;
+    _favoriteControlSupported = false;
+    debugPrint(
+      '[AudioService] ⚠️ 原生媒体通知构建失败，摘除通知栏收藏按钮后重播状态'
+      '（宿主 APK 可能缺少 ic_widget_favorite* 资源，需安装完整安装包）',
+    );
+    _broadcastState();
+  }
 
   void setFavorited(bool favorited) {
     _isCurrentSongFavorited = favorited;
@@ -218,7 +262,8 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       controls: [
         MediaControl.skipToPrevious,
         if (_player.playing) MediaControl.pause else MediaControl.play,
-        _isCurrentSongFavorited ? _unfavoriteControl : _favoriteControl,
+        if (_favoriteControlSupported)
+          _isCurrentSongFavorited ? _unfavoriteControl : _favoriteControl,
         MediaControl.skipToNext,
       ],
       // 显式声明 play/pause/skip 系统动作：Android 13+ 通知与灵动岛/锁屏的媒体控件由系统
@@ -235,7 +280,13 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
         MediaAction.skipToNext,
         MediaAction.skipToPrevious,
       },
-      androidCompactActionIndices: const [0, 1, 3],
+      // 索引是**通知 action 列表**（audio_service 原生侧的 nativeActions）的下标，不是上面
+      // controls 的下标：带 customAction 的控件（收藏）会被拿去做 PlaybackState 的
+      // CustomAction，**不进**通知 action 列表。故无论收藏按钮在不在，通知 action 恒为
+      // [上一首, 播放/暂停, 下一首] 三个，紧凑视图只能取 0/1/2。
+      // 写成 [0,1,3] 会让 Android 12 及以下的 SystemUI 渲染紧凑视图时数组越界 →
+      // 整条通知不显示（songloft-org/songloft#329）。
+      androidCompactActionIndices: const [0, 1, 2],
       processingState:
           const {
             ja.ProcessingState.idle: AudioProcessingState.idle,
@@ -926,6 +977,8 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
     debugPrint('[AudioService] playing state subscription canceled');
     await _playbackLogSub.cancel();
     debugPrint('[AudioService] playback log subscription canceled');
+    await _asyncErrorSub.cancel();
+    debugPrint('[AudioService] async error subscription canceled');
     await _playbackEventSub.cancel();
     debugPrint('[AudioService] playback event subscription canceled');
     await _player.dispose();

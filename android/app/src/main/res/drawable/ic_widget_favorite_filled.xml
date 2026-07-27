@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 桌面小组件 + 通知栏收藏按钮共用（见 lib/core/audio/audio_service.dart）。
+     铁律（songloft-org/songloft#329）：**不要**加 android:tint="?attr/..." 之类的主题属性
+     引用——通知图标由 SystemUI 在它自己的上下文渲染，解析不到应用主题属性会抛
+     Resources$NotFoundException，导致整条媒体通知不显示、前台服务建不起来；也**不要**改名，
+     res/ 不能热更，Dart 侧引用的资源名必须在历史 APK 里就存在。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"

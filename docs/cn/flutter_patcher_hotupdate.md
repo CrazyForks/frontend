@@ -52,6 +52,7 @@
 
 - **纯 Dart 改动** → 随下次发版自动带补丁,老包热更、冷重启生效(无需单独打补丁 tag);
 - **动了原生 / 插件原生侧 / 引擎** → Flutter 引擎变则 `flutterBinding` 键不匹配,老包自动落整包 APK 分支;有意 bump versionCode 时同理走整包,用户被引导下 APK。
+- **Dart 引用原生资源(`res/`)是隐藏的跨界**:Dart 里写 `androidIcon: 'drawable/xxx'` 这类**资源名字符串**,编译期无人检查、契约哈希闸也拦不到(它只覆盖 MethodChannel 面),但 `res/` 随旧 APK 冻结。热更后引用到旧 APK 没有的资源 → `getIdentifier()` 返回 0 → 原生构建通知直接抛异常。**只引用早已随历史 APK 落地、且内容无主题属性(`?attr/...`)依赖的资源;新增资源必须发整包。**(songloft-org/songloft#329;由 `test/core/audio/notification_icon_contract_test.dart` 静态兜底)
 
 ## 验证
 
