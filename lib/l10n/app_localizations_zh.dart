@@ -1089,6 +1089,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeMyRadios => '我的电台';
 
   @override
+  String get homeLoadingSlowRetrying => '网络较慢，正在重试…';
+
+  @override
   String get homeGreetingLateNight => '夜深了';
 
   @override

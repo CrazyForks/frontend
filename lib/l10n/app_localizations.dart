@@ -2054,6 +2054,12 @@ abstract class AppLocalizations {
   /// **'我的电台'**
   String get homeMyRadios;
 
+  /// No description provided for @homeLoadingSlowRetrying.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络较慢，正在重试…'**
+  String get homeLoadingSlowRetrying;
+
   /// No description provided for @homeGreetingLateNight.
   ///
   /// In zh, this message translates to:

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../shared/widgets/network_cover_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -426,8 +428,33 @@ class _GridPlaylistCard extends StatelessWidget {
 }
 
 /// 加载中内容
-class _LoadingContent extends StatelessWidget {
+class _LoadingContent extends StatefulWidget {
   const _LoadingContent();
+
+  @override
+  State<_LoadingContent> createState() => _LoadingContentState();
+}
+
+class _LoadingContentState extends State<_LoadingContent> {
+  // 加载持续超过阈值仍未出内容时，露出「网络较慢，正在重试…」提示：此时首屏请求的
+  // 韧性兜底（loadWithRetry，attemptTimeout=6s）已开始重试，给用户可感知的反馈，
+  // 避免长时间空骨架屏被误认为卡死（songloft-org/songloft#314）。
+  bool _slow = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _slow = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -467,6 +494,28 @@ class _LoadingContent extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           // 列表骨架
           for (int i = 0; i < 3; i++) SkeletonLoader.listTile(),
+          if (_slow) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    AppLocalizations.of(context).homeLoadingSlowRetrying,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

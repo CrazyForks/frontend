@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/async_retry.dart';
 import '../../../../features/library/presentation/providers/songs_provider.dart';
 import '../../../../shared/models/song.dart';
 import '../../data/playlist_api.dart';
@@ -149,12 +150,17 @@ class PaginatedPlaylistsNotifier
   @override
   Future<PaginatedPlaylistsState> build() async {
     final repository = ref.watch(playlistRepositoryProvider);
-    final response = await repository.getPlaylists(
-      type: _typeArg,
-      excludeLabels: _excludeLabels,
-      keyword: _keyword,
-      limit: pageLimit,
-      offset: 0,
+    // 首屏关键请求：单次超时 + 有限重试兜底，避免偶发「服务端已返回但请求卡在坏连接上
+    // 不完成」导致首页无限骨架屏、只能反复退出重启（songloft-org/songloft#314）。
+    // 全部重试失败才抛出，交由 UI 显示错误态 + 手动重试。
+    final response = await loadWithRetry(
+      () => repository.getPlaylists(
+        type: _typeArg,
+        excludeLabels: _excludeLabels,
+        keyword: _keyword,
+        limit: pageLimit,
+        offset: 0,
+      ),
     );
     return PaginatedPlaylistsState(
       items: response.playlists,

@@ -1119,6 +1119,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeMyRadios => 'My Radios';
 
   @override
+  String get homeLoadingSlowRetrying => 'Network is slow, retrying…';
+
+  @override
   String get homeGreetingLateNight => 'It\'s late';
 
   @override

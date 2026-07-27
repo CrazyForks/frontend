@@ -686,6 +686,7 @@
   "homeMyPlaylists": "我的歌单",
   "homeViewAll": "查看全部",
   "homeMyRadios": "我的电台",
+  "homeLoadingSlowRetrying": "网络较慢，正在重试…",
   "homeGreetingLateNight": "夜深了",
   "homeGreetingMorning": "早上好",
   "homeGreetingNoon": "中午好",

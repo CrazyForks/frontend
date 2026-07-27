@@ -581,6 +581,7 @@
   "homeMyPlaylists": "My Playlists",
   "homeViewAll": "View all",
   "homeMyRadios": "My Radios",
+  "homeLoadingSlowRetrying": "Network is slow, retrying…",
   "homeGreetingLateNight": "It's late",
   "homeGreetingMorning": "Good morning",
   "homeGreetingNoon": "Good afternoon",
