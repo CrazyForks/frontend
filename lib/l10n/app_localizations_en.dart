@@ -3279,6 +3279,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'Resume the last playback automatically when the app opens';
 
   @override
+  String get settingsMiniPlayerControlsTitle => 'Mini player buttons';
+
+  @override
+  String get settingsMiniPlayerControlsDesc =>
+      'Which controls to show on the mini player bar at the bottom';
+
+  @override
+  String get settingsMiniPlayerControlsDialogTitle => 'Buttons to show';
+
+  @override
+  String get settingsMiniPlayerControlsPlayOnly => 'Play/pause only';
+
+  @override
+  String get settingsMiniPlayerControlsPrevNext => 'Previous / next';
+
+  @override
+  String get settingsMiniPlayerControlsPrevNextMode =>
+      'Previous / next + play mode';
+
+  @override
   String get settingsAutoEnterLyricsOnLaunchTitle => 'Open lyrics on launch';
 
   @override

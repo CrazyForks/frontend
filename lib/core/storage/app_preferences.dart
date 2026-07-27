@@ -446,6 +446,18 @@ class AppPreferences {
     return _prefs.remove(_shortcutBindingsKey);
   }
 
+  static const _miniPlayerControlsKey = 'player_mini_controls';
+
+  /// 迷你播放条显示哪些按钮：'playOnly' / 'prevNext'（默认） / 'prevNextMode'。
+  /// 纯本地设置，不参与服务器偏好同步（songloft-org/songloft-player#25）。
+  String getMiniPlayerControls() {
+    return _prefs.getString(_miniPlayerControlsKey) ?? 'prevNext';
+  }
+
+  Future<bool> setMiniPlayerControls(String value) {
+    return _prefs.setString(_miniPlayerControlsKey, value);
+  }
+
   /// 清除所有偏好设置
   Future<bool> clear() {
     return _prefs.clear();

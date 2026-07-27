@@ -5684,6 +5684,42 @@ abstract class AppLocalizations {
   /// **'启动客户端后自动继续上次的播放'**
   String get settingsAutoPlayOnLaunchDesc;
 
+  /// No description provided for @settingsMiniPlayerControlsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'底部播放条按钮'**
+  String get settingsMiniPlayerControlsTitle;
+
+  /// No description provided for @settingsMiniPlayerControlsDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'手机底部播放条上显示哪些控制按钮'**
+  String get settingsMiniPlayerControlsDesc;
+
+  /// No description provided for @settingsMiniPlayerControlsDialogTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择显示的按钮'**
+  String get settingsMiniPlayerControlsDialogTitle;
+
+  /// No description provided for @settingsMiniPlayerControlsPlayOnly.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅播放/暂停'**
+  String get settingsMiniPlayerControlsPlayOnly;
+
+  /// No description provided for @settingsMiniPlayerControlsPrevNext.
+  ///
+  /// In zh, this message translates to:
+  /// **'上一首 / 下一首'**
+  String get settingsMiniPlayerControlsPrevNext;
+
+  /// No description provided for @settingsMiniPlayerControlsPrevNextMode.
+  ///
+  /// In zh, this message translates to:
+  /// **'上一首 / 下一首 + 播放模式'**
+  String get settingsMiniPlayerControlsPrevNextMode;
+
   /// No description provided for @settingsAutoEnterLyricsOnLaunchTitle.
   ///
   /// In zh, this message translates to:

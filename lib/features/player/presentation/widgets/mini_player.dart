@@ -2,14 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/theme/responsive.dart';
 import '../../../../core/utils/url_helper.dart';
 import '../../../../l10n/app_localizations.dart';
 
+import '../../domain/mini_player_controls.dart';
+import '../../domain/player_state.dart';
+import '../providers/mini_player_controls_provider.dart';
 import '../providers/player_provider.dart';
 import '../../../dlna/presentation/providers/dlna_provider.dart';
 import '../utils/full_player_route.dart';
 import 'play_controls.dart';
+import 'popup_controls.dart';
 import 'progress_bar.dart';
+
+/// 播放模式按钮所需的最小屏幕宽度。低于此值时即使偏好选了 prevNextMode 也降级成
+/// prevNext：四个按钮约占 148dp，标题列在更窄的屏上只剩不到 120dp，已无可读性。
+const double _kPlayModeMinWidth = 340;
 
 /// 移动端迷你播放器（底部小条）
 class MiniPlayer extends ConsumerWidget {
@@ -21,6 +30,7 @@ class MiniPlayer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(playerStateProvider);
     final notifier = ref.read(playerStateProvider.notifier);
+    final controls = ref.watch(miniPlayerControlsProvider);
     final theme = Theme.of(context);
 
     // 无歌曲时不显示
@@ -116,14 +126,8 @@ class MiniPlayer extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      // 播放/暂停按钮
-                      CompactPlayButton(
-                        isPlaying: state.isPlaying,
-                        isBuffering: state.showBufferingIndicator,
-                        onPlay: notifier.togglePlay,
-                        onPause: notifier.togglePlay,
-                        size: 44,
-                      ),
+                      // 控制按钮（档位由偏好决定）
+                      _buildActions(context, state, notifier, controls),
                     ],
                   ),
                 ),
@@ -132,6 +136,80 @@ class MiniPlayer extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 右侧控制按钮区（songloft-org/songloft-player#25）。
+  ///
+  /// 保持单行 64px 主体不变，靠紧凑命中框（36x40，而非 IconButton 默认的 48）从标题列
+  /// 借最少的宽度：三键约 116dp、四键约 148dp。标题在唯一的 Expanded 里，固定宽度总和
+  /// 远小于视口，不会 RenderFlex 溢出，只会更早省略。
+  Widget _buildActions(
+    BuildContext context,
+    PlayerState state,
+    PlayerNotifier notifier,
+    MiniPlayerControls controls,
+  ) {
+    final playButton = CompactPlayButton(
+      isPlaying: state.isPlaying,
+      isBuffering: state.showBufferingIndicator,
+      onPlay: notifier.togglePlay,
+      onPause: notifier.togglePlay,
+      size: 44,
+    );
+
+    if (!controls.hasPrevNext) return playButton;
+
+    final l10n = AppLocalizations.of(context);
+    final showPlayMode =
+        controls.hasPlayMode && context.screenWidth >= _kPlayModeMinWidth;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showPlayMode)
+          PopupPlayModeControl(
+            playMode: state.playMode,
+            onPlayModeChanged: notifier.setPlayMode,
+          ),
+        _buildSkipButton(
+          context,
+          icon: Icons.skip_previous_rounded,
+          tooltip: l10n.playerPrevious,
+          onPressed: state.hasPrev ? notifier.playPrev : null,
+        ),
+        playButton,
+        _buildSkipButton(
+          context,
+          icon: Icons.skip_next_rounded,
+          tooltip: l10n.playerNext,
+          onPressed: state.hasNext ? notifier.playNext : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSkipButton(
+    BuildContext context, {
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback? onPressed,
+  }) {
+    final theme = Theme.of(context);
+
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 22),
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 40),
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
+        foregroundColor: theme.colorScheme.onSurface,
+        disabledForegroundColor: theme.colorScheme.onSurface.withValues(
+          alpha: 0.38,
+        ),
       ),
     );
   }

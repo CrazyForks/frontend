@@ -21,6 +21,8 @@ import '../../../../core/utils/web_cache_clearer.dart' as web_cache;
 import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../desktop_lyric/desktop_lyric_font_size.dart';
+import '../../../player/domain/mini_player_controls.dart';
+import '../../../player/presentation/providers/mini_player_controls_provider.dart';
 import '../../../playlist/presentation/providers/playlist_provider.dart';
 import '../../../jsplugin/data/jsplugin_api.dart';
 import '../../../jsplugin/presentation/providers/jsplugin_provider.dart';
@@ -417,6 +419,13 @@ class _SettingsCategoryContentState
     final l10n = AppLocalizations.of(context);
     final quality = ref.watch(audioQualityProvider);
     final autoPlayOnLaunch = ref.watch(autoPlayOnLaunchProvider);
+    final miniPlayerControls = ref.watch(miniPlayerControlsProvider);
+    final miniPlayerControlsLabels = {
+      MiniPlayerControls.playOnly: l10n.settingsMiniPlayerControlsPlayOnly,
+      MiniPlayerControls.prevNext: l10n.settingsMiniPlayerControlsPrevNext,
+      MiniPlayerControls.prevNextMode:
+          l10n.settingsMiniPlayerControlsPrevNextMode,
+    };
     final autoEnterLyrics = ref.watch(autoEnterLyricsOnLaunchProvider);
     final lyricInTitle = ref.watch(notificationLyricInTitleProvider);
     final desktopLyricEnabled = ref.watch(desktopLyricEnabledProvider);
@@ -506,6 +515,50 @@ class _SettingsCategoryContentState
             value: autoPlayOnLaunch,
             onChanged: (v) {
               ref.read(autoPlayOnLaunchProvider.notifier).setEnabled(v);
+            },
+          ),
+          const Divider(height: 1),
+          // 底部播放条显示哪些按钮（纯本地设置，songloft-org/songloft-player#25）
+          ListTile(
+            leading: const Icon(Icons.skip_next_outlined),
+            title: Text(l10n.settingsMiniPlayerControlsTitle),
+            subtitle: Text(
+              miniPlayerControlsLabels[miniPlayerControls] ??
+                  l10n.settingsMiniPlayerControlsPrevNext,
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final picked = await showDialog<MiniPlayerControls>(
+                context: context,
+                builder:
+                    (ctx) => SimpleDialog(
+                      title: Text(l10n.settingsMiniPlayerControlsDialogTitle),
+                      children: [
+                        RadioGroup<MiniPlayerControls>(
+                          groupValue: miniPlayerControls,
+                          onChanged: (v) => Navigator.pop(ctx, v),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children:
+                                MiniPlayerControls.values
+                                    .map(
+                                      (mode) => RadioListTile<MiniPlayerControls>(
+                                        title: Text(
+                                          miniPlayerControlsLabels[mode] ?? '',
+                                        ),
+                                        value: mode,
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+              );
+              if (picked == null) return;
+              ref
+                  .read(miniPlayerControlsProvider.notifier)
+                  .setControls(picked);
             },
           ),
           const Divider(height: 1),

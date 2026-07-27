@@ -3141,6 +3141,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAutoPlayOnLaunchDesc => '启动客户端后自动继续上次的播放';
 
   @override
+  String get settingsMiniPlayerControlsTitle => '底部播放条按钮';
+
+  @override
+  String get settingsMiniPlayerControlsDesc => '手机底部播放条上显示哪些控制按钮';
+
+  @override
+  String get settingsMiniPlayerControlsDialogTitle => '选择显示的按钮';
+
+  @override
+  String get settingsMiniPlayerControlsPlayOnly => '仅播放/暂停';
+
+  @override
+  String get settingsMiniPlayerControlsPrevNext => '上一首 / 下一首';
+
+  @override
+  String get settingsMiniPlayerControlsPrevNextMode => '上一首 / 下一首 + 播放模式';
+
+  @override
   String get settingsAutoEnterLyricsOnLaunchTitle => '打开后自动进入歌词';
 
   @override
