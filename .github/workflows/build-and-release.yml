@@ -318,6 +318,15 @@ jobs:
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > $RUNNER_TEMP/release.jks
             echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> $GITHUB_ENV
           fi
+      # 原生契约哈希:pub get 后、build 前计算并写 asset;同一 dart 值稍后写进 manifest。
+      # 标准版无内嵌后端 → 不传 --export-surface,go 哈希留空。
+      - name: Compute native contract hash (bake asset)
+        run: |
+          HASHES=$(./scripts/compute_native_contract.sh \
+            --write-asset android/app/src/main/assets/native_contract.json)
+          echo "native_contract.json = $HASHES"
+          DART_CONTRACT_HASH=$(printf '%s' "$HASHES" | sed -n 's/.*"dart":"\([a-f0-9]*\)".*/\1/p')
+          echo "DART_CONTRACT_HASH=$DART_CONTRACT_HASH" >> "$GITHUB_ENV"
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -374,6 +383,7 @@ jobs:
               "semanticVersion": "${SEMVER}",
               "gitCommit": "${GIT_COMMIT}",
               "flutterBinding": "${FLUTTER_BINDING}",
+              "contractHash": "${DART_CONTRACT_HASH}",
               "targetVersionCode": ${ABI_VC},
               "patchUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/patch-${abi}.zip",
               "md5": "${ZIP_MD5}"

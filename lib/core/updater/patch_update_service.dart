@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_patcher/flutter_patcher.dart';
 
 import '../../config/app_config.dart';
+import '../backend/native_contract_service.dart';
 import '../utils/platform_utils.dart';
 import 'channel_release_resolver.dart';
 import 'version_compare.dart';
@@ -92,6 +93,8 @@ class PatchUpdateService {
           (patch['gitCommit'] ?? patch['git_commit'] ?? '') as String;
       final manifestBinding =
           (patch['flutterBinding'] ?? patch['flutter_binding'] ?? '') as String;
+      final manifestContractHash =
+          (patch['contractHash'] ?? patch['contract_hash'] ?? '') as String;
       final hasSemver =
           patch.containsKey('semanticVersion') ||
           patch.containsKey('semantic_version');
@@ -129,6 +132,20 @@ class PatchUpdateService {
         debugPrint(
           '[Patcher] checkPatch: flutterBinding 不匹配(manifest=$manifestBinding, '
           'app=$appBinding),不热更 → 整包',
+        );
+        return null;
+      }
+
+      // 原生契约哈希闸:热更换 libapp.so(全部 Dart),但 Kotlin 插件/自定义 channel 随旧
+      // APK 冻结。若补丁的 Dart 调用了旧原生层没有的 MethodChannel 方法 → 运行时崩。
+      // 设备侧哈希取自不被热更的 Kotlin(com.songloft/contract),与 manifest 的 dart 哈希
+      // 比对,不等即不热更 → 整包。两端任一为空(老宿主/本地开发/老式 manifest)→ 视为
+      // 未知,不拦截(降级),同 flutterBinding 闸。见 docs/cn/backend_hotupdate.md。
+      final deviceContractHash = await NativeContractService.dartHash();
+      if (contractHashBlocks(manifestContractHash, deviceContractHash)) {
+        debugPrint(
+          '[Patcher] checkPatch: 原生契约哈希不匹配(manifest=$manifestContractHash, '
+          'device=$deviceContractHash),不热更 → 整包',
         );
         return null;
       }

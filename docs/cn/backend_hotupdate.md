@@ -13,6 +13,20 @@
   - **后端 libgojni.so**:兼容边界是 gomobile 导出面(`mobile/export_surface.txt` + `release.yml` 导出面守卫,自动)。**去掉 versionCode**,靠「导出面冻结 + 崩溃回滚黑名单」保证任意老包热更到最新。
 - **比较规则**:dev 比 **git commit hash**;stable 比**版本号**(semver,`lib/core/updater/version_compare.dart`)。已应用同补丁(`flutter_patcher.currentVersion == patchLabel` / 后端 confirmed)跳过。
 
+## 原生契约哈希闸(Dart↔原生 / Go 导出面运行时校验)
+
+热更只换 native .so,**Kotlin/Java 永不热更**(只随整包 APK 走)。versionCode 与 `flutterBinding` 两闸抓不到 **Dart↔原生 MethodChannel 契约漂移**:若某次发版给某 `com.songloft/*` channel 加了方法(Kotlin 加 + Dart 调),既不动引擎也不动 versionCode → 现有闸全放行 → 老包热更到新 `libapp.so`,但设备旧 Kotlin 没这方法 → 运行时 `MissingPluginException`。dev 渠道尤甚:只有一个滚动 release,git commit 每次都不同,无法据此区分「正常新版本」与「契约不兼容版本」。标准版无后端桥但同样热更 `libapp.so`,风险面更大(自定义 channel + 大量原生插件)。
+
+**唯一能忠实反映「本地 APK 原生层支持什么」的信号只能运行时从不被热更的 Kotlin 读取**(Dart/Go 侧常量都会被补丁覆盖)。为此引入原生契约哈希闸:
+
+- **两个哈希**,由原生 channel `com.songloft/contract` 的 `getHash` 一次返回 `{"dart","go"}`:
+  - `dart` = Dart↔原生契约 = {所有 `com.songloft/*` channel 名 + 方法名集合 + `GeneratedPluginRegistrant` 插件集 + `.flutter-plugins-dependencies` 里 android 原生插件 name+version}。门控**前端 libapp.so**(标准版 + bundle 都用)。
+  - `go` = `sha256(mobile/export_surface.txt)`。门控**后端 libgojni.so**(仅 bundle),补上「老 APK Kotlin vs 新 libgojni 运行时错配」——这是 CI 导出面冻结守卫看不到的维度。
+- **值的来源**:CI 用 `scripts/compute_native_contract.sh`(确定性)在 `flutter build apk` 前算出,同时写进 APK asset `android/app/src/main/assets/native_contract.json`(Kotlin 读它返回)与热更 manifest(`patch.contractHash` / `backend.contractHash`),**同源同值**。
+- **比对**:`checkPatch` 里 `contractHashBlocks(manifestHash, deviceHash)`——两端非空且不同 → 返回 null(落整包)。**任一为空**(老宿主无此 channel / 本地开发无 asset / 老式 manifest 无字段)→ 视为未知、**不拦截**(降级),同 `flutterBinding` 闸。
+- **iOS 不参与**:热更 Android-only,`NativeContractService` 的 `_isAndroid` 守卫使 iOS 永不触发。
+- **残余风险(诚实)**:Kotlin 方法集为启发式解析(`call.method == "x"` / `when` 分支 `"x" ->`),动态拼接的方法名可能漏掉;插件「同版本号但内部原生实现变化」也不捕获。宁滥勿缺(误触发只是多走整包=安全侧),换来零手维护清单。
+
 ## 能力边界(诚实)
 
 | 场景 | 前端 libapp.so | 后端 libgojni.so |
@@ -20,7 +34,8 @@
 | dev → 最新 dev | ✓(dev 共用 versionCode/引擎) | ✓ |
 | stable → 最新 stable(引擎未变) | ✓(引擎键相同,跨 versionCode) | ✓(无 versionCode) |
 | stable 且 Flutter 引擎升级 | ✗ → 走整包 APK(本就是新引擎新包) | ✓(与 gomobile 导出面无关) |
-| 改了 mobile.go 导出面 / 加原生插件 | ✗ 整包 | ✗ 整包(导出面守卫拦截) |
+| 改了 `com.songloft/*` channel 方法集 / 增删原生插件 | ✗ 整包(dart 契约哈希不匹配) | —— |
+| 改了 mobile.go 导出面 | ✗ 整包(前端不受影响则仍可热更) | ✗ 整包(导出面守卫 + go 契约哈希双拦) |
 
 - 仅 Android;仅 Bundle 版(`hasEmbeddedBackend`)+ local 模式后端在运行时才检查后端补丁。iOS 静态 xcframework + Apple 政策 → 不支持。
 
@@ -54,6 +69,7 @@
 
 - 每次发版自动带补丁,无需额外操作;**导出面守卫**(`go doc ./mobile` 比对 `mobile/export_surface.txt`)在 `release.yml` 里,导出面漂移即 fail(须整包)。
 - 改 Flutter 版本 → 前端老包自动走整包(引擎键不匹配);改 mobile.go 导出面 / 加原生插件 → 整包。
+- **原生契约哈希全自动**:`scripts/compute_native_contract.sh` 每次构建重算 asset + manifest,无需手维护版本号或清单。改 `com.songloft/*` channel 方法集 / 增删原生插件 → dart 哈希自动变,老包读到不匹配自动走整包;导出面变 → go 哈希自动变。**无需 bump 任何常量**。
 
 ## 验证
 

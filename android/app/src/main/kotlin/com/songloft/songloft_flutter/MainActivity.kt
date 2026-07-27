@@ -12,6 +12,13 @@ import com.ryanheise.audioservice.AudioServiceActivity
 class MainActivity : AudioServiceActivity() {
     companion object {
         private const val CHANNEL = "com.songloft/tv_detector"
+
+        // 原生契约哈希闸（见 docs/cn/backend_hotupdate.md「原生契约哈希闸」）。
+        // asset 由 CI 用 scripts/compute_native_contract.sh 在打包前生成，内容形如
+        // {"dart":"<sha>","go":"<sha>"}。热更客户端运行时读它与 manifest 比对，
+        // 不等即拒绝热更（落整包）。本地开发无此 asset → 返回空串 → 客户端降级不拦截。
+        private const val CONTRACT_CHANNEL = "com.songloft/contract"
+        private const val CONTRACT_ASSET = "native_contract.json"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,6 +33,20 @@ class MainActivity : AudioServiceActivity() {
                 val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
                 val isTv = uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
                 result.success(isTv)
+            } else {
+                result.notImplemented()
+            }
+        }
+
+        // 原生契约哈希：读打包进 APK 的 asset 原文返回（缺失/异常 → 空串，客户端降级不拦截）
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CONTRACT_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "getHash") {
+                val json = try {
+                    applicationContext.assets.open(CONTRACT_ASSET).bufferedReader().use { it.readText() }.trim()
+                } catch (e: Exception) {
+                    ""
+                }
+                result.success(json)
             } else {
                 result.notImplemented()
             }

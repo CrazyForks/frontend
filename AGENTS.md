@@ -183,6 +183,7 @@ Bundle 版通过 `--dart-define=HAS_BACKEND=true` 注入（`AppConfig.hasEmbedde
 - **无基线 + 自动发布**:客户端查**本渠道最新**（dev→`dev` tag;stable→`/releases/latest`,`channel_release_resolver.dart`）；`release.yml` 的 `build-bundled-android` 每次发版**自动**产出并上传前端 `patch-<abi>.zip`+`manifest`、后端 `libgojni-<abi>.so`+`backend-manifest`（无手动 workflow）。
 - **合并为一次体验**:`PatchUpdateDialog.maybeShow`（`lib/core/updater/`）每会话并行检查两类补丁,一个对话框列出、一起下载、**只重启一次**（`EmbeddedBackendService.restartProcess` 真进程冷启 —— libapp.so 生效 + `SongloftApplication` 预加载 libgojni.so）。
 - **兼容键取代 versionCode**（自动、非手改）:前端用 **Flutter 引擎版本**（`AppConfig.flutterBinding` = CI `FLUTTER_VERSION`,manifest 带 `flutterBinding`;相同即兼容并 `targetVersionCode=null` 跨 versionCode 放行,不同→整包）;后端用**导出面冻结**（`mobile/export_surface.txt` + `release.yml` 守卫）,无 versionCode。
+- **原生契约哈希闸**（Dart↔原生 MethodChannel / Go 导出面运行时校验,拦「热更 Dart 调旧 APK 不存在的原生方法」）:原生 channel `com.songloft/contract` 的 `getHash` 返回 `{dart,go}`（值由 CI `scripts/compute_native_contract.sh` 构建期算出、同时烧进 APK asset 与 manifest `contractHash`）。`checkPatch` 用 `contractHashBlocks` 比对,不等落整包,任一空则降级不拦。全自动无需 bump 常量。标准版 + bundle 通用（iOS 不参与）。见 `docs/cn/backend_hotupdate.md`。
 - 比较分渠道:**dev 比 git commit hash、stable 比版本号**（`version_compare.dart`）;崩溃回滚由原生 `BackendPatchManager`（pending→confirmed + 黑名单）负责。
 - 标准版（非 bundle）也无基线:本仓库 `build-and-release.yml` 的 `build-android` 每次发版自动产出前端 `patch-<abi>.zip`+`manifest`（无后端）；手动 `patch-release.yml` 已删。前端跨版本靠**恒定 versionCode**（pubspec `+N` 不 bump）+ 引擎键(`flutterBinding`)兜底,非手挑基线。客户端对老式 manifest 向后兼容。
 

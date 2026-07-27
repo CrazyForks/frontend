@@ -13,6 +13,20 @@ This doc describes songloft-player's **self-hosted Android hot update** in Bundl
   - **Backend libgojni.so**: the boundary is the gomobile export surface (`mobile/export_surface.txt` + the `release.yml` guard, automatic). **versionCode dropped**; safety comes from "frozen export surface + crash rollback/blacklist", so any old build updates to the latest.
 - **Comparison**: dev by **git commit hash**; stable by **version number** (semver, `lib/core/updater/version_compare.dart`). Already-applied (`flutter_patcher.currentVersion == patchLabel` / backend confirmed) is skipped.
 
+## Native contract hash gate (runtime Dart↔native / Go export-surface check)
+
+Hot update only swaps the native .so; **Kotlin/Java is never hot-updated** (it ships only with the full APK). The versionCode and `flutterBinding` gates cannot catch **Dart↔native MethodChannel contract drift**: if a release adds a method to some `com.songloft/*` channel (Kotlin side + Dart call) without touching the engine or versionCode, both existing gates pass → an old build hot-patches to the new `libapp.so`, but the device's old Kotlin lacks that method → runtime `MissingPluginException`. This is worst on the dev channel: a single rolling release, and git commit differs every time, so it cannot distinguish "a normal new version" from "a contract-incompatible one". The standard build has no backend bridge yet still hot-patches `libapp.so`, so its exposure is even larger (custom channels + many native plugins).
+
+**The only signal that faithfully reflects "what the installed APK's native layer supports" must be read at runtime from the never-hot-updated Kotlin** (any Dart/Go constant gets overwritten by the patch). Hence the native contract hash gate:
+
+- **Two hashes**, returned together by the native channel `com.songloft/contract`'s `getHash` as `{"dart","go"}`:
+  - `dart` = the Dart↔native contract = {all `com.songloft/*` channel names + method-name set + the `GeneratedPluginRegistrant` plugin set + android native plugin name+version from `.flutter-plugins-dependencies`}. Gates the **frontend libapp.so** (both standard and bundle).
+  - `go` = `sha256(mobile/export_surface.txt)`. Gates the **backend libgojni.so** (bundle only), closing the "old-APK Kotlin vs new libgojni runtime skew" that the CI export-surface freeze guard cannot see.
+- **Value source**: CI computes it deterministically via `scripts/compute_native_contract.sh` before `flutter build apk`, writing it both into the APK asset `android/app/src/main/assets/native_contract.json` (read back by Kotlin) and into the hot-update manifest (`patch.contractHash` / `backend.contractHash`) — **same source, same value**.
+- **Comparison**: `checkPatch` uses `contractHashBlocks(manifestHash, deviceHash)` — both non-empty and different → return null (full APK). **Either empty** (old host without the channel / local dev without the asset / legacy manifest without the field) → treated as unknown, **not blocked** (graceful degradation), same as the `flutterBinding` gate.
+- **iOS not involved**: hot update is Android-only; `NativeContractService`'s `_isAndroid` guard means iOS never triggers it.
+- **Residual risk (honest)**: the Kotlin method set is parsed heuristically (`call.method == "x"` / `when` branch `"x" ->`); dynamically-composed method names may be missed, and a plugin's "same version but changed internal native impl" is not captured. Over-inclusive by design (a false trigger only means an extra full APK = safe side), in exchange for a zero-maintenance descriptor.
+
 ## Capability boundaries (honest)
 
 | Scenario | Frontend libapp.so | Backend libgojni.so |
@@ -20,7 +34,8 @@ This doc describes songloft-player's **self-hosted Android hot update** in Bundl
 | dev → latest dev | ✓ (dev shares versionCode/engine) | ✓ |
 | stable → latest stable (engine unchanged) | ✓ (engine key equal, cross versionCode) | ✓ (no versionCode) |
 | stable with a Flutter engine upgrade | ✗ → full APK (it's a new engine/new APK anyway) | ✓ (independent of gomobile surface) |
-| mobile.go export surface changed / native plugin added | ✗ full APK | ✗ full APK (blocked by the guard) |
+| `com.songloft/*` channel method set changed / native plugin added-removed | ✗ full APK (dart contract hash mismatch) | —— |
+| mobile.go export surface changed | ✗ full APK (unaffected frontend still hot-patchable) | ✗ full APK (guard + go contract hash, both block) |
 
 - Android only; backend patch is checked only on Bundle builds (`hasEmbeddedBackend`) in local mode with the backend running. iOS static xcframework + Apple policy → unsupported.
 
@@ -54,6 +69,7 @@ State in a plain file `filesDir/backend_patch/state.json` (readable before the D
 
 - Every release ships patches automatically, no extra steps; the **export-surface guard** (`go doc ./mobile` vs `mobile/export_surface.txt`) in `release.yml` fails on drift (must go full APK).
 - Changing the Flutter version → old frontend builds auto-fall to full APK (engine key mismatch); changing mobile.go's export surface / adding native plugins → full APK.
+- **Native contract hash is fully automatic**: `scripts/compute_native_contract.sh` recomputes the asset + manifest on every build, with no hand-maintained version number or descriptor. Changing a `com.songloft/*` channel method set / adding-removing a native plugin → the dart hash changes automatically, and old builds reading a mismatch auto-fall to full APK; an export-surface change → the go hash changes automatically. **No constant needs bumping.**
 
 ## Verification
 

@@ -8,6 +8,16 @@
 /// 逻辑对齐 `FrontendVersionApi._isNewerVersion`，抽出为独立函数供前后端复用。
 library;
 
+/// 原生契约哈希闸判定：manifest 与设备两端哈希都非空且不同 → 阻断热更（返回 true，
+/// checkPatch 落整包）。任一为空（老宿主无 contract channel / 本地开发无 asset /
+/// 老式 manifest 无字段）→ 视为未知，**不阻断**（降级），语义同 flutterBinding 闸。
+/// 见 docs/cn/backend_hotupdate.md「原生契约哈希闸」。
+bool contractHashBlocks(String manifestHash, String deviceHash) {
+  return manifestHash.isNotEmpty &&
+      deviceHash.isNotEmpty &&
+      manifestHash != deviceHash;
+}
+
 /// 解析 `YYYY-MM-DD_HH:MM:SS` 形式的构建时间；空/`unknown`/非法 → null。
 DateTime? parseBuildTime(String? buildTime) {
   if (buildTime == null || buildTime.isEmpty || buildTime == 'unknown') {

@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../config/app_config.dart';
 import '../backend/embedded_backend_service.dart';
+import '../backend/native_contract_service.dart';
 import '../utils/platform_utils.dart';
 import 'channel_release_resolver.dart';
 import 'patch_update_service.dart' show PatchUpdateService;
@@ -42,6 +43,10 @@ class BackendPatchInfo {
   /// .so 字节数（可选，展示用）。
   final int size;
 
+  /// 后端 Go 导出面契约哈希（`sha256(mobile/export_surface.txt)`）。空 = 未知。
+  /// 与设备 Kotlin 侧读到的 go 哈希比对,拦「老 APK Kotlin vs 新 libgojni 运行时错配」。
+  final String contractHash;
+
   const BackendPatchInfo({
     required this.patchLabel,
     required this.version,
@@ -51,6 +56,7 @@ class BackendPatchInfo {
     required this.soUrl,
     required this.md5,
     this.size = 0,
+    this.contractHash = '',
   });
 
   static BackendPatchInfo? fromManifest(Map<String, dynamic> json) {
@@ -78,6 +84,8 @@ class BackendPatchInfo {
       soUrl: soUrl,
       md5: (m['md5'] ?? '') as String,
       size: (m['size'] as num?)?.toInt() ?? 0,
+      contractHash:
+          (m['contractHash'] ?? m['contract_hash'] ?? '') as String,
     );
   }
 }
@@ -185,6 +193,19 @@ class BackendPatchService {
         debugPrint(
           '[BackendPatch] checkPatch: ABI 不匹配(manifest=${info.abi}, '
           'device=$abi),跳过',
+        );
+        return null;
+      }
+
+      // 原生契约哈希闸（go 导出面）:换 libgojni.so 后,旧 APK 的 Kotlin 仍按旧导出面
+      // 调用 gomobile 符号(Start/Stop/...)。导出面漂移会让老 Kotlin 调用崩。设备侧 go
+      // 哈希取自不被热更的 Kotlin(com.songloft/contract),与 manifest 的 go 哈希比对,
+      // 不等即不热更。任一为空(老宿主/老式 manifest)→ 未知,不拦截(降级)。
+      final deviceContractHash = await NativeContractService.goHash();
+      if (contractHashBlocks(info.contractHash, deviceContractHash)) {
+        debugPrint(
+          '[BackendPatch] checkPatch: 原生契约哈希不匹配(manifest=${info.contractHash}, '
+          'device=$deviceContractHash),不热更 → 整包',
         );
         return null;
       }
