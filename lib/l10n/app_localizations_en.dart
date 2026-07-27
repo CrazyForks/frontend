@@ -3831,6 +3831,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsFrontendUpgradeGoDownload => 'Go to download';
 
   @override
+  String get settingsFrontendUpgradeDownloadFull => 'Download full installer';
+
+  @override
+  String get settingsFrontendUpgradeReinstallHint =>
+      'If the app misbehaves after a hot update, download the full installer and reinstall over it';
+
+  @override
   String get settingsConfigTitle => 'Configuration';
 
   @override

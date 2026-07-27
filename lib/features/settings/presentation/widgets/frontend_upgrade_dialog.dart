@@ -265,6 +265,15 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
               ),
               style: theme.textTheme.bodySmall,
             ),
+            const SizedBox(height: 12),
+            // 热更后行为异常时的退路：即便版本已是最新，也允许去下完整安装包覆盖安装。
+            Text(
+              l10n.settingsFrontendUpgradeReinstallHint,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       );
@@ -367,13 +376,15 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  /// 打开发布页。检查失败（[_checkResult] 为空）时回退到当前渠道的发布页常量，
+  /// 保证 GitHub API 不可达时用户仍有下载完整安装包的退路。
   Future<void> _launchReleaseUrl() async {
-    if (_checkResult == null) return;
     final proxy = _effectiveProxy;
+    final releaseUrl = _checkResult?.releaseUrl ?? '';
     final rawUrl =
-        _checkResult!.releaseUrl.isNotEmpty
-            ? _checkResult!.releaseUrl
-            : AppConfig.frontendUpdateReleasesUrl;
+        releaseUrl.isNotEmpty
+            ? releaseUrl
+            : AppConfig.frontendUpdateChannelReleaseUrl;
     final url = Uri.parse(FrontendVersionApi.applyProxy(rawUrl, proxy));
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -411,6 +422,7 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
           ),
           child: Text(l10n.settingsFrontendUpgradeClose),
         ),
+        _buildDownloadFullButton(l10n),
         FilledButton(
           onPressed: _checkUpdate,
           style: FilledButton.styleFrom(
@@ -458,6 +470,7 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
           ),
           child: Text(l10n.settingsFrontendUpgradeClose),
         ),
+        _buildDownloadFullButton(l10n),
         if (_proxyChanged)
           FilledButton(
             onPressed: _checkUpdate,
@@ -470,5 +483,18 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
     }
 
     return [];
+  }
+
+  /// 「下载完整安装包」：已是最新 / 检查失败时的退路，用于热更异常后覆盖安装。
+  /// 次要按钮层级，不抢「重新检查」的主按钮位。
+  Widget _buildDownloadFullButton(AppLocalizations l10n) {
+    return OutlinedButton.icon(
+      onPressed: _launchReleaseUrl,
+      style: OutlinedButton.styleFrom(
+        minimumSize: context.responsiveButtonMinSize,
+      ),
+      icon: const Icon(Icons.open_in_new, size: 18),
+      label: Text(l10n.settingsFrontendUpgradeDownloadFull),
+    );
   }
 }

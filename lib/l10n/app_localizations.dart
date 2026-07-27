@@ -6631,6 +6631,18 @@ abstract class AppLocalizations {
   /// **'前往下载'**
   String get settingsFrontendUpgradeGoDownload;
 
+  /// No description provided for @settingsFrontendUpgradeDownloadFull.
+  ///
+  /// In zh, this message translates to:
+  /// **'下载完整安装包'**
+  String get settingsFrontendUpgradeDownloadFull;
+
+  /// No description provided for @settingsFrontendUpgradeReinstallHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'客户端热更后如出现异常，可下载完整安装包覆盖安装'**
+  String get settingsFrontendUpgradeReinstallHint;
+
   /// No description provided for @settingsConfigTitle.
   ///
   /// In zh, this message translates to:

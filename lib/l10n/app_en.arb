@@ -2312,6 +2312,8 @@
   "settingsFrontendUpgradeClose": "Close",
   "settingsFrontendUpgradeLater": "Later",
   "settingsFrontendUpgradeGoDownload": "Go to download",
+  "settingsFrontendUpgradeDownloadFull": "Download full installer",
+  "settingsFrontendUpgradeReinstallHint": "If the app misbehaves after a hot update, download the full installer and reinstall over it",
   "settingsConfigTitle": "Configuration",
   "settingsConfigSubtitle": "Manage system configuration items",
   "settingsConfigAdd": "Add config",

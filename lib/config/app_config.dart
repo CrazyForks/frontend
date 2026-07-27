@@ -122,6 +122,17 @@ class AppConfig {
   static const String frontendUpdateReleasesUrl =
       'https://github.com/$frontendUpdateRepo/releases/latest';
 
+  /// 当前客户端是否 dev 渠道（本地开发默认也是 dev）
+  static const bool isFrontendDev = frontendVersion == 'dev';
+
+  /// 「客户端更新」流程使用的**当前渠道**发布页：
+  /// dev 渠道 → releases/tag/dev（dev 产物只挂在该 tag 下）；正式渠道 → releases/latest。
+  /// 仓库跟随 frontendUpdateRepo，故 bundle 版 / 标准版自动分流。
+  static const String frontendUpdateChannelReleaseUrl =
+      isFrontendDev
+          ? 'https://github.com/$frontendUpdateRepo/releases/tag/dev'
+          : frontendUpdateReleasesUrl;
+
   /// 格式化前端版本号用于显示
   /// 'dev' -> '开发版本 (abc1234)', '1.0.14' -> 'v1.0.14'
   static String get frontendVersionDisplay {

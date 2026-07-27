@@ -3670,6 +3670,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsFrontendUpgradeGoDownload => '前往下载';
 
   @override
+  String get settingsFrontendUpgradeDownloadFull => '下载完整安装包';
+
+  @override
+  String get settingsFrontendUpgradeReinstallHint => '客户端热更后如出现异常，可下载完整安装包覆盖安装';
+
+  @override
   String get settingsConfigTitle => '配置管理';
 
   @override

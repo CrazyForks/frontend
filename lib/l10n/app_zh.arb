@@ -2417,6 +2417,8 @@
   "settingsFrontendUpgradeClose": "关闭",
   "settingsFrontendUpgradeLater": "稍后",
   "settingsFrontendUpgradeGoDownload": "前往下载",
+  "settingsFrontendUpgradeDownloadFull": "下载完整安装包",
+  "settingsFrontendUpgradeReinstallHint": "客户端热更后如出现异常，可下载完整安装包覆盖安装",
   "settingsConfigTitle": "配置管理",
   "settingsConfigSubtitle": "管理系统配置项",
   "settingsConfigAdd": "添加配置",
