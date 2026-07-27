@@ -39,6 +39,26 @@
 
 - 仅 Android;仅 Bundle 版(`hasEmbeddedBackend`)+ local 模式后端在运行时才检查后端补丁。iOS 静态 xcframework + Apple 政策 → 不支持。
 
+### Kotlin 层冻结策略
+
+`classes.dex`（Kotlin/Java 代码）不可热更，但可通过**冻结 Kotlin 方法接口**让契约哈希保持不变，使日常迭代不阻断 `libapp.so` 热更。策略：
+
+1. **参数扩展优先**：新样式/行为走现有方法（`show`/`updateConfig`）的参数 Map 加 key，Kotlin 侧 `call.argument` 缺失时取默认值。方法名集合不变 → 哈希不变。
+2. **`exec` 逃逸方法**：`FloatingLyricPlugin` 预埋 `exec` 方法，新原生能力通过 `exec` + `cmd` 参数实现。**关键**：子命令分发用 `if/else`（不用 `when`），因为 `compute_native_contract.sh` 的 grep 会捕获 `"x" ->` 模式但不捕获 `cmd == "x"` 比较。Dart 侧 `exec` 返回 null 表示当前 APK 不支持（优雅降级，不崩溃）。
+3. **纯 Dart 插件优先**：增删带原生代码的 Flutter 插件会改变 `GeneratedPluginRegistrant` → 哈希变。能用 Dart 实现则不引入原生插件。
+
+冻结后的能力边界变化：
+
+| 场景 | 是否可热更 |
+|------|-----------|
+| FloatingLyric 新样式参数（字号/颜色/对齐） | ✓ 走 `updateConfig` 参数 Map |
+| FloatingLyric 新原生能力（exec 子命令） | ✓ APK 含该子命令时生效，不含时降级 |
+| 新增 Kotlin→Dart 反向回调 | ✓ `channel.invokeMethod` 不被哈希脚本捕获 |
+| Widget 新数据字段 | ✓ SharedPreferences key 不影响哈希 |
+| 增删带原生代码的 Flutter 插件 | ✗ 仍需整包 |
+
+详见 `songloft-player/AGENTS.md`「Kotlin 层冻结规则」。
+
 ## 可行性根基(原生机制)
 
 - `libgojni.so` 由 gomobile 的 `go.Seq` 静态块 `System.loadLibrary("gojni")` 在首次触碰任意 `mobile.*` 类时懒加载。

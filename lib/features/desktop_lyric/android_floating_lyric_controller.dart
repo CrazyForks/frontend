@@ -107,6 +107,19 @@ class AndroidFloatingLyricController {
     );
   }
 
+  /// 通用扩展入口（对应 Kotlin 侧 `FloatingLyricPlugin.handleExec`）。
+  /// 返回 null 表示当前 APK 不支持该子命令（优雅降级）。
+  Future<T?> exec<T>(String cmd, [Map<String, dynamic>? params]) async {
+    try {
+      return await floatingLyricChannel.invokeMethod<T>('exec', {
+        'cmd': cmd,
+        if (params != null) ...params,
+      });
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'onPositionChanged':

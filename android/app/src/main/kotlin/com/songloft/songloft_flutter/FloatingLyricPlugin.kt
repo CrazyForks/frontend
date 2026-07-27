@@ -78,8 +78,17 @@ class FloatingLyricPlugin(private val context: Context, flutterEngine: FlutterEn
                 result.success(null)
             }
             "isShowing" -> result.success(container != null)
+            "exec" -> handleExec(call, result)
             else -> result.notImplemented()
         }
+    }
+
+    private fun handleExec(call: MethodCall, result: MethodChannel.Result) {
+        val cmd = call.argument<String>("cmd")
+        // if/else dispatch (NOT when) — new sub-commands here won't trigger
+        // contract hash changes because compute_native_contract.sh only captures
+        // "x" -> patterns (when branches) and call.method == "x" comparisons.
+        result.notImplemented()
     }
 
     private fun handleShow(call: MethodCall, result: MethodChannel.Result) {

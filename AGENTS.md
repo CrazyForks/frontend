@@ -187,6 +187,25 @@ Bundle 版通过 `--dart-define=HAS_BACKEND=true` 注入（`AppConfig.hasEmbedde
 - 比较分渠道:**dev 比 git commit hash、stable 比版本号**（`version_compare.dart`）;崩溃回滚由原生 `BackendPatchManager`（pending→confirmed + 黑名单）负责。
 - 标准版（非 bundle）也无基线:本仓库 `build-and-release.yml` 的 `build-android` 每次发版自动产出前端 `patch-<abi>.zip`+`manifest`（无后端）；手动 `patch-release.yml` 已删。前端跨版本靠**恒定 versionCode**（pubspec `+N` 不 bump）+ 引擎键(`flutterBinding`)兜底,非手挑基线。客户端对老式 manifest 向后兼容。
 
+### Kotlin 层冻结规则（Android 热更安全边界）
+
+目的：让 `compute_native_contract.sh` 产出的 dart 契约哈希在日常迭代中**保持不变**，避免 `libapp.so` 热更被阻断、用户被迫跳设置页下整包 APK。非 Bundle 版没有 Go 后端可下沉，此规则尤为关键。
+
+**硬规则：**
+
+1. **禁止新增 MethodChannel 方法名** —— 不得在 Kotlin `when(call.method)` 中加新分支。契约哈希脚本用 `grep` 提取 `call.method == "x"` 和 `"x" ->` 模式，新增即变哈希。
+2. **扩展已有方法的参数 Map** —— 需要新的配置/样式/行为参数时，往现有方法（`show` / `updateConfig`）的参数 Map 里加 key。Kotlin 侧用 `call.argument<T>("newKey")` 读取，缺失时取默认值（向后兼容）。这不改变方法名集合 → 哈希不变。
+3. **用 `exec` 逃逸方法扩展不可参数化的新能力** —— `FloatingLyricPlugin` 已预埋 `exec` 方法。新原生能力（如查询窗口边界、新交互模式）通过 `exec` + `cmd` 参数实现。**子命令分发必须用 `if/else`，禁止用 `when`**（`"x" ->` 会被哈希脚本捕获）。Dart 侧调 `exec` 返回 null 表示当前 APK 不支持（优雅降级）。
+4. **优先选纯 Dart 实现的 Flutter 插件** —— 增删带原生代码的 Flutter 插件会改变 `GeneratedPluginRegistrant` → 哈希变。能用 Dart 实现就不引入原生插件。
+5. **必须改 Kotlin 时视为「整包发版」事件** —— 在 commit message 中明确标注：`feat(android)!: add new native channel (breaks hot-update contract hash)`。
+
+**不影响哈希（无需担心）：**
+
+- Kotlin→Dart 反向回调（`channel.invokeMethod`）不被哈希脚本捕获，可自由新增。
+- `updateConfig` / `show` 的参数 Map 新增 key 不影响哈希。
+- SharedPreferences 的 key（Widget 数据通道）不影响哈希。
+- `exec` 内部用 `if/else` 新增的子命令不影响哈希。
+
 ---
 
 ## Git 提交约定

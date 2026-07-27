@@ -39,6 +39,26 @@ Hot update only swaps the native .so; **Kotlin/Java is never hot-updated** (it s
 
 - Android only; backend patch is checked only on Bundle builds (`hasEmbeddedBackend`) in local mode with the backend running. iOS static xcframework + Apple policy → unsupported.
 
+### Kotlin layer freeze strategy
+
+`classes.dex` (Kotlin/Java code) cannot be hot-updated, but by **freezing the Kotlin method interface** the contract hash stays unchanged, so routine iterations don't block `libapp.so` hot-updates. Strategy:
+
+1. **Parameter extension first**: new styles/behavior go through existing methods' (`show`/`updateConfig`) argument Maps by adding keys. Kotlin reads via `call.argument` with default fallbacks. Method name set unchanged → hash unchanged.
+2. **`exec` escape method**: `FloatingLyricPlugin` has a pre-planted `exec` method. New native capabilities use `exec` + `cmd` parameter. **Key**: sub-command dispatch uses `if/else` (not `when`), because `compute_native_contract.sh`'s grep captures `"x" ->` patterns but not `cmd == "x"` comparisons. Dart-side `exec` returns null when the current APK doesn't support the command (graceful degradation, no crash).
+3. **Pure Dart plugins preferred**: adding/removing Flutter plugins with native code changes `GeneratedPluginRegistrant` → hash changes. Use Dart-only implementations when possible.
+
+Capability boundary changes after freeze:
+
+| Scenario | Hot-updatable? |
+|------|-----------|
+| FloatingLyric new style params (font size/color/alignment) | ✓ via `updateConfig` argument Map |
+| FloatingLyric new native capability (exec sub-command) | ✓ works when APK contains the sub-command, degrades otherwise |
+| New Kotlin→Dart reverse callbacks | ✓ `channel.invokeMethod` not captured by hash script |
+| Widget new data fields | ✓ SharedPreferences keys don't affect hash |
+| Adding/removing Flutter plugins with native code | ✗ still requires full APK |
+
+See `songloft-player/AGENTS.md` "Kotlin 层冻结规则" for enforcement details.
+
 ## Feasibility basis (native mechanism)
 
 - `libgojni.so` is lazily loaded by gomobile's `go.Seq` static block `System.loadLibrary("gojni")` on the first touch of any `mobile.*` class.
