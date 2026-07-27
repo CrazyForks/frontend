@@ -136,8 +136,12 @@ class PlaylistApi {
 
   /// 删除歌单
   /// DELETE /api/v1/playlists/{id}
-  Future<void> deletePlaylist(int id) async {
-    await dio.delete('${AppConfig.apiPrefix}/playlists/$id');
+  /// [deleteSongs] 为 true 时，一并删除仅属于本歌单的孤儿歌曲（含本地文件）。
+  Future<void> deletePlaylist(int id, {bool deleteSongs = false}) async {
+    await dio.delete(
+      '${AppConfig.apiPrefix}/playlists/$id',
+      queryParameters: deleteSongs ? {'delete_songs': 'true'} : null,
+    );
   }
 
   /// 获取歌单内歌曲
@@ -223,10 +227,14 @@ class PlaylistApi {
 
   /// 批量删除歌单
   /// POST /api/v1/playlists/batch-delete
-  Future<Map<String, dynamic>> batchDeletePlaylists(List<int> ids) async {
+  /// [deleteSongs] 为 true 时，一并删除仅属于这些歌单的孤儿歌曲（含本地文件）。
+  Future<Map<String, dynamic>> batchDeletePlaylists(
+    List<int> ids, {
+    bool deleteSongs = false,
+  }) async {
     final response = await dio.post(
       '${AppConfig.apiPrefix}/playlists/batch-delete',
-      data: {'ids': ids},
+      data: {'ids': ids, 'delete_songs': deleteSongs},
     );
     return response.data as Map<String, dynamic>;
   }

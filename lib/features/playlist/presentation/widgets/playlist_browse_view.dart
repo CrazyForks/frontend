@@ -638,30 +638,50 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
     final count = _selectedPlaylistIds.length;
     if (count == 0) return;
     final l10n = AppLocalizations.of(context);
+    var deleteSongs = false;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.playlistConfirmBatchDelete),
-        content: Text(l10n.playlistBatchDeleteConfirm(count)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.commonCancel),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(l10n.playlistConfirmBatchDelete),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.playlistBatchDeleteConfirm(count)),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: deleteSongs,
+                onChanged: (v) =>
+                    setDialogState(() => deleteSongs = v ?? false),
+                title: Text(l10n.playlistDeleteWithSongs),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.commonCancel),
             ),
-            child: Text(l10n.commonDelete),
-          ),
-        ],
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: Text(l10n.commonDelete),
+            ),
+          ],
+        ),
       ),
     );
     if (confirmed == true && mounted) {
       final deleted = await ref
           .read(playlistNotifierProvider.notifier)
-          .batchDeletePlaylists(_selectedPlaylistIds.toList());
+          .batchDeletePlaylists(
+            _selectedPlaylistIds.toList(),
+            deleteSongs: deleteSongs,
+          );
       if (mounted) {
         if (deleted > 0) {
           ResponsiveSnackBar.showSuccess(
@@ -685,30 +705,47 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
 
   Future<void> _confirmDelete(Playlist playlist) async {
     final l10n = AppLocalizations.of(context);
+    var deleteSongs = false;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.playlistConfirmDelete),
-        content: Text(l10n.playlistDeleteConfirm(playlist.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.commonCancel),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(l10n.playlistConfirmDelete),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.playlistDeleteConfirm(playlist.name)),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: deleteSongs,
+                onChanged: (v) =>
+                    setDialogState(() => deleteSongs = v ?? false),
+                title: Text(l10n.playlistDeleteWithSongs),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.commonCancel),
             ),
-            child: Text(l10n.commonDelete),
-          ),
-        ],
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: Text(l10n.commonDelete),
+            ),
+          ],
+        ),
       ),
     );
     if (confirmed == true && mounted) {
       final success = await ref
           .read(playlistNotifierProvider.notifier)
-          .deletePlaylist(playlist.id);
+          .deletePlaylist(playlist.id, deleteSongs: deleteSongs);
       if (success && mounted) {
         ResponsiveSnackBar.showSuccess(context, message: l10n.playlistDeleted);
       }

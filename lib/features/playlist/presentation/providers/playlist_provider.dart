@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../features/library/presentation/providers/songs_provider.dart';
 import '../../../../shared/models/song.dart';
 import '../../data/playlist_api.dart';
 import '../../data/playlist_repository.dart';
@@ -478,14 +479,16 @@ class PlaylistNotifier extends Notifier<AsyncValue<void>> {
     }
   }
 
-  /// 删除歌单
-  Future<bool> deletePlaylist(int id) async {
+  /// 删除歌单。[deleteSongs] 为 true 时一并删除仅属于本歌单的孤儿歌曲（含本地文件）。
+  Future<bool> deletePlaylist(int id, {bool deleteSongs = false}) async {
     state = const AsyncValue.loading();
     try {
-      await _repository.deletePlaylist(id);
+      await _repository.deletePlaylist(id, deleteSongs: deleteSongs);
       state = const AsyncValue.data(null);
       // 刷新歌单列表
       ref.invalidate(playlistListProvider);
+      // 连带删除了曲库歌曲时，刷新曲库列表以移除已删歌曲
+      if (deleteSongs) ref.invalidate(songsListProvider);
       return true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -573,14 +576,22 @@ class PlaylistNotifier extends Notifier<AsyncValue<void>> {
     }
   }
 
-  /// 批量删除歌单
-  Future<int> batchDeletePlaylists(List<int> ids) async {
+  /// 批量删除歌单。[deleteSongs] 为 true 时一并删除仅属于这些歌单的孤儿歌曲（含本地文件）。
+  Future<int> batchDeletePlaylists(
+    List<int> ids, {
+    bool deleteSongs = false,
+  }) async {
     state = const AsyncValue.loading();
     try {
-      final deleted = await _repository.batchDeletePlaylists(ids);
+      final deleted = await _repository.batchDeletePlaylists(
+        ids,
+        deleteSongs: deleteSongs,
+      );
       state = const AsyncValue.data(null);
       // 刷新歌单列表
       ref.invalidate(playlistListProvider);
+      // 连带删除了曲库歌曲时，刷新曲库列表以移除已删歌曲
+      if (deleteSongs) ref.invalidate(songsListProvider);
       return deleted;
     } catch (e, st) {
       state = AsyncValue.error(e, st);

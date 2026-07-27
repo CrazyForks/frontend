@@ -1876,6 +1876,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playlistDeleted => '歌单已删除';
 
   @override
+  String get playlistDeleteWithSongs => '同时从曲库删除歌曲（含本地文件）';
+
+  @override
   String get playlistEmpty => '歌单为空';
 
   @override

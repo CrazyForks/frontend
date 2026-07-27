@@ -1077,6 +1077,7 @@
     }
   },
   "playlistDeleted": "Playlist deleted",
+  "playlistDeleteWithSongs": "Also delete songs from library (including local files)",
   "playlistEmpty": "Playlist is empty",
   "playlistPlayFailed": "Playback failed",
   "playlistPlayingCount": "{count, plural, =1{Playing 1 song} other{Playing all {count} songs}}",

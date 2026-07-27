@@ -1182,6 +1182,7 @@
     }
   },
   "playlistDeleted": "歌单已删除",
+  "playlistDeleteWithSongs": "同时从曲库删除歌曲（含本地文件）",
   "playlistEmpty": "歌单为空",
   "playlistPlayFailed": "播放失败",
   "playlistPlayingCount": "播放全部 {count} 首歌曲",

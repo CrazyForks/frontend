@@ -1936,6 +1936,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playlistDeleted => 'Playlist deleted';
 
   @override
+  String get playlistDeleteWithSongs =>
+      'Also delete songs from library (including local files)';
+
+  @override
   String get playlistEmpty => 'Playlist is empty';
 
   @override

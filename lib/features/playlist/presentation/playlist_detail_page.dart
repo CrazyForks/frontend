@@ -1589,31 +1589,54 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
   /// 确认删除歌单
   Future<void> _confirmDelete(Playlist playlist) async {
     final l10n = AppLocalizations.of(context);
+    var deleteSongs = false;
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: Text(l10n.playlistConfirmDelete),
-            content: Text(l10n.playlistDeleteConfirm(playlist.name)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(l10n.commonCancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
+          (context) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: Text(l10n.playlistConfirmDelete),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.playlistDeleteConfirm(playlist.name)),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: deleteSongs,
+                        onChanged:
+                            (v) => setDialogState(
+                              () => deleteSongs = v ?? false,
+                            ),
+                        title: Text(l10n.playlistDeleteWithSongs),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text(l10n.commonCancel),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                      child: Text(l10n.commonDelete),
+                    ),
+                  ],
                 ),
-                child: Text(l10n.commonDelete),
-              ),
-            ],
           ),
     );
 
     if (confirmed == true && mounted) {
       final notifier = ref.read(playlistNotifierProvider.notifier);
-      final success = await notifier.deletePlaylist(playlist.id);
+      final success = await notifier.deletePlaylist(
+        playlist.id,
+        deleteSongs: deleteSongs,
+      );
 
       if (success && mounted) {
         // 安全返回：检查是否有可弹出的路由

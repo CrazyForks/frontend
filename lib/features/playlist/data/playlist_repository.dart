@@ -105,10 +105,10 @@ class PlaylistRepository {
     }
   }
 
-  /// 删除歌单
-  Future<void> deletePlaylist(int id) async {
+  /// 删除歌单。[deleteSongs] 为 true 时一并删除仅属于本歌单的孤儿歌曲（含本地文件）。
+  Future<void> deletePlaylist(int id, {bool deleteSongs = false}) async {
     try {
-      await playlistApi.deletePlaylist(id);
+      await playlistApi.deletePlaylist(id, deleteSongs: deleteSongs);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -194,10 +194,16 @@ class PlaylistRepository {
     }
   }
 
-  /// 批量删除歌单
-  Future<int> batchDeletePlaylists(List<int> ids) async {
+  /// 批量删除歌单。[deleteSongs] 为 true 时一并删除仅属于这些歌单的孤儿歌曲（含本地文件）。
+  Future<int> batchDeletePlaylists(
+    List<int> ids, {
+    bool deleteSongs = false,
+  }) async {
     try {
-      final result = await playlistApi.batchDeletePlaylists(ids);
+      final result = await playlistApi.batchDeletePlaylists(
+        ids,
+        deleteSongs: deleteSongs,
+      );
       return result['deleted'] as int? ?? 0;
     } on DioException catch (e) {
       throw _handleError(e);

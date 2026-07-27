@@ -3488,6 +3488,12 @@ abstract class AppLocalizations {
   /// **'歌单已删除'**
   String get playlistDeleted;
 
+  /// No description provided for @playlistDeleteWithSongs.
+  ///
+  /// In zh, this message translates to:
+  /// **'同时从曲库删除歌曲（含本地文件）'**
+  String get playlistDeleteWithSongs;
+
   /// No description provided for @playlistEmpty.
   ///
   /// In zh, this message translates to:
