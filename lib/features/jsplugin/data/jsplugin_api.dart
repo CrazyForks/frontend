@@ -274,6 +274,27 @@ class RegistryPluginEntry {
     this.sourceUrl,
   });
 
+  RegistryPluginEntry copyWith({
+    bool? installed,
+    String? installedVersion,
+    bool? hasUpdate,
+  }) {
+    return RegistryPluginEntry(
+      name: name,
+      entryPath: entryPath,
+      version: version,
+      description: description,
+      author: author,
+      homepage: homepage,
+      icon: icon,
+      downloadUrl: downloadUrl,
+      installed: installed ?? this.installed,
+      installedVersion: installedVersion ?? this.installedVersion,
+      hasUpdate: hasUpdate ?? this.hasUpdate,
+      sourceUrl: sourceUrl,
+    );
+  }
+
   factory RegistryPluginEntry.fromJson(Map<String, dynamic> json) {
     return RegistryPluginEntry(
       name: json['name'] as String? ?? '',

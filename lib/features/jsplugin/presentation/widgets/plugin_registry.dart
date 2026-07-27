@@ -135,6 +135,26 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
     }
   }
 
+  void _markPluginInstalled(String entryPath, String version) {
+    if (_pluginResponse == null) return;
+    final updatedPlugins = _pluginResponse!.plugins.map((p) {
+      if (p.entryPath == entryPath) {
+        return p.copyWith(
+            installed: true, installedVersion: version, hasUpdate: false);
+      }
+      return p;
+    }).toList();
+    setState(() {
+      _pluginResponse = RegistryRefreshResponse(
+        plugins: updatedPlugins,
+        total: _pluginResponse!.total,
+        page: _pluginResponse!.page,
+        pageSize: _pluginResponse!.pageSize,
+        warnings: _pluginResponse!.warnings,
+      );
+    });
+  }
+
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 500), () {
@@ -492,7 +512,8 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
                   // 「全部」模式无法确定插件来源，token 留空（私有源需切到具体源安装）
                   token: _allSources ? '' : (_selectedRegistry?.token ?? ''),
                   onInstalled: () {
-                    _refreshPlugins();
+                    _markPluginInstalled(
+                        plugins[index].entryPath, plugins[index].version);
                     ref.invalidate(jsPluginsProvider);
                   },
                 ),
