@@ -2598,6 +2598,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScanAutoCreatePlaylistsDesc => '按目录结构自动生成歌单';
 
   @override
+  String get settingsScanAutoFingerprint => '扫描后自动计算音频指纹';
+
+  @override
+  String get settingsScanAutoFingerprintDesc =>
+      '指纹仅用于重复歌曲检测和插件搜索。大音乐库开启后会长时间占用 CPU，关闭时可在「重复歌曲检测」页手动计算';
+
+  @override
   String get settingsScanLoadingConfig => '加载中...';
 
   @override
@@ -2908,6 +2915,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDuplicatePending => '待计算';
 
   @override
+  String get settingsDuplicateUncomputable => '无法计算';
+
+  @override
+  String get settingsDuplicateUncomputableHint =>
+      '这些文件没有音频轨、已损坏或计算超时，不会被自动重试。需要重试请点「重新计算全部指纹」。';
+
+  @override
   String settingsDuplicateSongCount(int count) {
     return '$count 首';
   }
@@ -2937,6 +2951,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDuplicateAutoDetect => '计算完成后将自动检测重复歌曲';
+
+  @override
+  String get settingsDuplicateStopCompute => '停止计算';
+
+  @override
+  String get settingsDuplicateStopComputeHint => '已算出的指纹会保留，未计算的歌曲下次再算';
 
   @override
   String get settingsDuplicateRecheck => '重新检测';

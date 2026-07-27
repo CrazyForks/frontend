@@ -1610,6 +1610,8 @@
   "settingsScanCancelScan": "Cancel scan",
   "settingsScanAutoCreatePlaylists": "Auto-create playlists after scan",
   "settingsScanAutoCreatePlaylistsDesc": "Auto-generate playlists by directory structure",
+  "settingsScanAutoFingerprint": "Compute audio fingerprints after scan",
+  "settingsScanAutoFingerprintDesc": "Fingerprints are only used for duplicate detection and plugin search. Enabling this on a large library keeps the CPU busy for a long time; while off, you can compute them manually on the Duplicate detection page",
   "settingsScanLoadingConfig": "Loading...",
   "settingsScanReadConfigFailed": "Failed to read config",
   "settingsScanSaveFailed": "Save failed: {error}",
@@ -1822,6 +1824,8 @@
   "settingsDuplicateLocalSongs": "Local songs",
   "settingsDuplicateComputed": "Fingerprinted",
   "settingsDuplicatePending": "Pending",
+  "settingsDuplicateUncomputable": "Cannot compute",
+  "settingsDuplicateUncomputableHint": "These files have no audio track, are corrupted, or timed out. They will not be retried automatically — use \"Recompute all fingerprints\" to try again.",
   "settingsDuplicateSongCount": "{count}",
   "@settingsDuplicateSongCount": {
     "placeholders": {
@@ -1854,6 +1858,8 @@
     }
   },
   "settingsDuplicateAutoDetect": "Duplicates will be detected automatically once computation finishes",
+  "settingsDuplicateStopCompute": "Stop computing",
+  "settingsDuplicateStopComputeHint": "Fingerprints already computed are kept; the remaining songs will be computed next time",
   "settingsDuplicateRecheck": "Recheck",
   "settingsDuplicateNoResults": "No duplicate songs found",
   "settingsDuplicateNoResultsHint": "Your music library is clean!",

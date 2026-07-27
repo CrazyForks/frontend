@@ -454,6 +454,33 @@ class SettingsApi {
     }
   }
 
+  // ---------- 扫描后自动计算音频指纹 ----------
+  // 默认关闭：指纹只服务于「重复歌曲检测」和插件歌词/封面搜索，属按需功能，
+  // 全库自动计算会在扫描完成后继续长时间占用 CPU。
+
+  Future<bool> getScanAutoFingerprint() async {
+    try {
+      final response = await dio.get(
+        '${AppConfig.apiPrefix}/settings/scan-auto-fingerprint',
+      );
+      final data = response.data as Map<String, dynamic>;
+      return data['enabled'] as bool? ?? false;
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  Future<void> setScanAutoFingerprint(bool enabled) async {
+    try {
+      await dio.put(
+        '${AppConfig.apiPrefix}/settings/scan-auto-fingerprint',
+        data: {'enabled': enabled},
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   // ---------- 歌单创建方式 ----------
 
   Future<String> getScanPlaylistMode() async {

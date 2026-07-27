@@ -144,6 +144,10 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
         _buildAutoScanTile(),
         const SizedBox(height: AppSpacing.md),
 
+        // 「扫描后自动计算音频指纹」开关（默认关闭，注意 CPU 开销）
+        _buildAutoFingerprintTile(),
+        const SizedBox(height: AppSpacing.md),
+
         // 排除目录设置（可展开/折叠）
         Card(
           elevation: 0,
@@ -523,6 +527,56 @@ class _ScanManagerState extends ConsumerState<ScanManager> {
                   try {
                     await ref
                         .read(autoCreatePlaylistsProvider.notifier)
+                        .setValue(value);
+                  } catch (e) {
+                    if (mounted) {
+                      ResponsiveSnackBar.showError(
+                        context,
+                        message: l10n.settingsScanSaveFailed('$e'),
+                      );
+                    }
+                  }
+                },
+      ),
+    );
+  }
+
+  /// 「扫描后自动计算音频指纹」总开关。
+  /// 默认关闭：指纹只用于重复歌曲检测和插件歌词/封面搜索，
+  /// 大音乐库开启后会在扫描完成之后继续长时间占用 CPU。
+  Widget _buildAutoFingerprintTile() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final asyncValue = ref.watch(scanAutoFingerprintProvider);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: SwitchListTile(
+        secondary: Icon(Icons.fingerprint, color: colorScheme.onSurfaceVariant),
+        title: Text(l10n.settingsScanAutoFingerprint),
+        subtitle: Text(
+          asyncValue.when(
+            data: (_) => l10n.settingsScanAutoFingerprintDesc,
+            loading: () => l10n.settingsScanLoadingConfig,
+            error: (_, _) => l10n.settingsScanReadConfigFailed,
+          ),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        value: asyncValue.value ?? false,
+        onChanged:
+            asyncValue.isLoading
+                ? null
+                : (value) async {
+                  try {
+                    await ref
+                        .read(scanAutoFingerprintProvider.notifier)
                         .setValue(value);
                   } catch (e) {
                     if (mounted) {

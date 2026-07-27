@@ -26,6 +26,7 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
   FingerprintProgress? _progress;
   DuplicatesResult? _duplicates;
   bool _loading = false;
+  bool _cancelling = false;
   String? _error;
   Timer? _pollTimer;
 
@@ -107,12 +108,33 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
         final progress = await api.getFingerprintProgress();
         if (!mounted) return;
         setState(() => _progress = progress);
-        if (progress.isDone) {
+        if (progress.isFinished) {
           _pollTimer?.cancel();
           _loadDuplicates();
         }
       } catch (_) {}
     });
+  }
+
+  /// 中断正在运行的指纹计算。已算出的指纹会保留，未算的下次再算。
+  Future<void> _cancelCompute() async {
+    setState(() => _cancelling = true);
+    try {
+      await ref.read(scanApiProvider).cancelFingerprintCompute();
+      if (!mounted) return;
+      _pollTimer?.cancel();
+      setState(() {
+        _cancelling = false;
+        _phase = _PagePhase.status;
+      });
+      await _loadStatus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _cancelling = false;
+        _error = '$e';
+      });
+    }
   }
 
   Future<void> _loadDuplicates() async {
@@ -333,11 +355,24 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
                       l10n.settingsDuplicateSongCount(status.computed)),
                   _statRow(l10n.settingsDuplicatePending,
                       l10n.settingsDuplicateSongCount(status.missing)),
+                  if (status.failed > 0)
+                    _statRow(l10n.settingsDuplicateUncomputable,
+                        l10n.settingsDuplicateSongCount(status.failed)),
                 ],
               ),
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
+          // 有失败项时说明它们不会被自动重试，避免用户以为卡住了
+          if (status.failed > 0) ...[
+            Text(
+              l10n.settingsDuplicateUncomputableHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           if (!status.chromaprintAvailable) ...[
             Container(
               padding: const EdgeInsets.all(12),
@@ -372,7 +407,9 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
                   : l10n.settingsDuplicateCheck),
             ),
           ),
-          if (status.chromaprintAvailable && status.computed > 0) ...[
+          // failed > 0 也要给入口：全部失败时 computed 为 0，否则用户无法重试
+          if (status.chromaprintAvailable &&
+              (status.computed > 0 || status.failed > 0)) ...[
             const SizedBox(height: AppSpacing.sm),
             SizedBox(
               width: double.infinity,
@@ -433,6 +470,23 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
         const SizedBox(height: 8),
         Text(
           l10n.settingsDuplicateAutoDetect,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        // 指纹计算是 ffmpeg 密集型任务，必须给用户随时停下的入口
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _cancelling ? null : _cancelCompute,
+            icon: const Icon(Icons.stop_circle_outlined, size: 18),
+            label: Text(l10n.settingsDuplicateStopCompute),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          l10n.settingsDuplicateStopComputeHint,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),

@@ -1715,6 +1715,8 @@
   "settingsScanCancelScan": "取消扫描",
   "settingsScanAutoCreatePlaylists": "扫描后自动创建歌单",
   "settingsScanAutoCreatePlaylistsDesc": "按目录结构自动生成歌单",
+  "settingsScanAutoFingerprint": "扫描后自动计算音频指纹",
+  "settingsScanAutoFingerprintDesc": "指纹仅用于重复歌曲检测和插件搜索。大音乐库开启后会长时间占用 CPU，关闭时可在「重复歌曲检测」页手动计算",
   "settingsScanLoadingConfig": "加载中...",
   "settingsScanReadConfigFailed": "读取配置失败",
   "settingsScanSaveFailed": "保存失败: {error}",
@@ -1927,6 +1929,8 @@
   "settingsDuplicateLocalSongs": "本地歌曲",
   "settingsDuplicateComputed": "已有指纹",
   "settingsDuplicatePending": "待计算",
+  "settingsDuplicateUncomputable": "无法计算",
+  "settingsDuplicateUncomputableHint": "这些文件没有音频轨、已损坏或计算超时，不会被自动重试。需要重试请点「重新计算全部指纹」。",
   "settingsDuplicateSongCount": "{count} 首",
   "@settingsDuplicateSongCount": {
     "placeholders": {
@@ -1959,6 +1963,8 @@
     }
   },
   "settingsDuplicateAutoDetect": "计算完成后将自动检测重复歌曲",
+  "settingsDuplicateStopCompute": "停止计算",
+  "settingsDuplicateStopComputeHint": "已算出的指纹会保留，未计算的歌曲下次再算",
   "settingsDuplicateRecheck": "重新检测",
   "settingsDuplicateNoResults": "未发现重复歌曲",
   "settingsDuplicateNoResultsHint": "音乐库很干净！",

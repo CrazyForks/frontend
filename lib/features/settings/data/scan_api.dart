@@ -176,6 +176,22 @@ class ScanApi {
     }
   }
 
+  /// 中断正在运行的指纹计算
+  ///
+  /// 指纹任务不挂在扫描的取消通道上（扫描「完成」后该通道已关闭），
+  /// 所以需要独立的取消入口。返回是否确实中断了一个在跑的任务。
+  Future<bool> cancelFingerprintCompute() async {
+    try {
+      final response = await dio.post(
+        '${AppConfig.apiPrefix}/scan/fingerprints/cancel',
+      );
+      final data = response.data as Map<String, dynamic>;
+      return data['cancelled'] as bool? ?? false;
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   /// 获取重复歌曲组
   Future<DuplicatesResult> getDuplicates() async {
     try {
@@ -196,13 +212,24 @@ class FingerprintStatus {
   final bool chromaprintAvailable;
   final int total;
   final int computed;
+
+  /// 尚未尝试过计算的数量
   final int missing;
+
+  /// 尝试过但失败的数量（无音轨 / 文件损坏 / 超时）。
+  /// 这些歌曲不会被自动重试，只有「重新计算全部」才会再试。
+  final int failed;
+
+  /// 扫描后是否自动计算指纹（默认关闭）
+  final bool autoEnabled;
 
   FingerprintStatus({
     required this.chromaprintAvailable,
     required this.total,
     required this.computed,
     required this.missing,
+    required this.failed,
+    required this.autoEnabled,
   });
 
   factory FingerprintStatus.fromJson(Map<String, dynamic> json) {
@@ -211,13 +238,15 @@ class FingerprintStatus {
       total: json['total'] as int? ?? 0,
       computed: json['computed'] as int? ?? 0,
       missing: json['missing'] as int? ?? 0,
+      failed: json['failed'] as int? ?? 0,
+      autoEnabled: json['auto_enabled'] as bool? ?? false,
     );
   }
 }
 
 /// 指纹计算进度
 class FingerprintProgress {
-  final String status; // idle, running, done
+  final String status; // idle, running, done, cancelled
   final int computed;
   final int total;
   final int failed;
@@ -241,6 +270,10 @@ class FingerprintProgress {
   bool get isRunning => status == 'running';
   bool get isDone => status == 'done';
   bool get isIdle => status == 'idle';
+  bool get isCancelled => status == 'cancelled';
+
+  /// 任务已停止（正常结束或被取消），轮询可以收尾
+  bool get isFinished => isDone || isCancelled;
   int get progress => total > 0 ? (computed * 100 ~/ total) : 0;
 }
 

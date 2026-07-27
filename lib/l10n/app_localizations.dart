@@ -4730,6 +4730,18 @@ abstract class AppLocalizations {
   /// **'按目录结构自动生成歌单'**
   String get settingsScanAutoCreatePlaylistsDesc;
 
+  /// No description provided for @settingsScanAutoFingerprint.
+  ///
+  /// In zh, this message translates to:
+  /// **'扫描后自动计算音频指纹'**
+  String get settingsScanAutoFingerprint;
+
+  /// No description provided for @settingsScanAutoFingerprintDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'指纹仅用于重复歌曲检测和插件搜索。大音乐库开启后会长时间占用 CPU，关闭时可在「重复歌曲检测」页手动计算'**
+  String get settingsScanAutoFingerprintDesc;
+
   /// No description provided for @settingsScanLoadingConfig.
   ///
   /// In zh, this message translates to:
@@ -5276,6 +5288,18 @@ abstract class AppLocalizations {
   /// **'待计算'**
   String get settingsDuplicatePending;
 
+  /// No description provided for @settingsDuplicateUncomputable.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法计算'**
+  String get settingsDuplicateUncomputable;
+
+  /// No description provided for @settingsDuplicateUncomputableHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'这些文件没有音频轨、已损坏或计算超时，不会被自动重试。需要重试请点「重新计算全部指纹」。'**
+  String get settingsDuplicateUncomputableHint;
+
   /// No description provided for @settingsDuplicateSongCount.
   ///
   /// In zh, this message translates to:
@@ -5323,6 +5347,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'计算完成后将自动检测重复歌曲'**
   String get settingsDuplicateAutoDetect;
+
+  /// No description provided for @settingsDuplicateStopCompute.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止计算'**
+  String get settingsDuplicateStopCompute;
+
+  /// No description provided for @settingsDuplicateStopComputeHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'已算出的指纹会保留，未计算的歌曲下次再算'**
+  String get settingsDuplicateStopComputeHint;
 
   /// No description provided for @settingsDuplicateRecheck.
   ///

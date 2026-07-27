@@ -411,6 +411,43 @@ final autoCreatePlaylistsProvider =
     );
 
 // ============================================================================
+// Auto-Fingerprint Provider
+// ============================================================================
+
+/// 「扫描后自动计算音频指纹」总开关 Notifier。
+/// 默认关闭：指纹只服务于「重复歌曲检测」和插件歌词/封面搜索，
+/// 全库自动计算会在扫描完成后继续长时间占用 CPU。
+/// 业务端点：GET/PUT /api/v1/settings/scan-auto-fingerprint
+class ScanAutoFingerprintNotifier extends AsyncNotifier<bool> {
+  @override
+  Future<bool> build() async {
+    final api = ref.watch(settingsApiProvider);
+    try {
+      return await api.getScanAutoFingerprint();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> setValue(bool value) async {
+    state = AsyncValue.data(value);
+    try {
+      final api = ref.read(settingsApiProvider);
+      await api.setScanAutoFingerprint(value);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+}
+
+/// 「扫描后自动计算音频指纹」Provider
+final scanAutoFingerprintProvider =
+    AsyncNotifierProvider<ScanAutoFingerprintNotifier, bool>(
+      ScanAutoFingerprintNotifier.new,
+    );
+
+// ============================================================================
 // 歌单创建方式 Provider
 // ============================================================================
 

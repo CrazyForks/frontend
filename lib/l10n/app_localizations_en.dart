@@ -2716,6 +2716,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Auto-generate playlists by directory structure';
 
   @override
+  String get settingsScanAutoFingerprint =>
+      'Compute audio fingerprints after scan';
+
+  @override
+  String get settingsScanAutoFingerprintDesc =>
+      'Fingerprints are only used for duplicate detection and plugin search. Enabling this on a large library keeps the CPU busy for a long time; while off, you can compute them manually on the Duplicate detection page';
+
+  @override
   String get settingsScanLoadingConfig => 'Loading...';
 
   @override
@@ -3039,6 +3047,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDuplicatePending => 'Pending';
 
   @override
+  String get settingsDuplicateUncomputable => 'Cannot compute';
+
+  @override
+  String get settingsDuplicateUncomputableHint =>
+      'These files have no audio track, are corrupted, or timed out. They will not be retried automatically — use \"Recompute all fingerprints\" to try again.';
+
+  @override
   String settingsDuplicateSongCount(int count) {
     return '$count';
   }
@@ -3069,6 +3084,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsDuplicateAutoDetect =>
       'Duplicates will be detected automatically once computation finishes';
+
+  @override
+  String get settingsDuplicateStopCompute => 'Stop computing';
+
+  @override
+  String get settingsDuplicateStopComputeHint =>
+      'Fingerprints already computed are kept; the remaining songs will be computed next time';
 
   @override
   String get settingsDuplicateRecheck => 'Recheck';
