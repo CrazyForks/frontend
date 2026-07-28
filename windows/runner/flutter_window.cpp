@@ -4,6 +4,8 @@
 
 #include "flutter/generated_plugin_registrant.h"
 #include "desktop_multi_window/desktop_multi_window_plugin.h"
+#include "screen_retriever_windows/screen_retriever_windows_plugin_c_api.h"
+#include "window_manager/window_manager_plugin.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -27,13 +29,30 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   // 桌面歌词悬浮窗（songloft-org/songloft#318）：desktop_multi_window 为每个新窗口
-  // 创建独立 Flutter engine，需要在这里手动为每个新 engine 也注册一遍全部插件，
-  // 否则子窗口里 window_manager / shared_preferences 等插件不可用。
+  // 创建独立 Flutter engine，插件必须按 engine 各注册一次，否则悬浮窗里调不到。
+  //
+  // 这里**只注册悬浮窗真正用到的插件**，绝对不能图省事调 RegisterPlugins() 全量注册：
+  // media_kit_video 的插件构造函数会把自己写进进程级静态 instance_，并用
+  // SetWindowLongPtr(GWLP_WNDPROC) 劫持所在窗口的消息过程，而它那个静态
+  // WindowProcDelegate 统一通过 instance_ 回落到 original_window_proc_。一旦第二个
+  // engine 也注册它，instance_ 就被改写成悬浮窗那份，**主窗口**的消息随即被转发进
+  // desktop_multi_window 自己的 window class 过程，把主窗口 GWLP_USERDATA 上的
+  // runner Win32Window* 当成插件的 Win32Window* 用——类型混淆，进程当场崩溃。
+  // 这正是「打开桌面歌词开关后程序秒退」的成因。
+  //
+  // 悬浮窗需要：window_manager（无边框/置顶/位置/点击穿透/拖动）、
+  // screen_retriever（多屏坐标）。desktop_multi_window 自身的 channel 由插件在
+  // MultiWindowManager::Create 内部注册；shared_preferences / path_provider 在
+  // Windows 上是纯 Dart 实现，都不需要在这里出现。新增悬浮窗能力时按需**单独**加，
+  // 加之前先确认该插件不会碰进程级静态状态或窗口消息过程。
   DesktopMultiWindowSetWindowCreatedCallback([](void* controller) {
     auto* flutter_view_controller =
         reinterpret_cast<flutter::FlutterViewController*>(controller);
     auto* registry = flutter_view_controller->engine();
-    RegisterPlugins(registry);
+    WindowManagerPluginRegisterWithRegistrar(
+        registry->GetRegistrarForPlugin("WindowManagerPlugin"));
+    ScreenRetrieverWindowsPluginCApiRegisterWithRegistrar(
+        registry->GetRegistrarForPlugin("ScreenRetrieverWindowsPluginCApi"));
   });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 

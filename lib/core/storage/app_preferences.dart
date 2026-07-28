@@ -381,6 +381,7 @@ class AppPreferences {
   static const _desktopLyricOpacityKey = 'desktop_lyric_opacity';
   static const _desktopLyricPosXKey = 'desktop_lyric_pos_x';
   static const _desktopLyricPosYKey = 'desktop_lyric_pos_y';
+  static const _desktopLyricOpeningKey = 'desktop_lyric_opening';
 
   /// 桌面歌词悬浮窗总开关（默认关闭，目前仅 Windows 支持，songloft-org/songloft#318）。
   /// 纯本地设置，不参与服务器偏好同步。
@@ -390,6 +391,21 @@ class AppPreferences {
 
   Future<bool> setDesktopLyricEnabled(bool value) {
     return _prefs.setBool(_desktopLyricEnabledKey, value);
+  }
+
+  /// 「正在打开悬浮窗」哨兵：open() 前置 true、返回后清 false。
+  ///
+  /// 悬浮窗要拉起独立 Flutter engine 并调一串原生窗口 API，任何一环原生崩溃都会让整个
+  /// 进程无声消失（songloft-org/songloft#318 就是 setSkipTaskbar 空指针）。开关此时已落盘
+  /// 为 true，下次进设置页又会自动 open —— 用户被锁在「进设置页必崩」里，界面上根本没
+  /// 机会关掉它。启动时读到残留的 true 说明上次没能走完 open()，据此自动关掉开关自救。
+  /// 只覆盖 open() 那一小段窗口期，窗口正常存活期间被杀进程不会误判。
+  bool getDesktopLyricOpening() {
+    return _prefs.getBool(_desktopLyricOpeningKey) ?? false;
+  }
+
+  Future<bool> setDesktopLyricOpening(bool value) {
+    return _prefs.setBool(_desktopLyricOpeningKey, value);
   }
 
   /// 桌面歌词窗口是否锁定位置（锁定后点击穿透、不可拖动，默认关闭）。

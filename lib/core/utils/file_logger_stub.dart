@@ -24,7 +24,8 @@ class FileLogger {
   static String _redact(String line) =>
       line.replaceAllMapped(_tokenPattern, (m) => '${m[1]}***');
 
-  static Future<void> init() async {}
+  /// [fileSuffix] 仅原生多 engine 分文件时有意义，Web 只有一个 engine，忽略。
+  static Future<void> init({String fileSuffix = ''}) async {}
 
   static void writeln(String line) {
     final now = DateTime.now();
@@ -52,6 +53,10 @@ class FileLogger {
     if (_buffer.isEmpty) return null;
     return utf8.encode('${_buffer.join('\n')}\n');
   }
+
+  /// Web 没有多 engine 场景（桌面歌词悬浮窗是桌面端能力），恒为 null。
+  static Future<List<int>?> readLogBytesWithSuffix(String fileSuffix) async =>
+      null;
 
   static String _pad(int n) => n.toString().padLeft(2, '0');
   static String _pad3(int n) => n.toString().padLeft(3, '0');

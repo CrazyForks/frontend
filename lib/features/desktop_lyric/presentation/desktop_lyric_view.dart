@@ -6,6 +6,7 @@ import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../core/storage/app_preferences.dart';
+import '../../../core/utils/file_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../desktop_lyric_font_size.dart';
 import '../desktop_lyric_ipc.dart';
@@ -56,23 +57,43 @@ class _DesktopLyricViewState extends State<DesktopLyricView>
     );
     _opacity = prefs.getDesktopLyricOpacity();
 
-    await windowManager.setAsFrameless();
-    await windowManager.setBackgroundColor(Colors.transparent);
-    await windowManager.setAlwaysOnTop(true);
-    await windowManager.setSkipTaskbar(true);
-    await windowManager.setHasShadow(false);
-    await windowManager.setResizable(false);
-    await windowManager.setBounds(await _computeInitialBounds());
+    // 下面每一步都是原生窗口调用。这条序列曾经在 setSkipTaskbar 上因插件内部空指针
+    // 直接把进程带走（songloft-org/songloft#318），而原生崩溃既没有 Dart 异常也来不及
+    // 刷日志缓冲——逐步打点 + flush 是唯一能在事后指认「崩在哪一步」的手段，别合并回
+    // 一串裸 await。
+    await _step('setAsFrameless', () => windowManager.setAsFrameless());
+    await _step(
+      'setBackgroundColor',
+      () => windowManager.setBackgroundColor(Colors.transparent),
+    );
+    await _step('setAlwaysOnTop', () => windowManager.setAlwaysOnTop(true));
+    await _step('setSkipTaskbar', () => windowManager.setSkipTaskbar(true));
+    await _step('setHasShadow', () => windowManager.setHasShadow(false));
+    await _step('setResizable', () => windowManager.setResizable(false));
+    final bounds = await _computeInitialBounds();
+    await _step('setBounds($bounds)', () => windowManager.setBounds(bounds));
     if (_locked) {
-      await windowManager.setIgnoreMouseEvents(true, forward: true);
+      await _step(
+        'setIgnoreMouseEvents',
+        () => windowManager.setIgnoreMouseEvents(true, forward: true),
+      );
     }
 
     await desktopLyricChannel.setMethodCallHandler(_handleMethodCall);
 
     if (mounted) setState(() {});
 
-    await windowManager.show();
+    await _step('show', () => windowManager.show());
+    debugPrint('[DesktopLyric] 悬浮窗初始化完成');
+    await FileLogger.flush();
     unawaited(desktopLyricChannel.invokeMethod(kDesktopLyricMethodReady));
+  }
+
+  /// 打点后**立即 flush** 再执行 [action]：进程若死在 action 里，日志最后一行就是崩点。
+  Future<void> _step(String name, Future<void> Function() action) async {
+    debugPrint('[DesktopLyric] → $name');
+    await FileLogger.flush();
+    await action();
   }
 
   Future<Rect> _computeInitialBounds() async {
@@ -135,6 +156,11 @@ class _DesktopLyricViewState extends State<DesktopLyricView>
         });
       case kDesktopLyricMethodClose:
         await _persistPosition();
+        // 悬浮窗的 engine 不会随窗口销毁立刻回收（desktop_multi_window 要等下一次
+        // Create 才 CleanupRemovedWindows），dispose 也就不一定跑得到。这里主动注销
+        // channel handler：bidirectional channel 只有 2 个注册名额，僵尸 engine 占着
+        // 名额会让重开的悬浮窗注册失败、彻底收不到歌词推送。
+        await desktopLyricChannel.setMethodCallHandler(null);
         await windowManager.close();
     }
     return null;

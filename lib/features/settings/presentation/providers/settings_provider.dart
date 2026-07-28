@@ -1061,7 +1061,19 @@ class DesktopLyricEnabledNotifier extends Notifier<bool> {
       final prefs = await ref.read(appPreferencesProvider.future);
       final enabled = prefs.getDesktopLyricEnabled();
       if (!enabled || !_desktopLyricSupported) {
+        if (prefs.getDesktopLyricOpening()) {
+          // 开关未落盘就崩在 open() 里的残留哨兵，顺手清掉
+          await prefs.setDesktopLyricOpening(false);
+        }
         state = enabled;
+        return;
+      }
+      if (prefs.getDesktopLyricOpening()) {
+        // 上次进程死在 open() 半途（原生崩溃）。自动关掉开关，否则每次进设置页都会
+        // 重走同一条崩溃路径，用户在界面上永远碰不到这个开关。详见 getDesktopLyricOpening。
+        await prefs.setDesktopLyricOpening(false);
+        await prefs.setDesktopLyricEnabled(false);
+        state = false;
         return;
       }
       if (!kIsWeb && Platform.isAndroid) {
@@ -1085,7 +1097,9 @@ class DesktopLyricEnabledNotifier extends Notifier<bool> {
       }
       // Windows：上次退出前是开启状态，启动时自动恢复悬浮窗
       state = true;
+      await prefs.setDesktopLyricOpening(true);
       await ref.read(desktopLyricControllerProvider).open();
+      await prefs.setDesktopLyricOpening(false);
     } catch (_) {
       state = false;
     }
@@ -1096,7 +1110,10 @@ class DesktopLyricEnabledNotifier extends Notifier<bool> {
       final prefs = await ref.read(appPreferencesProvider.future);
       if (value) {
         if (_desktopLyricSupported) {
+          // 哨兵包住 open()：崩在半途时下次启动能自愈（见 getDesktopLyricOpening）
+          await prefs.setDesktopLyricOpening(true);
           final opened = await _openDesktopLyric(ref);
+          await prefs.setDesktopLyricOpening(false);
           if (!opened) {
             // Android 用户拒绝了悬浮窗权限：开关维持关闭，不落盘
             state = false;

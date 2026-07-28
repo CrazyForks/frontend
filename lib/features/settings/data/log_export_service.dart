@@ -71,6 +71,18 @@ class LogExportService {
       debugPrint('[LogExport] 前端日志读取失败: $e');
     }
 
+    // 桌面歌词悬浮窗跑在独立 engine，日志落在同目录的 *_lyric.log（仅 Windows 有）。
+    try {
+      final lyricBytes = await FileLogger.readLogBytesWithSuffix('_lyric');
+      if (lyricBytes != null && lyricBytes.isNotEmpty) {
+        archive.addFile(
+          ArchiveFile('frontend-lyric.log', lyricBytes.length, lyricBytes),
+        );
+      }
+    } catch (e) {
+      debugPrint('[LogExport] 悬浮歌词窗口日志读取失败: $e');
+    }
+
     if (archive.isEmpty) {
       throw StateError('没有可导出的日志');
     }

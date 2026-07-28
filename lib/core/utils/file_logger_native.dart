@@ -31,7 +31,17 @@ class FileLogger {
   static String _redact(String line) =>
       line.replaceAllMapped(_tokenPattern, (m) => '${m[1]}***');
 
-  static Future<void> init() async {
+  /// 日志文件名：`songloft_<yyyy-MM-dd>[_suffix].log`，suffix 为独立 engine 的分文件后缀。
+  static final RegExp _logNamePattern = RegExp(
+    r'^songloft_(\d{4}-\d{2}-\d{2})(?:_[A-Za-z0-9]+)?\.log$',
+  );
+
+  /// 初始化日志文件。
+  ///
+  /// [fileSuffix] 用于让**独立 engine** 落到独立文件（如桌面歌词悬浮窗传 `_lyric`）。
+  /// 同进程多 engine 各有自己的 IOSink 缓冲，若共写一个文件会交叉写入把主日志搅乱，
+  /// 故按 engine 分文件；导出日志时一并打包（见 [readLogBytesWithSuffix]）。
+  static Future<void> init({String fileSuffix = ''}) async {
     try {
       final appDir = await getApplicationSupportDirectory();
       final logsDir = Directory('${appDir.path}${Platform.pathSeparator}logs');
@@ -44,7 +54,8 @@ class FileLogger {
       final dateStr =
           '${now.year}-${_pad(now.month)}-${_pad(now.day)}';
       final logFile = File(
-        '${logsDir.path}${Platform.pathSeparator}songloft_$dateStr.log',
+        '${logsDir.path}${Platform.pathSeparator}'
+        'songloft_$dateStr$fileSuffix.log',
       );
       _currentPath = logFile.path;
 
@@ -112,15 +123,32 @@ class FileLogger {
     }
   }
 
+  /// 读取同一天、由**另一个 engine** 写的日志（见 [init] 的 `fileSuffix`），供导出打包。
+  /// 该 engine 的 sink 不在本 isolate，flush 不了，只能读已落盘的部分；文件不存在返回 null。
+  static Future<List<int>?> readLogBytesWithSuffix(String fileSuffix) async {
+    final path = _currentPath;
+    if (path == null || !path.endsWith('.log')) return null;
+    try {
+      final sibling = File(
+        '${path.substring(0, path.length - 4)}$fileSuffix.log',
+      );
+      if (!sibling.existsSync()) return null;
+      return await sibling.readAsBytes();
+    } catch (e) {
+      debugPrint('[FileLogger] 读取 $fileSuffix 日志文件失败: $e');
+      return null;
+    }
+  }
+
   static void _cleanOldLogs(Directory logsDir, DateTime now) {
     try {
       final cutoff = now.subtract(const Duration(days: _maxAgeDays));
       for (final entity in logsDir.listSync()) {
         if (entity is! File) continue;
         final name = entity.uri.pathSegments.last;
-        if (!name.startsWith('songloft_') || !name.endsWith('.log')) continue;
-        final datePart = name.substring(9, name.length - 4);
-        final fileDate = DateTime.tryParse(datePart);
+        final match = _logNamePattern.firstMatch(name);
+        if (match == null) continue;
+        final fileDate = DateTime.tryParse(match.group(1)!);
         if (fileDate != null && fileDate.isBefore(cutoff)) {
           entity.deleteSync();
         }

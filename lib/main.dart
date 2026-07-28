@@ -3,7 +3,6 @@ import 'dart:ui';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_service_mpris/audio_service_mpris.dart';
-import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,12 +64,17 @@ void main(List<String> args) async {
   // 桌面歌词悬浮窗（songloft-org/songloft#318）：desktop_multi_window 为悬浮窗创建了
   // 独立的 Flutter engine，也会从这个 main() 入口重新跑一遍。这里尽早分流，跳过下面
   // 一切主窗口专属的初始化（AudioService/SMTC/Tracely/托盘/单实例检测等）。
-  if (!kIsWeb && Platform.isWindows) {
-    final windowController = await WindowController.fromCurrentEngine();
-    if (windowController.arguments == kDesktopLyricWindowArguments) {
+  //
+  // 判据用 entrypoint 参数而不是 WindowController.fromCurrentEngine()：子窗口 engine 的
+  // 参数固定是 ["multi_window", <windowId>, <arguments>]，同步可判、不依赖任何 channel
+  // 调用。fromCurrentEngine 要跨 channel 往返，一旦失败（插件未注册/时序异常）子 engine
+  // 会继续往下跑主窗口初始化——那会在同一进程里第二次跑单实例检测把整个进程带走。
+  if (!kIsWeb && Platform.isWindows && args.length >= 3 &&
+      args.first == 'multi_window') {
+    if (args[2] == kDesktopLyricWindowArguments) {
       await runDesktopLyricWindow();
-      return;
     }
+    return;
   }
 
   // 调大图片解码缓存：Flutter 默认仅 1000 张 / 100 MiB LRU。列表/网格封面在切 tab、
