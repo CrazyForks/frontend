@@ -1,12 +1,14 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb, visibleForTesting;
 import 'package:flutter/semantics.dart';
 
 import 'semantics_pointer_override.dart';
 
 /// Web 端语义树（无障碍）句柄管理。
 ///
-/// Songloft Web 端默认常驻语义树（`ensureSemantics()`，见无障碍改进
-/// songloft-org/songloft#186），让读屏器无需用户先点「Enable accessibility」。
+/// Songloft **桌面** Web 默认常驻语义树（`ensureSemantics()`，见无障碍改进
+/// songloft-org/songloft#186），让读屏器无需用户先点「Enable accessibility」；
+/// 移动端浏览器**不常驻**，否则软键盘弹不出来（见下文 songloft-player#26）。
 ///
 /// 但插件 Tab 是内嵌 iframe 的**平台视图**（HtmlElementView）。当语义树常驻时，
 /// Flutter 引擎的残留 bug（[flutter/flutter#175119]）会把语义节点卡在
@@ -33,6 +35,27 @@ import 'semantics_pointer_override.dart';
 ///
 /// 插件内容本身是独立文档、自带无障碍，故主 App 的无障碍能力不受影响。
 ///
+/// ## 移动端浏览器不常驻语义树（songloft-org/songloft-player#26）
+///
+/// **常驻语义树会让移动浏览器（尤其 iOS Safari）的软键盘无法弹出**，登录页的
+/// 用户名/密码框首当其冲。原因：引擎的 `HybridTextEditing.strategy` 是
+/// `late final`，**首次用到文本输入时**按当时的 `semanticsEnabled` 一次性定型。
+/// 启动即 `ensureSemantics()` 会把整个会话钉死在 `SemanticsTextEditingStrategy`
+/// 上，从此绕开 `IOSTextEditingStrategy` —— 后者才带着 iOS 的全部绕法（聚焦前
+/// 先移出屏外、100ms 后再定位、tap 监听），以及 iOS 26「自动填充前先 blur 输入
+/// 框」的补救（该补救只监听 `flt-text-editing-host` 的 focusin，语义模式下输入
+/// 框在 `flt-semantics-host` 里，够不着）。
+///
+/// 上游长期未修：[flutter/flutter#129324]（仍 open，3.41 可复现）、
+/// [flutter/flutter#123338]、[flutter/flutter#141975]、[flutter/flutter#154741]
+/// —— 症状均为「语义模式 + 移动浏览器 → 键盘不弹或弹起立刻收起」，且与
+/// `InputDecoration`（label/hint/suffixIcon）、滚动容器组合相关，正是登录页的形状。
+///
+/// 故 [enableByDefault] 在移动端浏览器（iOS / Android）直接跳过：Web 移动端回落
+/// 到引擎默认的按需启用路径（`MobileSemanticsEnabler` 检测读屏器的双击手势后自动
+/// 开启语义树），读屏器用户仍可用，普通用户的输入法恢复正常。桌面 Web 不受影响，
+/// 继续常驻（#186 的收益主要也在桌面读屏器）。
+///
 /// 非 Web 平台所有方法均为 no-op。
 class WebSemanticsController {
   WebSemanticsController._();
@@ -51,20 +74,37 @@ class WebSemanticsController {
   /// suspend/resume，引用计数确保仅当**所有**调用方都 resume 后才真正恢复语义。
   int _suspendCount = 0;
 
-  /// 应用启动时调用一次：Web 端默认启用（常驻）语义树。
+  /// 应用启动时调用一次：桌面 Web 默认启用（常驻）语义树。
+  ///
+  /// 移动端浏览器跳过，否则软键盘弹不出来（见类注释
+  /// songloft-org/songloft-player#26）。
   void enableByDefault() {
     if (!kIsWeb) return;
+    if (isMobileWebPlatform(defaultTargetPlatform)) return;
     _wantEnabledByDefault = true;
     _acquire();
   }
+
+  /// 当前 Web 运行环境是否为移动端浏览器。
+  ///
+  /// Web 上 `defaultTargetPlatform` 由引擎按 `navigator.platform` /
+  /// `maxTouchPoints` 推断浏览器所在系统；iPadOS 谎报 `MacIntel` 的情况引擎已处理
+  /// （`maxTouchPoints > 2` → iOS），故无需自己解析 UA。引擎把无法识别的系统归为
+  /// `android`，此处一并按移动端处理（宁可少开语义树，也不要赌输入法）。
+  @visibleForTesting
+  static bool isMobileWebPlatform(TargetPlatform platform) =>
+      platform == TargetPlatform.iOS || platform == TargetPlatform.android;
 
   /// 进入插件 Tab（iframe 平台视图激活）时调用：临时释放语义句柄，并用 CSS
   /// 覆盖禁止语义节点拦截指针事件，避免残留语义节点遮挡 iframe
   /// （songloft-org/songloft#295）。
   ///
   /// 支持嵌套：多次调用需匹配等量的 [resume] 才真正恢复。
+  ///
+  /// 不再要求 [_wantEnabledByDefault]：移动端浏览器不常驻语义树，但读屏器可能自己
+  /// 开启语义树，第二层 CSS 兜底仍需生效（[_release] 在未持句柄时本就是 no-op）。
   void suspendForPlugin() {
-    if (!kIsWeb || !_wantEnabledByDefault) return;
+    if (!kIsWeb) return;
     _suspendCount++;
     if (_suspendCount == 1) {
       _release();
@@ -72,14 +112,14 @@ class WebSemanticsController {
     }
   }
 
-  /// 离开插件 Tab 时调用：当所有 suspend 调用方都已 resume 后，恢复常驻语义树
-  /// 和指针事件。
+  /// 离开插件 Tab 时调用：当所有 suspend 调用方都已 resume 后，恢复指针事件；仅当
+  /// 本就常驻语义树（桌面 Web）时才重新获取句柄。
   void resume() {
-    if (!kIsWeb || !_wantEnabledByDefault) return;
+    if (!kIsWeb) return;
     if (_suspendCount <= 0) return;
     _suspendCount--;
     if (_suspendCount == 0) {
-      _acquire();
+      if (_wantEnabledByDefault) _acquire();
       overrideSemanticsPointerEvents(false);
     }
   }

@@ -122,9 +122,11 @@ void main(List<String> args) async {
     return true;
   };
 
-  // Web 端默认启用语义树，无需用户手动点击 "Enable accessibility"。
+  // 桌面 Web 默认启用语义树，无需用户手动点击 "Enable accessibility"。
   // 句柄交由 WebSemanticsController 持有：进入插件 Tab 时临时释放，避免 Flutter
   // 引擎残留 bug 让语义节点遮挡插件 iframe（songloft-org/songloft#295）。
+  // 移动端浏览器（iOS/Android）内部跳过：常驻语义树会让引擎把文本输入钉死在
+  // SemanticsTextEditingStrategy 上，iOS Safari 点输入框不弹软键盘（#26）。
   if (kIsWeb) {
     WebSemanticsController.instance.enableByDefault();
     // WebGL context 丢失/恢复时清空 imageCache，避免离屏封面持有的死纹理在回滚时
