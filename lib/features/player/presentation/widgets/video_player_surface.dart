@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/platform_utils.dart';
+import '../../../../core/utils/web_fullscreen.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/models/song.dart';
 import '../../../../shared/widgets/favorite_button.dart';
@@ -99,6 +100,7 @@ class _VideoPlayerSurfaceState extends ConsumerState<VideoPlayerSurface> {
     if (widget.isFullscreen) {
       Navigator.of(context).maybePop();
     } else {
+      if (kIsWeb) enterWebFullscreen();
       VideoFullscreenPage.show(context, widget.song);
     }
   }
@@ -282,7 +284,7 @@ class _VideoPlayerSurfaceState extends ConsumerState<VideoPlayerSurface> {
             tooltip: subtitleOn ? l10n.playerSubtitleOff : l10n.playerSubtitleOn,
           ),
           // 全屏(仅移动端)
-          if (PlatformUtils.isMobile)
+          if (PlatformUtils.isMobile || kIsWeb)
             IconButton(
               onPressed: _onFullscreenToggle,
               icon: Icon(

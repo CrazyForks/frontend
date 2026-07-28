@@ -1,15 +1,18 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/web_fullscreen.dart';
 import '../../../../shared/models/song.dart';
 import 'video_player_surface.dart';
 
 /// 移动端横屏全屏视频页。
 ///
-/// 进入时锁定横屏 + 沉浸式(隐藏状态栏/导航栏),退出时恢复竖屏与常规系统 UI,
-/// 确保返回后 App 不会卡在横屏。画面与控制层复用 [VideoPlayerSurface](传
-/// `isFullscreen: true`)。仅供移动端(Android/iOS)调用。
+/// 原生(Android/iOS): 锁定横屏 + 沉浸式,退出时恢复竖屏与常规系统 UI。
+/// Web: 通过浏览器 Fullscreen API 进入全屏(由 [VideoPlayerSurface] 在按钮点击
+/// 时调用 [enterWebFullscreen] 触发),本页仅监听 `fullscreenchange` 事件以在
+/// 用户按 Escape 退出全屏时自动 pop。
 class VideoFullscreenPage extends ConsumerStatefulWidget {
   const VideoFullscreenPage({super.key, required this.song});
 
@@ -34,24 +37,36 @@ class VideoFullscreenPage extends ConsumerStatefulWidget {
 }
 
 class _VideoFullscreenPageState extends ConsumerState<VideoFullscreenPage> {
+  void Function()? _removeWebListener;
+
   @override
   void initState() {
     super.initState();
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    if (kIsWeb) {
+      _removeWebListener = onWebFullscreenExit(() {
+        if (mounted) Navigator.of(context).maybePop();
+      });
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
   }
 
   @override
   void dispose() {
-    // 恢复竖屏与常规系统 UI(edgeToEdge 与 App 默认一致)。
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (kIsWeb) {
+      _removeWebListener?.call();
+      exitWebFullscreen();
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     super.dispose();
   }
 
