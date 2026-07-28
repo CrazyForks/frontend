@@ -19,6 +19,7 @@ class _FakeScanApi extends ScanApi {
   int cancelCalls = 0;
   int startCalls = 0;
   bool? lastRecomputeAll;
+  bool? lastRetryFailed;
 
   @override
   Future<FingerprintStatus> getFingerprintStatus() async => status;
@@ -27,9 +28,13 @@ class _FakeScanApi extends ScanApi {
   Future<FingerprintProgress> getFingerprintProgress() async => progress;
 
   @override
-  Future<void> startFingerprintCompute({bool recomputeAll = false}) async {
+  Future<void> startFingerprintCompute({
+    bool recomputeAll = false,
+    bool retryFailed = false,
+  }) async {
     startCalls++;
     lastRecomputeAll = recomputeAll;
+    lastRetryFailed = retryFailed;
   }
 
   @override
@@ -168,6 +173,45 @@ void main() {
     await tester.tap(find.text('重新计算全部指纹'));
     await tester.pumpAndSettle();
     expect(api.lastRecomputeAll, isTrue);
+  });
+
+  testWidgets('存在失败项时提供「仅重试失败项」入口，只带 retry_failed 参数', (tester) async {
+    final api = _FakeScanApi(
+      status: _status(total: 10, computed: 7, missing: 0, failed: 3),
+      progress: FingerprintProgress(
+        status: 'done',
+        computed: 7,
+        total: 10,
+        failed: 3,
+      ),
+    );
+
+    await tester.pumpWidget(_wrapPage(api));
+    await tester.pumpAndSettle();
+
+    // 失败项入口：保留已算好的指纹，只重试失败歌曲（ffmpeg 升级后的恢复路径）
+    expect(find.text('仅重试失败项'), findsOneWidget);
+    await tester.tap(find.text('仅重试失败项'));
+    await tester.pumpAndSettle();
+    expect(api.lastRetryFailed, isTrue);
+    expect(api.lastRecomputeAll, isFalse);
+  });
+
+  testWidgets('无失败项时不显示「仅重试失败项」按钮', (tester) async {
+    final api = _FakeScanApi(
+      status: _status(total: 10, computed: 10, missing: 0, failed: 0),
+      progress: FingerprintProgress(
+        status: 'done',
+        computed: 10,
+        total: 10,
+        failed: 0,
+      ),
+    );
+
+    await tester.pumpWidget(_wrapPage(api));
+    await tester.pumpAndSettle();
+
+    expect(find.text('仅重试失败项'), findsNothing);
   });
 
   test('scanAutoFingerprintProvider 默认关闭，setValue 写入业务端点', () async {

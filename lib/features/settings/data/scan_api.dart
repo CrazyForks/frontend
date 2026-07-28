@@ -106,10 +106,7 @@ class ScanApi {
       if (paths != null && paths.isNotEmpty) {
         data['paths'] = paths;
       }
-      await dio.post(
-        '${AppConfig.apiPrefix}/scan',
-        data: data,
-      );
+      await dio.post('${AppConfig.apiPrefix}/scan', data: data);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -142,21 +139,29 @@ class ScanApi {
       final response = await dio.get(
         '${AppConfig.apiPrefix}/scan/fingerprints/status',
       );
-      return FingerprintStatus.fromJson(
-        response.data as Map<String, dynamic>,
-      );
+      return FingerprintStatus.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
   }
 
   /// 触发批量指纹计算
-  Future<void> startFingerprintCompute({bool recomputeAll = false}) async {
+  ///
+  /// [recomputeAll] 清空已有指纹后重算全部；[retryFailed] 仅重置失败项的
+  /// 「已尝试」标记后重试（已算好的指纹保留，适用于服务端 ffmpeg 升级后
+  /// 恢复失败歌曲）。两者同时为 true 时后端以 recomputeAll 优先。
+  Future<void> startFingerprintCompute({
+    bool recomputeAll = false,
+    bool retryFailed = false,
+  }) async {
     try {
-      await dio.post(
-        '${AppConfig.apiPrefix}/scan/fingerprints',
-        data: recomputeAll ? {'recompute_all': true} : null,
-      );
+      Map<String, dynamic>? data;
+      if (recomputeAll) {
+        data = {'recompute_all': true};
+      } else if (retryFailed) {
+        data = {'retry_failed': true};
+      }
+      await dio.post('${AppConfig.apiPrefix}/scan/fingerprints', data: data);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -195,12 +200,8 @@ class ScanApi {
   /// 获取重复歌曲组
   Future<DuplicatesResult> getDuplicates() async {
     try {
-      final response = await dio.get(
-        '${AppConfig.apiPrefix}/songs/duplicates',
-      );
-      return DuplicatesResult.fromJson(
-        response.data as Map<String, dynamic>,
-      );
+      final response = await dio.get('${AppConfig.apiPrefix}/songs/duplicates');
+      return DuplicatesResult.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
@@ -323,7 +324,8 @@ class DuplicateSong {
 
   String get fileSizeDisplay {
     if (fileSize < 1024) return '$fileSize B';
-    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    if (fileSize < 1024 * 1024)
+      return '${(fileSize / 1024).toStringAsFixed(1)} KB';
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }
@@ -338,7 +340,8 @@ class DuplicateGroup {
   factory DuplicateGroup.fromJson(Map<String, dynamic> json) {
     return DuplicateGroup(
       fingerprint: json['fingerprint'] as String? ?? '',
-      songs: (json['songs'] as List<dynamic>?)
+      songs:
+          (json['songs'] as List<dynamic>?)
               ?.map((e) => DuplicateSong.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -360,7 +363,8 @@ class DuplicatesResult {
 
   factory DuplicatesResult.fromJson(Map<String, dynamic> json) {
     return DuplicatesResult(
-      groups: (json['groups'] as List<dynamic>?)
+      groups:
+          (json['groups'] as List<dynamic>?)
               ?.map((e) => DuplicateGroup.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],

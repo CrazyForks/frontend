@@ -1825,7 +1825,7 @@
   "settingsDuplicateComputed": "Fingerprinted",
   "settingsDuplicatePending": "Pending",
   "settingsDuplicateUncomputable": "Cannot compute",
-  "settingsDuplicateUncomputableHint": "These files have no audio track, are corrupted, or timed out. They will not be retried automatically — use \"Recompute all fingerprints\" to try again.",
+  "settingsDuplicateUncomputableHint": "These files have no audio track, are corrupted, timed out, or the server ffmpeg does not support their format. They will not be retried automatically — use \"Retry failed only\" (e.g. after a server upgrade) or \"Recompute all fingerprints\".",
   "settingsDuplicateSongCount": "{count}",
   "@settingsDuplicateSongCount": {
     "placeholders": {
@@ -1838,6 +1838,7 @@
   "settingsDuplicateStartCompute": "Compute and detect",
   "settingsDuplicateCheck": "Detect duplicates",
   "settingsDuplicateRecomputeAll": "Recompute all fingerprints",
+  "settingsDuplicateRetryFailed": "Retry failed only",
   "settingsDuplicateComputing": "Computing audio fingerprints... {computed}/{total}",
   "@settingsDuplicateComputing": {
     "placeholders": {

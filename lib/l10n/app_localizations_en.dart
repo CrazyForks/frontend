@@ -3051,7 +3051,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDuplicateUncomputableHint =>
-      'These files have no audio track, are corrupted, or timed out. They will not be retried automatically — use \"Recompute all fingerprints\" to try again.';
+      'These files have no audio track, are corrupted, timed out, or the server ffmpeg does not support their format. They will not be retried automatically — use \"Retry failed only\" (e.g. after a server upgrade) or \"Recompute all fingerprints\".';
 
   @override
   String settingsDuplicateSongCount(int count) {
@@ -3070,6 +3070,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDuplicateRecomputeAll => 'Recompute all fingerprints';
+
+  @override
+  String get settingsDuplicateRetryFailed => 'Retry failed only';
 
   @override
   String settingsDuplicateComputing(int computed, int total) {

@@ -2919,7 +2919,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDuplicateUncomputableHint =>
-      '这些文件没有音频轨、已损坏或计算超时，不会被自动重试。需要重试请点「重新计算全部指纹」。';
+      '这些文件没有音频轨、已损坏、计算超时或服务端 ffmpeg 不支持其格式，不会被自动重试。可点「仅重试失败项」重试（如服务端升级后），或「重新计算全部指纹」全量重算。';
 
   @override
   String settingsDuplicateSongCount(int count) {
@@ -2938,6 +2938,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDuplicateRecomputeAll => '重新计算全部指纹';
+
+  @override
+  String get settingsDuplicateRetryFailed => '仅重试失败项';
 
   @override
   String settingsDuplicateComputing(int computed, int total) {

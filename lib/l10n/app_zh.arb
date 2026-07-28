@@ -1930,7 +1930,7 @@
   "settingsDuplicateComputed": "已有指纹",
   "settingsDuplicatePending": "待计算",
   "settingsDuplicateUncomputable": "无法计算",
-  "settingsDuplicateUncomputableHint": "这些文件没有音频轨、已损坏或计算超时，不会被自动重试。需要重试请点「重新计算全部指纹」。",
+  "settingsDuplicateUncomputableHint": "这些文件没有音频轨、已损坏、计算超时或服务端 ffmpeg 不支持其格式，不会被自动重试。可点「仅重试失败项」重试（如服务端升级后），或「重新计算全部指纹」全量重算。",
   "settingsDuplicateSongCount": "{count} 首",
   "@settingsDuplicateSongCount": {
     "placeholders": {
@@ -1943,6 +1943,7 @@
   "settingsDuplicateStartCompute": "开始计算并检测",
   "settingsDuplicateCheck": "检测重复",
   "settingsDuplicateRecomputeAll": "重新计算全部指纹",
+  "settingsDuplicateRetryFailed": "仅重试失败项",
   "settingsDuplicateComputing": "正在计算音频指纹... {computed}/{total}",
   "@settingsDuplicateComputing": {
     "placeholders": {

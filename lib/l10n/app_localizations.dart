@@ -5297,7 +5297,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsDuplicateUncomputableHint.
   ///
   /// In zh, this message translates to:
-  /// **'这些文件没有音频轨、已损坏或计算超时，不会被自动重试。需要重试请点「重新计算全部指纹」。'**
+  /// **'这些文件没有音频轨、已损坏、计算超时或服务端 ffmpeg 不支持其格式，不会被自动重试。可点「仅重试失败项」重试（如服务端升级后），或「重新计算全部指纹」全量重算。'**
   String get settingsDuplicateUncomputableHint;
 
   /// No description provided for @settingsDuplicateSongCount.
@@ -5329,6 +5329,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'重新计算全部指纹'**
   String get settingsDuplicateRecomputeAll;
+
+  /// No description provided for @settingsDuplicateRetryFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅重试失败项'**
+  String get settingsDuplicateRetryFailed;
 
   /// No description provided for @settingsDuplicateComputing.
   ///

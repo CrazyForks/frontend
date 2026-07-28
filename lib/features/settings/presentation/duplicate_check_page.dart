@@ -84,13 +84,19 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
     }
   }
 
-  Future<void> _startCompute({bool recomputeAll = false}) async {
+  Future<void> _startCompute({
+    bool recomputeAll = false,
+    bool retryFailed = false,
+  }) async {
     setState(() {
       _error = null;
     });
     try {
       final api = ref.read(scanApiProvider);
-      await api.startFingerprintCompute(recomputeAll: recomputeAll);
+      await api.startFingerprintCompute(
+        recomputeAll: recomputeAll,
+        retryFailed: retryFailed,
+      );
       if (!mounted) return;
       setState(() => _phase = _PagePhase.computing);
       _startPolling();
@@ -194,19 +200,24 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
       final dio = ref.read(dioProvider);
       await dio.post(
         '${AppConfig.apiPrefix}/songs/batch-delete',
-        data: {
-          'ids': toDelete.map((s) => s.id).toList(),
-          'delete_files': true,
-        },
+        data: {'ids': toDelete.map((s) => s.id).toList(), 'delete_files': true},
       );
       if (!mounted) return;
-      ResponsiveSnackBar.show(context,
-          message: AppLocalizations.of(context).settingsDuplicateDeleted(toDelete.length));
+      ResponsiveSnackBar.show(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).settingsDuplicateDeleted(toDelete.length),
+      );
       _loadDuplicates();
     } catch (e) {
       if (!mounted) return;
-      ResponsiveSnackBar.showError(context,
-          message: AppLocalizations.of(context).settingsDuplicateDeleteFailed('$e'));
+      ResponsiveSnackBar.showError(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).settingsDuplicateDeleteFailed('$e'),
+      );
     }
   }
 
@@ -231,19 +242,24 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
       final dio = ref.read(dioProvider);
       await dio.post(
         '${AppConfig.apiPrefix}/songs/batch-delete',
-        data: {
-          'ids': allToDelete,
-          'delete_files': true,
-        },
+        data: {'ids': allToDelete, 'delete_files': true},
       );
       if (!mounted) return;
-      ResponsiveSnackBar.show(context,
-          message: AppLocalizations.of(context).settingsDuplicateDeleted(allToDelete.length));
+      ResponsiveSnackBar.show(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).settingsDuplicateDeleted(allToDelete.length),
+      );
       _loadDuplicates();
     } catch (e) {
       if (!mounted) return;
-      ResponsiveSnackBar.showError(context,
-          message: AppLocalizations.of(context).settingsDuplicateDeleteFailed('$e'));
+      ResponsiveSnackBar.showError(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).settingsDuplicateDeleteFailed('$e'),
+      );
     }
   }
 
@@ -251,23 +267,24 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
     final l10n = AppLocalizations.of(context);
     return showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.settingsDuplicateConfirmTitle),
-        content: Text(l10n.settingsDuplicateConfirmMessage(count)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.commonCancel),
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(l10n.settingsDuplicateConfirmTitle),
+            content: Text(l10n.settingsDuplicateConfirmMessage(count)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.commonCancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: Text(l10n.settingsDuplicateConfirmTitle),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text(l10n.settingsDuplicateConfirmTitle),
-          ),
-        ],
-      ),
     );
   }
 
@@ -276,17 +293,18 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsDuplicateTitle)),
-      body: _loading && _phase == _PagePhase.status
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              children: [
-                if (_error != null) _buildError(),
-                if (_phase == _PagePhase.status) _buildStatusPhase(),
-                if (_phase == _PagePhase.computing) _buildComputingPhase(),
-                if (_phase == _PagePhase.results) _buildResultsPhase(),
-              ],
-            ),
+      body:
+          _loading && _phase == _PagePhase.status
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                children: [
+                  if (_error != null) _buildError(),
+                  if (_phase == _PagePhase.status) _buildStatusPhase(),
+                  if (_phase == _PagePhase.computing) _buildComputingPhase(),
+                  if (_phase == _PagePhase.results) _buildResultsPhase(),
+                ],
+              ),
     );
   }
 
@@ -306,7 +324,10 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
             Icon(Icons.error_outline, color: colorScheme.error),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(_error!, style: TextStyle(color: colorScheme.onErrorContainer)),
+              child: Text(
+                _error!,
+                style: TextStyle(color: colorScheme.onErrorContainer),
+              ),
             ),
             IconButton(
               icon: const Icon(Icons.close),
@@ -350,22 +371,36 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.bar_chart, size: 20, color: colorScheme.primary),
+                      Icon(
+                        Icons.bar_chart,
+                        size: 20,
+                        color: colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
-                      Text(l10n.settingsDuplicateFingerprintStats,
-                          style: theme.textTheme.titleSmall),
+                      Text(
+                        l10n.settingsDuplicateFingerprintStats,
+                        style: theme.textTheme.titleSmall,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _statRow(l10n.settingsDuplicateLocalSongs,
-                      l10n.settingsDuplicateSongCount(status.total)),
-                  _statRow(l10n.settingsDuplicateComputed,
-                      l10n.settingsDuplicateSongCount(status.computed)),
-                  _statRow(l10n.settingsDuplicatePending,
-                      l10n.settingsDuplicateSongCount(status.missing)),
+                  _statRow(
+                    l10n.settingsDuplicateLocalSongs,
+                    l10n.settingsDuplicateSongCount(status.total),
+                  ),
+                  _statRow(
+                    l10n.settingsDuplicateComputed,
+                    l10n.settingsDuplicateSongCount(status.computed),
+                  ),
+                  _statRow(
+                    l10n.settingsDuplicatePending,
+                    l10n.settingsDuplicateSongCount(status.missing),
+                  ),
                   if (status.failed > 0)
-                    _statRow(l10n.settingsDuplicateUncomputable,
-                        l10n.settingsDuplicateSongCount(status.failed)),
+                    _statRow(
+                      l10n.settingsDuplicateUncomputable,
+                      l10n.settingsDuplicateSongCount(status.failed),
+                    ),
                 ],
               ),
             ),
@@ -390,7 +425,10 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber, color: colorScheme.onSecondaryContainer),
+                  Icon(
+                    Icons.warning_amber,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -406,15 +444,32 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: status.chromaprintAvailable
-                  ? (status.missing > 0 ? _startCompute : _loadDuplicates)
-                  : null,
+              onPressed:
+                  status.chromaprintAvailable
+                      ? (status.missing > 0 ? _startCompute : _loadDuplicates)
+                      : null,
               icon: const Icon(Icons.fingerprint),
-              label: Text(status.missing > 0
-                  ? l10n.settingsDuplicateStartCompute
-                  : l10n.settingsDuplicateCheck),
+              label: Text(
+                status.missing > 0
+                    ? l10n.settingsDuplicateStartCompute
+                    : l10n.settingsDuplicateCheck,
+              ),
             ),
           ),
+          // failed > 0 时给「仅重试失败项」入口：只重置失败标记、保留已算好的
+          // 指纹，用于服务端 ffmpeg 升级（如新增 mpeg 解复用器）后恢复失败歌曲，
+          // 代价远低于全量重算。
+          if (status.chromaprintAvailable && status.failed > 0) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () => _startCompute(retryFailed: true),
+                icon: const Icon(Icons.replay, size: 18),
+                label: Text(l10n.settingsDuplicateRetryFailed),
+              ),
+            ),
+          ],
           // failed > 0 也要给入口：全部失败时 computed 为 0，否则用户无法重试
           if (status.chromaprintAvailable &&
               (status.computed > 0 || status.failed > 0)) ...[
@@ -440,9 +495,12 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          Text(value, style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-          )),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );
@@ -550,9 +608,9 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
         const SizedBox(height: 8),
         Text(
           l10n.settingsDuplicateNoResultsHint,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 24),
         OutlinedButton.icon(
@@ -583,7 +641,9 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
           children: [
             Text(
               l10n.settingsDuplicateSummary(
-                  duplicates.totalGroups, duplicates.totalDuplicates),
+                duplicates.totalGroups,
+                duplicates.totalDuplicates,
+              ),
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 color: colorScheme.onSecondaryContainer,
               ),
@@ -623,7 +683,8 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
     int count = 0;
     for (int i = 0; i < _duplicates!.groups.length; i++) {
       if (_ignoredGroups.contains(i)) continue;
-      final keepId = _selectedKeep[i] ?? _recommendedSongId(_duplicates!.groups[i]);
+      final keepId =
+          _selectedKeep[i] ?? _recommendedSongId(_duplicates!.groups[i]);
       count += _duplicates!.groups[i].songs.where((s) => s.id != keepId).length;
     }
     return count;
@@ -674,9 +735,10 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
                       isIgnored ? Icons.visibility : Icons.visibility_off,
                       size: 20,
                     ),
-                    tooltip: isIgnored
-                        ? l10n.settingsDuplicateUnignore
-                        : l10n.settingsDuplicateIgnore,
+                    tooltip:
+                        isIgnored
+                            ? l10n.settingsDuplicateUnignore
+                            : l10n.settingsDuplicateIgnore,
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
@@ -686,7 +748,8 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
                 RadioGroup<int>(
                   groupValue: keepId,
                   onChanged: (v) {
-                    if (v != null) setState(() => _selectedKeep[groupIndex] = v);
+                    if (v != null)
+                      setState(() => _selectedKeep[groupIndex] = v);
                   },
                   child: Column(
                     children: [
@@ -717,7 +780,12 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
     );
   }
 
-  Widget _buildSongTile(int groupIndex, DuplicateSong song, int keepId, int recommendedId) {
+  Widget _buildSongTile(
+    int groupIndex,
+    DuplicateSong song,
+    int keepId,
+    int recommendedId,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isSelected = song.id == keepId;
@@ -730,9 +798,7 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Radio<int>(
-              value: song.id,
-            ),
+            Radio<int>(value: song.id),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -751,13 +817,18 @@ class _DuplicateCheckPageState extends ConsumerState<DuplicateCheckPage> {
                       ),
                       if (isRecommended)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            AppLocalizations.of(context).settingsDuplicateRecommended,
+                            AppLocalizations.of(
+                              context,
+                            ).settingsDuplicateRecommended,
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colorScheme.onPrimaryContainer,
                             ),
