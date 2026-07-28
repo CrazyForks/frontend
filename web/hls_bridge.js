@@ -29,14 +29,23 @@ window.SongloftHls = (function () {
       instances.set(mediaElement, hls);
 
       hls.on(window.Hls.Events.ERROR, function (event, data) {
-        if (!data || !data.fatal) return;
-        // 网络 / 媒体类 fatal 错误先尝试自恢复（直播流常见的临时抖动），成功则不上报。
+        if (!data) return;
+        // 非 fatal 错误也打日志：排查「缓冲充足但画面停滞」这类问题的关键线索
+        // （如 bufferStalledError / bufferSeekOverHole）。
+        if (!data.fatal) {
+          console.warn('[SongloftHls] non-fatal:', data.type, data.details);
+          return;
+        }
+        // 网络 / 媒体类 fatal 错误先尝试自恢复（直播流常见的临时抖动），成功则不上报；
+        // 恢复动作本身也要留痕，否则 recoverMediaError 静默吞掉首次解码错误后无法回溯。
         try {
           if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
+            console.warn('[SongloftHls] fatal network error, startLoad() 自恢复:', data.details);
             hls.startLoad();
             return;
           }
           if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+            console.warn('[SongloftHls] fatal media error, recoverMediaError() 自恢复:', data.details);
             hls.recoverMediaError();
             return;
           }
@@ -44,6 +53,7 @@ window.SongloftHls = (function () {
           // 恢复失败，继续走下面的销毁 + 上报
         }
         var msg = (data.type || 'hls') + ':' + (data.details || 'fatal');
+        console.error('[SongloftHls] fatal, destroy:', msg);
         destroy(mediaElement);
         if (onError) onError(msg);
       });

@@ -62,6 +62,13 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 回调：停止 Web HLS 视频播放。
   VoidCallback? onStopHlsVideo;
 
+  /// 回调：Web HLS 视频主控模式下的播放控制转发（play/pause/seek 由 video 元素承接）。
+  /// 媒体会话按键 / 恢复播放进度等路径直接调 handler 方法，不经 PlayerNotifier
+  /// 的分支判定，若不转发会落到无音源的 just_audio 上静默失效。
+  VoidCallback? onPlayHlsVideo;
+  VoidCallback? onPauseHlsVideo;
+  void Function(Duration position)? onSeekHlsVideo;
+
   bool _isCurrentSongFavorited = false;
 
   /// 通知栏回调（由 PlayerNotifier 设置）
@@ -330,6 +337,12 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       '[AudioService] ▶️ play() 被调用 (before: playing=${_player.playing}, '
       'ps=${_player.processingState})',
     );
+    // Web HLS 视频主控模式：just_audio 无音源，转发给 video 元素
+    if (hlsVideoPrimaryMode && onPlayHlsVideo != null) {
+      onPlayHlsVideo!();
+      _broadcastState();
+      return;
+    }
     // 不要 return/await just_audio 的 play()：其 Future 仅在播放停止时才完成，
     // 若交给 audio_service 的方法通道回调 await，会一直挂起。改为 fire-and-forget，
     // 并立即重播一次 playbackState，让系统媒体控件即时反映播放态
@@ -348,6 +361,12 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       '[AudioService] ⏸️ pause() 被调用 (before: playing=${_player.playing}, '
       'ps=${_player.processingState})',
     );
+    // Web HLS 视频主控模式：转发给 video 元素
+    if (hlsVideoPrimaryMode && onPauseHlsVideo != null) {
+      onPauseHlsVideo!();
+      _broadcastState();
+      return;
+    }
     try {
       await _player.pause();
     } catch (e) {
@@ -367,6 +386,12 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> seek(Duration position) {
     debugPrint('[AudioService] ⏩ seek() 被调用: ${position.inSeconds}s');
+    // Web HLS 视频主控模式：just_audio 无音源，seek 必须落在 video 元素上，
+    // 否则恢复播放进度 / 媒体会话 seek 会静默失效。
+    if (hlsVideoPrimaryMode && onSeekHlsVideo != null) {
+      onSeekHlsVideo!(position);
+      return Future.value();
+    }
     return _player.seek(position);
   }
 
@@ -390,7 +415,10 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
-  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
+  Future<dynamic> customAction(
+    String name, [
+    Map<String, dynamic>? extras,
+  ]) async {
     debugPrint('[AudioService] customAction: $name');
     if (name == 'toggleFavorite') {
       onToggleFavorite?.call();

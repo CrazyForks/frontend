@@ -32,6 +32,7 @@ external void _hlsSetAudioTrack(web.HTMLVideoElement element, int index);
 class WebVideoPlaybackNotifier extends Notifier<WebVideoPlaybackState> {
   web.HTMLVideoElement? _video;
   bool _hlsAttached = false;
+  bool _autoplayAttempted = false;
 
   @override
   WebVideoPlaybackState build() {
@@ -46,6 +47,7 @@ class WebVideoPlaybackNotifier extends Notifier<WebVideoPlaybackState> {
   void startPlayback(String url) {
     // 清理旧实例
     _cleanup();
+    _autoplayAttempted = false;
 
     // 创建 video 元素（不可见，追加到 document.body）
     final el = web.document.createElement('video') as web.HTMLVideoElement;
@@ -116,6 +118,48 @@ class WebVideoPlaybackNotifier extends Notifier<WebVideoPlaybackState> {
   }
 
   void _setupEvents(web.HTMLVideoElement el) {
+    // 显式 play() 并捕获 rejection：非静音视频可能被浏览器 autoplay 策略拒绝
+    // （NotAllowedError），仅靠 autoplay 属性会无声失败、永远停在 0 秒，
+    // UI 表现为「缓冲充足但画面不动、持续转圈」。首帧就绪时若仍暂停则
+    // 主动尝试一次 play()，被拒时退出 buffering 态让用户可手动点播。
+    // 仅首次 canplay 尝试，避免用户暂停后 seek 触发的 canplay 意外恢复播放。
+    el.addEventListener(
+      'canplay',
+      ((web.Event e) {
+        if (!state.isActive || _autoplayAttempted) return;
+        _autoplayAttempted = true;
+        if (!el.paused) return;
+        el.play().toDart.catchError((Object err) {
+          debugPrint('[WebVideoPlayback] play() rejected: $err');
+          if (state.isActive) {
+            state = state.copyWith(isPlaying: false, isBuffering: false);
+          }
+          return null;
+        });
+      }).toJS,
+    );
+    // 诊断日志：缓冲中断 / 解码错误是「卡顿」排查的关键证据
+    el.addEventListener(
+      'stalled',
+      ((web.Event e) {
+        debugPrint(
+          '[WebVideoPlayback] stalled: pos=${el.currentTime.toStringAsFixed(2)}s '
+          'readyState=${el.readyState}',
+        );
+      }).toJS,
+    );
+    el.addEventListener(
+      'error',
+      ((web.Event e) {
+        final err = el.error;
+        debugPrint(
+          '[WebVideoPlayback] media error: code=${err?.code} '
+          'message=${err?.message}',
+        );
+        if (!state.isActive) return;
+        state = state.copyWith(isPlaying: false, isBuffering: false);
+      }).toJS,
+    );
     el.addEventListener(
       'timeupdate',
       ((web.Event e) {

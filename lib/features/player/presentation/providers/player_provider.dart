@@ -103,6 +103,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
       _audioHandler.onStopHlsVideo = () {
         ref.read(webVideoPlaybackProvider.notifier).stopPlayback();
       };
+      // 主控模式下 handler 层的 play/pause/seek 转发给 video 元素，
+      // 覆盖媒体会话按键 / 恢复播放进度等不经 PlayerNotifier 的调用路径。
+      _audioHandler.onPlayHlsVideo = () {
+        ref.read(webVideoPlaybackProvider.notifier).play();
+      };
+      _audioHandler.onPauseHlsVideo = () {
+        ref.read(webVideoPlaybackProvider.notifier).pause();
+      };
+      _audioHandler.onSeekHlsVideo = (position) {
+        ref.read(webVideoPlaybackProvider.notifier).seek(position);
+      };
     }
 
     // 切歌前主动通知后端 cancel 旧 song 的进行中工作（issue #79）。
@@ -331,7 +342,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
         if (playerState.playing) {
           HomeWidgetService().startProgressUpdates(
             currentPosition: () => _audioHandler.playbackState.value.position,
-            currentDuration: () => _audioHandler.mediaItem.value?.duration ?? Duration.zero,
+            currentDuration:
+                () => _audioHandler.mediaItem.value?.duration ?? Duration.zero,
           );
         } else {
           HomeWidgetService().stopProgressUpdates();
@@ -412,15 +424,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
     }
     final favState = ref.read(favoriteProvider);
     final isRadio = song.type == 'radio';
-    final isFav = isRadio
-        ? favState.favoriteRadioIds.contains(song.id)
-        : favState.favoriteSongIds.contains(song.id);
+    final isFav =
+        isRadio
+            ? favState.favoriteRadioIds.contains(song.id)
+            : favState.favoriteSongIds.contains(song.id);
     widget.updateNowPlaying(
       title: song.title,
       artist: song.artist ?? '',
-      artUrl: song.coverUrl != null
-          ? UrlHelper.buildCoverUrl(song.coverUrl!)
-          : null,
+      artUrl:
+          song.coverUrl != null
+              ? UrlHelper.buildCoverUrl(song.coverUrl!)
+              : null,
       isPlaying: state.isPlaying,
       isFavorite: isFav,
       position: Duration.zero,
@@ -429,7 +443,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
     if (state.isPlaying) {
       widget.startProgressUpdates(
         currentPosition: () => _audioHandler.playbackState.value.position,
-        currentDuration: () => _audioHandler.mediaItem.value?.duration ?? Duration.zero,
+        currentDuration:
+            () => _audioHandler.mediaItem.value?.duration ?? Duration.zero,
       );
     } else {
       widget.stopProgressUpdates();
@@ -586,9 +601,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
     if (song == null) return;
     final favState = ref.read(favoriteProvider);
     final isRadio = song.type == 'radio';
-    final isFav = isRadio
-        ? favState.favoriteRadioIds.contains(song.id)
-        : favState.favoriteSongIds.contains(song.id);
+    final isFav =
+        isRadio
+            ? favState.favoriteRadioIds.contains(song.id)
+            : favState.favoriteSongIds.contains(song.id);
     _audioHandler.setFavorited(isFav);
   }
 
@@ -597,13 +613,16 @@ class PlayerNotifier extends Notifier<PlayerState> {
     if (song == null) return;
     final favState = ref.read(favoriteProvider);
     final isRadio = song.type == 'radio';
-    final isFav = isRadio
-        ? favState.favoriteRadioIds.contains(song.id)
-        : favState.favoriteSongIds.contains(song.id);
+    final isFav =
+        isRadio
+            ? favState.favoriteRadioIds.contains(song.id)
+            : favState.favoriteSongIds.contains(song.id);
     HomeWidgetService().updateFavoriteState(isFav);
   }
 
-  static const _widgetActionChannel = MethodChannel('com.songloft/widget_action');
+  static const _widgetActionChannel = MethodChannel(
+    'com.songloft/widget_action',
+  );
 
   void _initWidgetActionChannel() {
     if (!PlatformUtils.isAndroid) return;
