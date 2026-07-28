@@ -15,6 +15,8 @@ import '../../../shared/widgets/empty_state.dart';
 import '../../playlist/domain/playlist.dart';
 import '../../player/presentation/providers/player_provider.dart';
 import '../../playlist/presentation/providers/playlist_provider.dart';
+import '../domain/home_grid_config.dart';
+import 'providers/home_grid_config_provider.dart';
 import 'widgets/playlist_carousel.dart';
 import 'widgets/section_header.dart';
 import 'widgets/stats_strip.dart';
@@ -33,6 +35,32 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// 每个 App 会话只做一次热更新检查（发现新版本 → 弹窗）。
   static bool _updateChecked = false;
 
+  /// 「不限行数」自动续拉的游标：每个 type 上次是在累积到多少条时发起 loadMore 的。
+  /// 同一条数只请求一次，防止上游 hasMore 恒真（或续拉拿到 0 条）时把首页拖进
+  /// 无限请求循环。刷新时清空以便重新续拉。
+  final Map<String, int> _autoLoadCursor = <String, int>{};
+
+  /// 选了「不限行数」时把后续分页补齐。
+  ///
+  /// 在 build 里调用、经 post-frame 才真正改 provider 状态 —— build 期间直接改
+  /// 会抛。重入由三层保证：notifier 自己的 isLoadingMore 同步置位、[_autoLoadCursor]
+  /// 的同条数去重、以及 [kHomeAutoLoadAllMaxItems] 的硬上限。
+  void _maybeAutoLoadAll(
+    String type,
+    PaginatedPlaylistsState? state, {
+    required bool enabled,
+  }) {
+    if (!enabled || state == null) return;
+    if (!state.hasMore || state.isLoadingMore) return;
+    if (state.items.length >= kHomeAutoLoadAllMaxItems) return;
+    if (_autoLoadCursor[type] == state.items.length) return;
+    _autoLoadCursor[type] = state.items.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(playlistListProvider(type).notifier).loadMore();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -47,17 +75,39 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final playlistsAsync = ref.watch(playlistListProvider(null));
-    final normalPlaylistsAsync = ref.watch(playlistListProvider('normal'));
-    final radioPlaylistsAsync = ref.watch(playlistListProvider('radio'));
+    // 只订阅两个 typed 实例。改造前还额外订阅了 playlistListProvider(null) 并在
+    // 本地按 type 拆分：pageLimit=30 是两个 section 的**共享**预算，歌单一多电台
+    // section 会一条都拿不到，而可配网格的 6×5=30 上限更喂不饱。typed provider
+    // 各自独立 30 条，同时少发一个 HTTP 请求（songloft-org/songloft#332）。
+    final normalAsync = ref.watch(playlistListProvider('normal'));
+    final radioAsync = ref.watch(playlistListProvider('radio'));
+
+    // 首次加载 = 既没数据也没错误。下拉刷新时 Riverpod 保留旧值（hasValue 仍为
+    // true），因此刷新不会把内容打回骨架屏。
+    // 刻意不判 isLoading：Riverpod 3 的 AsyncError 上 isLoading 仍为 true，
+    // 用它会让加载失败永久停在骨架屏。
+    final isFirstLoad =
+        (!normalAsync.hasValue && !normalAsync.hasError) ||
+        (!radioAsync.hasValue && !radioAsync.hasError);
+    // 只有两类都失败才整页报错；一类失败另一类有数据时降级为分区内联错误。
+    final bothFailed = normalAsync.hasError && radioAsync.hasError;
+
+    // 「不限行数」才需要续拉；窄屏走轮播、该设置按约定不生效，也就不额外发请求。
+    final autoLoadAll =
+        context.useWideLayout && ref.watch(homeGridConfigProvider).isAllRows;
+    _maybeAutoLoadAll('normal', normalAsync.value, enabled: autoLoadAll);
+    _maybeAutoLoadAll('radio', radioAsync.value, enabled: autoLoadAll);
+
+    void retryAll() {
+      // 清游标：刷新后 items 退回第一页，不清的话续拉会被同条数去重挡住。
+      _autoLoadCursor.clear();
+      ref.invalidate(playlistListProvider('normal'));
+      ref.invalidate(playlistListProvider('radio'));
+    }
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(playlistListProvider(null));
-          ref.invalidate(playlistListProvider('normal'));
-          ref.invalidate(playlistListProvider('radio'));
-        },
+        onRefresh: () async => retryAll(),
         child: CustomScrollView(
           slivers: [
             // 顶部问候栏
@@ -65,24 +115,25 @@ class _HomePageState extends ConsumerState<HomePage> {
 
             // 主体内容
             SliverToBoxAdapter(
-              child: playlistsAsync.when(
-                data:
-                    (state) => _buildContent(
-                      context,
-                      ref,
-                      state.items,
-                      normalTotalCount:
-                          normalPlaylistsAsync.value?.totalCount ?? 0,
-                      radioTotalCount:
-                          radioPlaylistsAsync.value?.totalCount ?? 0,
-                    ),
-                loading: () => const _LoadingContent(),
-                error:
-                    (error, stack) => _ErrorContent(
-                      error: error.toString(),
-                      onRetry: () => ref.invalidate(playlistListProvider(null)),
-                    ),
-              ),
+              child:
+                  isFirstLoad
+                      ? const _LoadingContent()
+                      : bothFailed
+                      ? _ErrorContent(
+                        error:
+                            (normalAsync.error ?? radioAsync.error).toString(),
+                        onRetry: retryAll,
+                      )
+                      : _buildContent(
+                        context,
+                        ref,
+                        normalPlaylists: normalAsync.value?.items ?? const [],
+                        radioPlaylists: radioAsync.value?.items ?? const [],
+                        normalFailed: normalAsync.hasError,
+                        radioFailed: radioAsync.hasError,
+                        normalTotalCount: normalAsync.value?.totalCount ?? 0,
+                        radioTotalCount: radioAsync.value?.totalCount ?? 0,
+                      ),
             ),
           ],
         ),
@@ -92,8 +143,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Widget _buildContent(
     BuildContext context,
-    WidgetRef ref,
-    List<Playlist> playlists, {
+    WidgetRef ref, {
+    required List<Playlist> normalPlaylists,
+    required List<Playlist> radioPlaylists,
+    required bool normalFailed,
+    required bool radioFailed,
     required int normalTotalCount,
     required int radioTotalCount,
   }) {
@@ -101,12 +155,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     final currentPlaylistId = ref.watch(sourcePlaylistIdProvider);
     final isPlaying = ref.watch(isPlayingProvider);
 
-    // 分离普通歌单和电台歌单
-    final normalPlaylists = playlists.where((p) => p.type == 'normal').toList();
-    final radioPlaylists = playlists.where((p) => p.type == 'radio').toList();
+    // 类型分离已由后端 type 过滤完成，无需本地 where。
 
-    // 空状态
-    if (playlists.isEmpty) {
+    // 空状态：两类都空且都没失败（失败时走分区内联错误，别误报「还没有歌单」）
+    if (normalPlaylists.isEmpty &&
+        radioPlaylists.isEmpty &&
+        !normalFailed &&
+        !radioFailed) {
       return EmptyState(
         icon: Icons.library_music_outlined,
         title: l10n.homeEmptyPlaylists,
@@ -130,7 +185,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         const SizedBox(height: AppSpacing.md),
 
         // 我的歌单区域
-        if (normalPlaylists.isNotEmpty) ...[
+        if (normalPlaylists.isNotEmpty || normalFailed) ...[
           SectionHeader(
             title: l10n.homeMyPlaylists,
             actionText: l10n.homeViewAll,
@@ -138,7 +193,11 @@ class _HomePageState extends ConsumerState<HomePage> {
             onAction: () => context.go('${AppRoutes.library}?view=playlist'),
           ),
           const SizedBox(height: AppSpacing.md),
-          if (isWide)
+          if (normalFailed && normalPlaylists.isEmpty)
+            _SectionLoadError(
+              onRetry: () => ref.invalidate(playlistListProvider('normal')),
+            )
+          else if (isWide)
             _PlaylistGrid(
               playlists: normalPlaylists,
               currentPlaylistId: currentPlaylistId,
@@ -157,13 +216,22 @@ class _HomePageState extends ConsumerState<HomePage> {
         ],
 
         // 电台歌单区域
-        if (radioPlaylists.isNotEmpty) ...[
+        if (radioPlaylists.isNotEmpty || radioFailed) ...[
           SectionHeader(
             title: l10n.homeMyRadios,
             icon: Icons.radio_rounded,
+            actionText: l10n.homeViewAll,
+            // 跳转到曲库的「电台歌单」视图；网格按行数截断后用户需要这个出口。
+            // 即使该视图在自定义配置里被隐藏也能到达（_applyInitialViewKey 会强制选中）。
+            onAction:
+                () => context.go('${AppRoutes.library}?view=playlist_radio'),
           ),
           const SizedBox(height: AppSpacing.md),
-          if (isWide)
+          if (radioFailed && radioPlaylists.isEmpty)
+            _SectionLoadError(
+              onRetry: () => ref.invalidate(playlistListProvider('radio')),
+            )
+          else if (isWide)
             _PlaylistGrid(
               playlists: radioPlaylists,
               currentPlaylistId: currentPlaylistId,
@@ -256,8 +324,9 @@ class _GreetingAppBar extends StatelessWidget {
   }
 }
 
-/// Tablet/Desktop 歌单网格布局
-class _PlaylistGrid extends StatelessWidget {
+/// Tablet/Desktop 歌单网格布局。行列数可在设置 → 外观里配置
+/// （songloft-org/songloft#332）。
+class _PlaylistGrid extends ConsumerWidget {
   final List<Playlist> playlists;
   final int? currentPlaylistId;
   final bool isPlaying;
@@ -269,12 +338,20 @@ class _PlaylistGrid extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final crossAxisCount = context.responsive<int>(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(homeGridConfigProvider);
+    final autoColumns = context.responsive<int>(
       mobile: 2,
       tablet: 3,
       desktop: 4,
     );
+    final requestedColumns = config.resolveColumns(autoColumns);
+
+    // 卡片封面下方的固定占位：sm 间距 + bodyMedium 单行 + bodySmall 单行。
+    // 走 textScalerOf 让系统大字号下封面自动让位，而不是把文字挤出溢出。
+    final textScaler = MediaQuery.textScalerOf(context);
+    final textBlockHeight =
+        AppSpacing.sm + textScaler.scale(20) + textScaler.scale(16);
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -284,26 +361,44 @@ class _PlaylistGrid extends StatelessWidget {
           desktop: AppSpacing.lg,
         ),
       ),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          mainAxisSpacing: AppSpacing.md,
-          crossAxisSpacing: AppSpacing.md,
-          childAspectRatio: 0.82,
-        ),
-        itemCount: playlists.length > crossAxisCount * 2
-            ? crossAxisCount * 2
-            : playlists.length,
-        itemBuilder: (context, index) {
-          final playlist = playlists[index];
-          final isCurrent = playlist.id == currentPlaylistId;
-          return _GridPlaylistCard(
-            playlist: playlist,
-            isCurrent: isCurrent,
-            isPlaying: isPlaying && isCurrent,
-            onTap: () => context.push('/playlists/${playlist.id}'),
+      // 必须用 LayoutBuilder 拿真实可用宽度，不能用 context.screenWidth：宽屏下
+      // 左侧有 NavigationRail/侧边栏，外层还套着 ConstrainedBox(maxWidth: 1200)。
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final metrics = computeHomeGridMetrics(
+            availableWidth: constraints.maxWidth,
+            requestedColumns: requestedColumns,
+            spacing: AppSpacing.md,
+            textBlockHeight: textBlockHeight,
+          );
+          // 注意传 clamp 后的列数，否则窄窗口降列时渲染的行数会多出来。
+          final limit = config.maxItems(metrics.columns);
+          final itemCount =
+              limit == null
+                  ? playlists.length
+                  : (playlists.length < limit ? playlists.length : limit);
+
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: metrics.columns,
+              mainAxisSpacing: AppSpacing.md,
+              crossAxisSpacing: AppSpacing.md,
+              childAspectRatio: metrics.childAspectRatio,
+            ),
+            itemCount: itemCount,
+            itemBuilder: (context, index) {
+              final playlist = playlists[index];
+              final isCurrent = playlist.id == currentPlaylistId;
+              return _GridPlaylistCard(
+                playlist: playlist,
+                isCurrent: isCurrent,
+                isPlaying: isPlaying && isCurrent,
+                cardWidth: metrics.cardWidth,
+                onTap: () => context.push('/playlists/${playlist.id}'),
+              );
+            },
           );
         },
       ),
@@ -316,14 +411,27 @@ class _GridPlaylistCard extends StatelessWidget {
   final Playlist playlist;
   final bool isCurrent;
   final bool isPlaying;
+
+  /// 由 [_PlaylistGrid] 按 gridDelegate 同一口径算出并传入，用于缩放卡片内的
+  /// 图标；比在卡片里再套一层 LayoutBuilder 便宜，也不会与网格口径漂移。
+  final double cardWidth;
   final VoidCallback onTap;
 
   const _GridPlaylistCard({
     required this.playlist,
     required this.isCurrent,
     required this.isPlaying,
+    required this.cardWidth,
     required this.onTap,
   });
+
+  /// 占位封面图标：6 列时封面只有 ~90px，48px 的图标会顶满整格。
+  /// 上限 48 = 改造前的字面值，且系数让 clamp 只在 cardWidth ≲ 170 时生效
+  /// ⇒ 默认（3~4 列宽窗口）渲染完全不变。
+  double get _placeholderIconSize => (cardWidth * 0.28).clamp(24.0, 48.0);
+
+  /// 播放中遮罩图标，同理，上限 32 = 改造前字面值。
+  double get _playingIconSize => (cardWidth * 0.19).clamp(18.0, 32.0);
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +479,7 @@ class _GridPlaylistCard extends StatelessWidget {
                             child: Center(
                               child: Icon(
                                 Icons.equalizer_rounded,
-                                size: 32,
+                                size: _playingIconSize,
                                 color: colorScheme.primary,
                               ),
                             ),
@@ -420,8 +528,42 @@ class _GridPlaylistCard extends StatelessWidget {
     return Center(
       child: Icon(
         Icons.queue_music,
-        size: 48,
+        size: _placeholderIconSize,
         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+      ),
+    );
+  }
+}
+
+/// 单个 section 的内联加载失败提示：另一类歌单还有数据时不该整页报错。
+/// 复用现有 l10n 键，不新增文案。
+class _SectionLoadError extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _SectionLoadError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, size: 20, color: colorScheme.error),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              l10n.commonLoadFailed,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: Text(l10n.commonRetry)),
+        ],
       ),
     );
   }

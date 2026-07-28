@@ -3159,6 +3159,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMiniPlayerControlsPrevNextMode => '上一首 / 下一首 + 播放模式';
 
   @override
+  String get settingsHomeGridTitle => '首页歌单网格';
+
+  @override
+  String get settingsHomeGridDesc => '宽屏首页「我的歌单 / 我的电台」每行显示几个、显示几行';
+
+  @override
+  String get settingsHomeGridColumnsTitle => '每行数量';
+
+  @override
+  String get settingsHomeGridColumnsAuto => '自动';
+
+  @override
+  String get settingsHomeGridRowsTitle => '显示行数';
+
+  @override
+  String get settingsHomeGridRowsAll => '全部';
+
+  @override
+  String settingsHomeGridSummary(String layout, int count) {
+    return '当前：$layout，最多显示 $count 个歌单';
+  }
+
+  @override
+  String settingsHomeGridSummaryAuto(String layout) {
+    return '当前：$layout，每行数量随窗口宽度自动变化（平板 3 个、桌面 4 个）';
+  }
+
+  @override
+  String settingsHomeGridSummaryAllRows(String layout, int count) {
+    return '当前：$layout，显示全部歌单（每类最多 $count 个，更多请点「查看全部」）';
+  }
+
+  @override
+  String get settingsHomeGridClampHint => '窗口宽度不足时会自动减少每行数量，避免卡片过窄';
+
+  @override
+  String get settingsHomeGridNarrowHint => '当前窗口较窄，首页歌单为横向滑动列表，此设置在窗口变宽后生效';
+
+  @override
   String get settingsAutoEnterLyricsOnLaunchTitle => '打开后自动进入歌词';
 
   @override

@@ -5720,6 +5720,72 @@ abstract class AppLocalizations {
   /// **'上一首 / 下一首 + 播放模式'**
   String get settingsMiniPlayerControlsPrevNextMode;
 
+  /// No description provided for @settingsHomeGridTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'首页歌单网格'**
+  String get settingsHomeGridTitle;
+
+  /// No description provided for @settingsHomeGridDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'宽屏首页「我的歌单 / 我的电台」每行显示几个、显示几行'**
+  String get settingsHomeGridDesc;
+
+  /// No description provided for @settingsHomeGridColumnsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'每行数量'**
+  String get settingsHomeGridColumnsTitle;
+
+  /// No description provided for @settingsHomeGridColumnsAuto.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动'**
+  String get settingsHomeGridColumnsAuto;
+
+  /// No description provided for @settingsHomeGridRowsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示行数'**
+  String get settingsHomeGridRowsTitle;
+
+  /// No description provided for @settingsHomeGridRowsAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部'**
+  String get settingsHomeGridRowsAll;
+
+  /// No description provided for @settingsHomeGridSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前：{layout}，最多显示 {count} 个歌单'**
+  String settingsHomeGridSummary(String layout, int count);
+
+  /// No description provided for @settingsHomeGridSummaryAuto.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前：{layout}，每行数量随窗口宽度自动变化（平板 3 个、桌面 4 个）'**
+  String settingsHomeGridSummaryAuto(String layout);
+
+  /// No description provided for @settingsHomeGridSummaryAllRows.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前：{layout}，显示全部歌单（每类最多 {count} 个，更多请点「查看全部」）'**
+  String settingsHomeGridSummaryAllRows(String layout, int count);
+
+  /// No description provided for @settingsHomeGridClampHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'窗口宽度不足时会自动减少每行数量，避免卡片过窄'**
+  String get settingsHomeGridClampHint;
+
+  /// No description provided for @settingsHomeGridNarrowHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前窗口较窄，首页歌单为横向滑动列表，此设置在窗口变宽后生效'**
+  String get settingsHomeGridNarrowHint;
+
   /// No description provided for @settingsAutoEnterLyricsOnLaunchTitle.
   ///
   /// In zh, this message translates to:

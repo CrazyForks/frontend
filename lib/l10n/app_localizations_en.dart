@@ -3299,6 +3299,48 @@ class AppLocalizationsEn extends AppLocalizations {
       'Previous / next + play mode';
 
   @override
+  String get settingsHomeGridTitle => 'Home playlist grid';
+
+  @override
+  String get settingsHomeGridDesc =>
+      'Columns and rows for the \"My playlists\" / \"My radios\" sections on the wide-screen home page';
+
+  @override
+  String get settingsHomeGridColumnsTitle => 'Per row';
+
+  @override
+  String get settingsHomeGridColumnsAuto => 'Auto';
+
+  @override
+  String get settingsHomeGridRowsTitle => 'Rows';
+
+  @override
+  String get settingsHomeGridRowsAll => 'All';
+
+  @override
+  String settingsHomeGridSummary(String layout, int count) {
+    return 'Current: $layout — up to $count playlists';
+  }
+
+  @override
+  String settingsHomeGridSummaryAuto(String layout) {
+    return 'Current: $layout — columns follow the window width (3 on tablet, 4 on desktop)';
+  }
+
+  @override
+  String settingsHomeGridSummaryAllRows(String layout, int count) {
+    return 'Current: $layout — shows every playlist (up to $count per section; use \"View all\" for the rest)';
+  }
+
+  @override
+  String get settingsHomeGridClampHint =>
+      'Columns are reduced automatically when the window is too narrow, to keep cards readable.';
+
+  @override
+  String get settingsHomeGridNarrowHint =>
+      'This window is narrow, so home playlists use a horizontal carousel; the setting applies once the window is wider.';
+
+  @override
   String get settingsAutoEnterLyricsOnLaunchTitle => 'Open lyrics on launch';
 
   @override

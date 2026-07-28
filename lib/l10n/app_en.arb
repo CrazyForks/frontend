@@ -1993,6 +1993,34 @@
   "settingsMiniPlayerControlsPlayOnly": "Play/pause only",
   "settingsMiniPlayerControlsPrevNext": "Previous / next",
   "settingsMiniPlayerControlsPrevNextMode": "Previous / next + play mode",
+  "settingsHomeGridTitle": "Home playlist grid",
+  "settingsHomeGridDesc": "Columns and rows for the \"My playlists\" / \"My radios\" sections on the wide-screen home page",
+  "settingsHomeGridColumnsTitle": "Per row",
+  "settingsHomeGridColumnsAuto": "Auto",
+  "settingsHomeGridRowsTitle": "Rows",
+  "settingsHomeGridRowsAll": "All",
+  "settingsHomeGridSummary": "Current: {layout} — up to {count} playlists",
+  "@settingsHomeGridSummary": {
+    "placeholders": {
+      "layout": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "settingsHomeGridSummaryAuto": "Current: {layout} — columns follow the window width (3 on tablet, 4 on desktop)",
+  "@settingsHomeGridSummaryAuto": {
+    "placeholders": {
+      "layout": { "type": "String" }
+    }
+  },
+  "settingsHomeGridSummaryAllRows": "Current: {layout} — shows every playlist (up to {count} per section; use \"View all\" for the rest)",
+  "@settingsHomeGridSummaryAllRows": {
+    "placeholders": {
+      "layout": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "settingsHomeGridClampHint": "Columns are reduced automatically when the window is too narrow, to keep cards readable.",
+  "settingsHomeGridNarrowHint": "This window is narrow, so home playlists use a horizontal carousel; the setting applies once the window is wider.",
   "settingsAutoEnterLyricsOnLaunchTitle": "Open lyrics on launch",
   "settingsAutoEnterLyricsOnLaunchDesc": "Automatically open the full-screen lyrics view when the app opens (adapts to screen size)",
   "settingsNotificationLyricInTitleTitle": "Lyrics in the notification title",

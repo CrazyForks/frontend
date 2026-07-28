@@ -2098,6 +2098,34 @@
   "settingsMiniPlayerControlsPlayOnly": "仅播放/暂停",
   "settingsMiniPlayerControlsPrevNext": "上一首 / 下一首",
   "settingsMiniPlayerControlsPrevNextMode": "上一首 / 下一首 + 播放模式",
+  "settingsHomeGridTitle": "首页歌单网格",
+  "settingsHomeGridDesc": "宽屏首页「我的歌单 / 我的电台」每行显示几个、显示几行",
+  "settingsHomeGridColumnsTitle": "每行数量",
+  "settingsHomeGridColumnsAuto": "自动",
+  "settingsHomeGridRowsTitle": "显示行数",
+  "settingsHomeGridRowsAll": "全部",
+  "settingsHomeGridSummary": "当前：{layout}，最多显示 {count} 个歌单",
+  "@settingsHomeGridSummary": {
+    "placeholders": {
+      "layout": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "settingsHomeGridSummaryAuto": "当前：{layout}，每行数量随窗口宽度自动变化（平板 3 个、桌面 4 个）",
+  "@settingsHomeGridSummaryAuto": {
+    "placeholders": {
+      "layout": { "type": "String" }
+    }
+  },
+  "settingsHomeGridSummaryAllRows": "当前：{layout}，显示全部歌单（每类最多 {count} 个，更多请点「查看全部」）",
+  "@settingsHomeGridSummaryAllRows": {
+    "placeholders": {
+      "layout": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "settingsHomeGridClampHint": "窗口宽度不足时会自动减少每行数量，避免卡片过窄",
+  "settingsHomeGridNarrowHint": "当前窗口较窄，首页歌单为横向滑动列表，此设置在窗口变宽后生效",
   "settingsAutoEnterLyricsOnLaunchTitle": "打开后自动进入歌词",
   "settingsAutoEnterLyricsOnLaunchDesc": "启动客户端后自动进入全屏歌词界面（按屏幕自动适配）",
   "settingsNotificationLyricInTitleTitle": "通知栏歌词占用标题行",

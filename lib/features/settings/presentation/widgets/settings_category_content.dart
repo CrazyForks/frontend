@@ -33,6 +33,7 @@ import '../../data/log_export_service.dart';
 import '../../data/settings_api.dart';
 import '../../data/upgrade_api.dart';
 import 'cache_manager.dart';
+import 'home_grid_selector.dart';
 import 'metadata_refresh_manager.dart';
 import 'scan_manager.dart';
 import 'section_card.dart';
@@ -296,6 +297,16 @@ class _SettingsCategoryContentState
               AppSpacing.md,
             ),
             child: LanguageSelector(),
+          ),
+        ],
+      ),
+      SectionCard(
+        title: l10n.settingsHomeGridTitle,
+        icon: Icons.grid_view_outlined,
+        children: const [
+          Padding(
+            padding: EdgeInsets.all(AppSpacing.md),
+            child: HomeGridSelector(),
           ),
         ],
       ),

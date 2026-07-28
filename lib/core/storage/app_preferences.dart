@@ -474,6 +474,31 @@ class AppPreferences {
     return _prefs.setString(_miniPlayerControlsKey, value);
   }
 
+  static const _homeGridColumnsKey = 'home_grid_columns';
+  static const _homeGridRowsKey = 'home_grid_rows';
+
+  /// 首页宽屏歌单网格每行列数；0 = 自动（跟随响应式断点）。
+  ///
+  /// 返回 null 表示从未设置，默认值由 `HomeGridConfig.fromStorage` 决定 ——
+  /// 这样默认值只有一处定义，core 层也不用反向依赖 features。
+  /// 纯本地设置，不参与服务器偏好同步（songloft-org/songloft#332）。
+  int? getHomeGridColumns() {
+    return _prefs.getInt(_homeGridColumnsKey);
+  }
+
+  Future<bool> setHomeGridColumns(int value) {
+    return _prefs.setInt(_homeGridColumnsKey, value);
+  }
+
+  /// 首页宽屏歌单网格显示行数；0 = 全部（不截断）。返回 null 表示从未设置。
+  int? getHomeGridRows() {
+    return _prefs.getInt(_homeGridRowsKey);
+  }
+
+  Future<bool> setHomeGridRows(int value) {
+    return _prefs.setInt(_homeGridRowsKey, value);
+  }
+
   /// 清除所有偏好设置
   Future<bool> clear() {
     return _prefs.clear();
