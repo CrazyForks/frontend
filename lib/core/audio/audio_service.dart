@@ -11,6 +11,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:just_audio/just_audio.dart' as ja;
 
 import '../../config/app_config.dart';
+import '../../config/constants.dart';
 import '../../features/playlist/domain/playlist.dart';
 import '../network/insecure_media_proxy.dart';
 import '../../shared/models/song.dart';
@@ -37,6 +38,17 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 最近一次 [playSong] 的播放来源（本地缓存 / 远端流串），供 PlayerNotifier 回填
   /// 到 PlayerState，播放页「歌曲信息」据此展示。
   PlaybackSource lastPlaybackSource = PlaybackSource.unknown;
+
+  /// 是否正连着 Bundle 内嵌本地后端（RunMode.local 的等价判定）。
+  ///
+  /// handler 无 Riverpod Ref 拿不到 runModeProvider，但本地模式的所有入口都把
+  /// baseUrl 写成 127.0.0.1，故「bundle 构建 + 回环 host」可靠等价。
+  /// 内嵌后端（尤其手机）无 ffmpeg，video-hls 会 503，此时视频保持直出。
+  bool get _isLocalEmbeddedBackend {
+    if (!AppConfig.hasEmbeddedBackend) return false;
+    final host = Uri.tryParse(AppConfig.resolvedBaseUrl)?.host ?? '';
+    return host == '127.0.0.1' || host == 'localhost' || host == '::1';
+  }
 
   /// Web HLS 视频主控模式：video 元素接管播放，just_audio 不加载音源。
   bool hlsVideoPrimaryMode = false;
@@ -579,10 +591,16 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
               : null;
 
       // 原生平台无法携带 Authorization Header,UrlHelper 会自动拼接 baseUrl + access_token。
-      // 视频歌曲用 buildVideoUrl（media=video）：后端直出原容器，保留画面供 media_kit 渲染，
-      // 不做平台音频转码（转码 -vn 会丢画面）。
-      // Web 端视频：若格式浏览器原生支持（mp4/webm）走直出；否则走后端 HLS 转码端点，
-      // URL 以 .m3u8 结尾，songloft_web_audio_player 自动用 hls.js 处理。
+      // 视频歌曲三路分支：
+      // - Web 非浏览器兼容格式：走后端 HLS 转码端点，URL 以 .m3u8 结尾，
+      //   songloft_web_audio_player 自动用 hls.js 处理。
+      // - 原生端本地歌曲命中老旧容器黑名单（mpg/rmvb/wmv 等）：也走 video-hls——
+      //   这类容器无索引（mpv 在 HTTP 上二分 seek 产生大量超大 range 请求）且
+      //   MPEG-2/RV/VC-1 等老编码手机无硬解、软解卡顿。
+      //   附加 media=video 供 SongloftMediaKitPlayer 判定视频源创建纹理。
+      //   Bundle 本地模式除外：内嵌后端无 ffmpeg 会 503，且回环直出无网络 seek 开销。
+      // - 其余：buildVideoUrl（media=video）后端直出原容器，保留画面供 media_kit 渲染，
+      //   不做平台音频转码（转码 -vn 会丢画面）。
       final String songUrl;
       if (song.isVideo) {
         if (kIsWeb &&
@@ -590,7 +608,13 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
               song.format,
               song.filePath,
             )) {
-          songUrl = UrlHelper.buildWebVideoHlsUrl(song.id);
+          songUrl = UrlHelper.buildVideoHlsUrl(song.id);
+        } else if (!kIsWeb &&
+            song.type == AppConstants.songTypeLocal &&
+            !song.isLive &&
+            !_isLocalEmbeddedBackend &&
+            AudioFormatHelper.needsNativeVideoHls(song.format, song.filePath)) {
+          songUrl = UrlHelper.buildVideoHlsUrl(song.id, mediaVideoFlag: true);
         } else {
           songUrl = UrlHelper.buildVideoUrl(song.url!);
         }
@@ -670,13 +694,18 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
                 defaultTargetPlatform == TargetPlatform.iOS);
         final isHls = songUrl.toLowerCase().contains('.m3u8');
 
-        if (AppConfig.insecureTls && isMobile && isHls) {
-          // 移动端 HLS 电台连自签服务器：just_audio 自带代理只按单一 URL 注册 handler，
-          // 无法处理 m3u8 里指向别的 path 的切片（相对 URL 触发空指针、绝对 URL 直连自签
-          // 源站），故改走自研 HLS-aware trust-all 本地代理：拉取 m3u8 → 递归改写所有子
-          // 资源经本机代理 → 全程 trust-all（songloft-org/songloft#272）。桌面端直播不走此
-          // 分支（保留 #249 的 hlsDirect 直连源站逻辑，避免回归）。
-          final proxied = await InsecureMediaProxy.instance.wrapHls(songUrl);
+        if (AppConfig.insecureTls && isHls && (isMobile || song.isVideo)) {
+          // 移动端 HLS 电台 / 各端 HLS 视频连自签服务器：just_audio 自带代理只按单一 URL
+          // 注册 handler，无法处理 m3u8 里指向别的 path 的切片（相对 URL 触发空指针、绝对
+          // URL 直连自签源站），故改走自研 HLS-aware trust-all 本地代理：拉取 m3u8 →
+          // 递归改写所有子资源经本机代理 → 全程 trust-all（songloft-org/songloft#272）。
+          // 桌面端音频直播不走此分支（保留 #249 的 hlsDirect 直连源站逻辑，避免回归）。
+          var proxied = await InsecureMediaProxy.instance.wrapHls(songUrl);
+          // wrapHls 的入口 URL 只保留 path（query 丢失），视频源需补回 media=video
+          // 供 SongloftMediaKitPlayer 判定创建视频纹理，否则黑屏只出声。
+          if (song.isVideo) {
+            proxied = UrlHelper.appendMediaVideoParam(proxied);
+          }
           source = ja.AudioSource.uri(Uri.parse(proxied));
         } else {
           // 「忽略 SSL 证书校验」开启时，AudioSource.uri 直连路径（视频 / Windows 普通歌曲 /

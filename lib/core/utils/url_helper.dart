@@ -89,17 +89,30 @@ class UrlHelper {
   static String buildVideoUrl(String url) {
     final result = buildResourceUrl(url);
     if (result.isEmpty) return '';
-    return '$result${result.contains('?') ? '&' : '?'}media=video';
+    return appendMediaVideoParam(result);
   }
 
-  /// 构建 Web 视频 HLS 转码播放 URL。
+  /// 给已构建的 URL 追加 `media=video` 查询参数。
   ///
-  /// 当 Web 端视频格式不被浏览器原生支持时（mpg/flv/wmv/rmvb/avi/mkv 等），
-  /// 使用后端实时转码为 HLS 的端点。URL 以 .m3u8 结尾，前端 hls.js 自动识别。
+  /// 原生端 SongloftMediaKitPlayer 靠 URL 含 `media=video` 判定视频源并创建视频纹理，
+  /// 该参数是视频判定的唯一机制；video-hls 端点忽略多余 query，追加无副作用。
+  static String appendMediaVideoParam(String url) {
+    if (url.isEmpty) return url;
+    return '$url${url.contains('?') ? '&' : '?'}media=video';
+  }
+
+  /// 构建视频 HLS 转码播放 URL。
+  ///
+  /// 视频格式不被播放端良好支持时（Web：非 mp4/webm/mov；原生：mpg/rmvb/wmv 等
+  /// 老旧容器），使用后端实时转码为 HLS 的端点。URL 以 .m3u8 结尾，Web 端 hls.js
+  /// 自动识别；原生端传 [mediaVideoFlag]=true 追加 `media=video`，供
+  /// SongloftMediaKitPlayer 判定视频源以创建视频纹理（后端忽略该参数）。
   /// [songId] 歌曲 ID，用于构建 `/api/v1/songs/{id}/video-hls/playlist.m3u8` 路径。
-  static String buildWebVideoHlsUrl(int songId) {
+  static String buildVideoHlsUrl(int songId, {bool mediaVideoFlag = false}) {
     final url = '/api/v1/songs/$songId/video-hls/playlist.m3u8';
-    return buildResourceUrl(url);
+    final result = buildResourceUrl(url);
+    if (result.isEmpty) return '';
+    return mediaVideoFlag ? appendMediaVideoParam(result) : result;
   }
 
   /// 构建封面图片 URL（兼容旧接口，内部调用 buildResourceUrl）

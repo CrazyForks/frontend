@@ -15,6 +15,13 @@ import '../../config/app_config.dart';
 class SongloftMediaKitPlayer extends AudioPlayerPlatform {
   static const Duration _mediaLoadTimeout = Duration(seconds: 18);
 
+  /// 视频源加载超时。后端 video-hls 端点边转边播，playlist 请求会阻塞等待首个
+  /// 分片生成（waitForFirstSegment 最长 30s），18s 必然误判超时触发重试循环。
+  static const Duration _videoMediaLoadTimeout = Duration(seconds: 40);
+
+  /// 当前 load 请求的加载超时（load() 时按是否视频源刷新）。
+  Duration _currentLoadTimeout = _mediaLoadTimeout;
+
   late final Player player;
 
   /// 视频画面控制器。
@@ -341,7 +348,9 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
 
     // 移动端惰性创建 VideoController：仅视频源在 open() 之前建（纯音频不 attach，
     // 规避 isVideoControllerAttached 对 open() 的门闩）。桌面已在构造时建好，此处 no-op。
-    if (_isVideoRequest(request.audioSourceMessage)) {
+    final isVideo = _isVideoRequest(request.audioSourceMessage);
+    _currentLoadTimeout = isVideo ? _videoMediaLoadTimeout : _mediaLoadTimeout;
+    if (isVideo) {
       _ensureVideoControllerForVideo();
     }
 
@@ -398,7 +407,7 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
 
   Future<void> _openMedia(Future<void> Function() open) async {
     try {
-      await open().timeout(_mediaLoadTimeout);
+      await open().timeout(_currentLoadTimeout);
     } on TimeoutException catch (error) {
       _loadCompleter = null;
       _mediaOpened = false;
@@ -417,7 +426,7 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
     Completer<Duration?> loadCompleter,
   ) async {
     try {
-      return await loadCompleter.future.timeout(_mediaLoadTimeout);
+      return await loadCompleter.future.timeout(_currentLoadTimeout);
     } on TimeoutException catch (error) {
       if (_loadCompleter == loadCompleter) {
         _loadCompleter = null;

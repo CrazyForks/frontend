@@ -8,12 +8,41 @@ class AudioFormatHelper {
   /// 判断视频格式是否为 Web 浏览器原生支持（可直接用 <video> 播放）。
   /// 不支持的格式需要后端 HLS 转码。
   static bool isWebCompatibleVideo(String? format, String? filePath) {
+    return const {'mp4', 'webm', 'mov'}.contains(_videoExt(format, filePath));
+  }
+
+  /// 原生端（media_kit/libmpv）播放体验差、需改走后端 video-hls 转码的老旧视频容器：
+  /// - MPEG-PS/TS 等无索引容器在 HTTP 上二分 seek，产生大量超大 range 请求；
+  /// - MPEG-2/RV/VC-1/DivX 等老编码手机 MediaCodec 普遍无硬解，软解 1080P 卡顿。
+  /// mp4/mkv/webm/mov/m4v/3gp 等现代容器仍直出（mkv 直出保 libmpv 多音轨切换；
+  /// 后端 HLS 转码 -map 0:a:0 只保留首音轨）。黑名单口径：未知格式默认直出。
+  static const Set<String> _legacyVideoContainers = {
+    'mpg',
+    'mpeg',
+    'vob',
+    'rmvb',
+    'rm',
+    'wmv',
+    'asf',
+    'avi',
+    'flv',
+    'ts',
+    'm2ts',
+    'mts',
+  };
+
+  /// 原生端视频是否应改走后端 video-hls 转码端点（老旧容器命中黑名单）。
+  static bool needsNativeVideoHls(String? format, String? filePath) {
+    return _legacyVideoContainers.contains(_videoExt(format, filePath));
+  }
+
+  static String _videoExt(String? format, String? filePath) {
     var ext = (format ?? '').toLowerCase();
     // 优先从文件路径取扩展名（更可靠）
     if (filePath != null && filePath.contains('.')) {
       ext = filePath.split('.').last.toLowerCase();
     }
-    return const {'mp4', 'webm', 'mov'}.contains(ext);
+    return ext;
   }
 
   static const _webFormats = {
