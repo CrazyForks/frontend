@@ -68,8 +68,23 @@
 
 ## 客户端流程(统一入口)
 
-首页 `initState` 每会话调一次 `PatchUpdateDialog.maybeShow`(`lib/core/updater/`):
-1. 并行检查前端(`PatchUpdateService.checkPatch`)+ 后端(`BackendPatchService.checkPatch`,仅 `hasEmbeddedBackend && Android && local && 后端运行`)本渠道最新补丁,各自过滤「忽略此版本」。
+`ShellLayout.initState` 每会话调一次 `PatchUpdateDialog.maybeShow`(`lib/core/updater/`)。**放在 Shell 而不是首页**:Shell 全会话常驻(延迟期间不会被 dispose),且 `HomePage` 与 `TvHomePage` 都在它下面,TV 模式一并覆盖。
+
+**启动路径的三道闸**(按序,任一拦住即静默早退、一个网络请求都不发):
+1. **开关**:「设置 → 关于与更新 → 启动时自动检查更新」(`autoUpdateCheckProvider`,prefs `auto_update_check_enabled`,缺省开)。
+2. **节流**:距上次检查不足 `kPatchCheckThrottle`(6h,prefs `last_patch_check_at`)则跳过。时间戳刻意在发起检查**之前**就写 —— `checkPatch` 把网络异常都吞成 null,调用方分不清「没补丁」与「查失败」;宁可一次失败等一个窗口,也不要弱网环境每次冷启都白跑一轮,逃生门是手动入口。
+3. **延迟 + 超时**:首帧后延 `kPatchCheckStartupDelay`(4s)才发起,让首页歌单/电台请求先落地;检查阶段套 20s 整体超时。
+
+> **闸门顺序是「先等认证就绪、再等延迟」,不要退回只判 `mounted`。** 未登录时 `/login` 不在 ShellRoute 下,但 Shell 会在认证状态定型前先挂载一次再被重定向销毁。只判 `mounted` 是竞态而非因果:认证解析慢于延迟时(Web 的 secure_storage 走 IndexedDB、冷 Keychain、慢设备),那次短命挂载会吃掉本会话唯一的检查名额、写掉节流窗口,还带着无 token 的 dio 去查后端 `/settings/github-proxy`。因此改为 `ref.listenManual(authStateProvider)` 等到 `AuthStatus.authenticated` 才排延迟(与同类 `_scheduleAutoEnterLyrics` 等播放状态恢复同形),延迟用**可取消的 `Timer`** 而不是 `Future.delayed` —— 有句柄才能在 `dispose` 里取消,否则短命挂载会把已销毁的 State 子树多钉住一个延迟时长,且未来任何 pump 出 Shell 的 widget test 都会撞上「A Timer is still pending」。
+
+**手动入口**:「设置 → 关于与更新 → 检查客户端更新」(与整包更新合并为一个 tile)走 `maybeShow(manual: true)` —— 跳过开关与节流、**绕过「忽略此版本」名单**(只是本次不过滤,并不清除 `ignored_*` 记录)、不写节流时间戳;无补丁时不做整包检查,由调用方落回 `FrontendUpgradeDialog`(它自带「正在检查 / 已是最新 / 失败」三态,故无需额外 snackbar)。闸门语义由 `test/core/updater/patch_update_dialog_gates_test.dart` 覆盖。
+
+**查到补丁但弹不出来时要回滚节流时间戳**:`context.mounted` 为 false(用户在检查途中登出 / 离开设置页)时,这次发现只能丢,但必须把时间戳回滚回旧值 —— 否则一次「恰好卸载」会把一个真实可用的补丁压满一个节流窗口。该分支单独打日志,不要复用「无可热更补丁」那条,否则排查时误导人。
+
+**已知缺口(改动前即如此,不是本次引入)**:手动入口所在的 tile 在 `AppConfig.isEmbedded` 守卫**之内**,而开关在守卫**之外**。所以 embedded 构建里用户能关掉自动检查、却没有手动入口 —— 开关文案因此刻意不承诺「关闭后改为手动检查」。另外某版本被忽略后,手动入口会一直先弹该补丁对话框,因而够不到整包版本信息。
+
+放行后的流程:
+1. 并行检查前端(`PatchUpdateService.checkPatch`)+ 后端(`BackendPatchService.checkPatch`,仅 `hasEmbeddedBackend && Android && local && 后端运行`)本渠道最新补丁,各自过滤「忽略此版本」(`manual` 时不过滤)。
 2. 任一有更新 → 弹**一个**对话框列出待更新组件 + GitHub 代理选择器(复用 `GithubProxySelectionMixin`),按钮 **[忽略此版本] [稍后] [下载并更新]**。
 3. 「下载并更新」一起下载(前端 `flutter_patcher.applyPatch` stage libapp.so、后端 `downloadAndStage` 下 .so + md5 + 交原生 `stageBackendPatch`)。
 4. 完成 → 「立即重启」**一次** `EmbeddedBackendService.restartProcess()`(真进程冷启),提示「应用将重启,可能中断当前播放」。「稍后」保留 staged,下次冷启一并生效。

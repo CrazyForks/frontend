@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
@@ -5,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/a11y/web_semantics_controller.dart';
 import '../../core/theme/responsive.dart';
+import '../../core/updater/patch_update_dialog.dart';
+import '../../features/auth/domain/auth_state.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/home/presentation/plugin_tab_page.dart';
 import '../../features/jsplugin/presentation/providers/jsplugin_provider.dart';
@@ -36,6 +40,15 @@ class ShellLayout extends ConsumerStatefulWidget {
 }
 
 class _ShellLayoutState extends ConsumerState<ShellLayout> {
+  /// 每个 App 会话只做一次启动更新检查（跨会话的重复抑制交给
+  /// [kPatchCheckThrottle] 节流）。
+  static bool _updateChecked = false;
+
+  /// 等「认证就绪」的订阅，以及就绪后到真正发起检查之间的延迟定时器。
+  /// 两者都必须在 [dispose] 里清理。
+  ProviderSubscription<AuthState>? _updateAuthSub;
+  Timer? _updateCheckTimer;
+
   final _visitedPluginTabs = <String>{};
 
   /// 每个保活插件 Tab 的稳定 GlobalKey（按 entryPath 缓存）。
@@ -66,10 +79,61 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
   void initState() {
     super.initState();
     _scheduleAutoEnterLyrics();
+    _scheduleUpdateCheck();
+  }
+
+  /// 启动更新检查（热更补丁 + 整包新版本提示）。
+  ///
+  /// 放在 Shell 而不是首页：Shell 在整个 App 会话内常驻，延迟期间不会像 HomePage
+  /// 那样有被 dispose 的窗口；且 HomePage 与 TvHomePage 都在它下面，TV 模式
+  /// 也就一并覆盖到了（改动前 TV 从不检查热更）。
+  ///
+  /// **先等认证就绪，再等延迟。** 未登录时 `/login` 不在 ShellRoute 下，但 Shell 会
+  /// 在认证状态定型前先挂载一次再被重定向销毁。只用 `mounted` 判定是竞态而非因果：
+  /// 认证解析慢于延迟时（Web 的 secure_storage 走 IndexedDB、冷 Keychain、慢设备），
+  /// 那次短命挂载会吃掉本会话唯一的检查名额、写掉节流窗口，还带着无 token 的 dio 去
+  /// 查后端 `/settings/github-proxy`。改成监听 [authStateProvider]，与本类
+  /// [_scheduleAutoEnterLyrics] 等播放状态恢复的写法同形。
+  void _scheduleUpdateCheck() {
+    if (_updateChecked) return;
+    if (ref.read(authStateProvider).status == AuthStatus.authenticated) {
+      _armUpdateCheck();
+      return;
+    }
+    _updateAuthSub = ref.listenManual<AuthState>(authStateProvider, (
+      prev,
+      next,
+    ) {
+      if (next.status != AuthStatus.authenticated) return;
+      _updateAuthSub?.close();
+      _updateAuthSub = null;
+      _armUpdateCheck();
+    });
+  }
+
+  /// 认证已就绪，延迟一小会儿再查：让首页歌单/电台请求先落地，别和这轮 GitHub
+  /// 请求抢带宽。用 [Timer] 而不是 `Future.delayed` —— 有句柄才能在 [dispose] 里
+  /// 取消，否则短命挂载会把已销毁的 State 子树多钉住一个延迟时长，且未来任何 pump
+  /// 出 Shell 的 widget test 都会撞上「A Timer is still pending」。
+  void _armUpdateCheck() {
+    if (_updateChecked) return;
+    _updateCheckTimer = Timer(kPatchCheckStartupDelay, () async {
+      if (!mounted || _updateChecked) return;
+      _updateChecked = true;
+      try {
+        await PatchUpdateDialog.maybeShow(context, ref);
+      } catch (e) {
+        // 尽力而为的后台任务:失败不该把未捕获异步异常抛进错误流(定时器回调里没人
+        // 接,会变成一屏 FlutterError)。下次冷启过了节流窗口自然重试。
+        debugPrint('[Updater] 启动检查失败: $e');
+      }
+    });
   }
 
   @override
   void dispose() {
+    _updateAuthSub?.close();
+    _updateCheckTimer?.cancel();
     _autoLyricsSub?.close();
     super.dispose();
   }
@@ -167,8 +231,7 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
 
     // 监听播放器信息提示（如"正在缓存"），普通样式，与错误提示区分
     ref.listen<PlayerState>(playerStateProvider, (prev, next) {
-      if (next.infoMessage != null &&
-          next.infoMessage != prev?.infoMessage) {
+      if (next.infoMessage != null && next.infoMessage != prev?.infoMessage) {
         ResponsiveSnackBar.show(context, message: next.infoMessage!);
       }
     });

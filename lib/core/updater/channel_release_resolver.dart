@@ -31,7 +31,12 @@ class ChannelReleaseResolver {
 
   /// stable latest release 的资产名→下载地址缓存（单会话内一次检查里复用,避免前后端
   /// 各查一次 /releases/latest）。
-  Map<String, String>? _stableAssets;
+  ///
+  /// 缓存的是 **Future 而不是结果**:前后端两个 checkPatch 是在同一个 `Future.wait`
+  /// 里并发起跑的,若按「判空 → await → 回填」写,两者都会在回填之前读到 null,于是
+  /// 各打一次 /releases/latest —— 共用 resolver 的意义就没了,GitHub 未认证 API 的
+  /// 60 次/小时额度也双倍消耗。记忆化 Future 让第二个调用方直接搭上第一次请求。
+  Future<Map<String, String>?>? _stableAssetsFuture;
 
   /// 解析某资产（如 `manifest-arm64-v8a.json`）在本渠道最新 Release 的下载 URL（未套
   /// 代理）。找不到返回 null。[githubProxy] 用于给 stable 的 API 请求套代理。
@@ -44,8 +49,10 @@ class ChannelReleaseResolver {
     return assets?[assetName];
   }
 
-  Future<Map<String, String>?> _stableAssetMap(String? githubProxy) async {
-    if (_stableAssets != null) return _stableAssets;
+  Future<Map<String, String>?> _stableAssetMap(String? githubProxy) =>
+      _stableAssetsFuture ??= _fetchStableAssetMap(githubProxy);
+
+  Future<Map<String, String>?> _fetchStableAssetMap(String? githubProxy) async {
     try {
       const rawApi =
           'https://api.github.com/repos/${AppConfig.frontendUpdateRepo}/releases/latest';
@@ -63,7 +70,6 @@ class ChannelReleaseResolver {
           if (name != null && dl != null && dl.isNotEmpty) map[name] = dl;
         }
       }
-      _stableAssets = map;
       return map;
     } catch (e) {
       debugPrint('[ChannelResolver] 解析 latest release 失败: $e');

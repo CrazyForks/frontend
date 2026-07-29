@@ -41,7 +41,13 @@ class PatchUpdateService {
   final ChannelReleaseResolver _resolver;
 
   /// 当前平台是否支持热更新（仅 Android)。
-  bool get isSupported => PlatformUtils.isAndroid;
+  ///
+  /// 静态形式,供不想只为读一个平台判定就构造整个 service（会白建一个 Dio）的调用方
+  /// 使用 —— 典型是设置页决定要不要走热更检查那一跳。
+  static bool get isPlatformSupported => PlatformUtils.isAndroid;
+
+  /// 当前平台是否支持热更新（仅 Android)。
+  bool get isSupported => isPlatformSupported;
 
   /// 给 GitHub URL 套代理前缀（空则直连）。规则同 `frontend_version_api._applyProxy`。
   static String applyProxy(String rawUrl, String? proxy) {

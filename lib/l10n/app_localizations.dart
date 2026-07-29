@@ -6151,6 +6151,18 @@ abstract class AppLocalizations {
   /// **'检查客户端更新'**
   String get settingsCheckClientUpdate;
 
+  /// No description provided for @settingsAutoUpdateCheckTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动时自动检查更新'**
+  String get settingsAutoUpdateCheckTitle;
+
+  /// No description provided for @settingsAutoUpdateCheckSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动后稍等一会儿在后台检查一次，最多每 {hours} 小时一次'**
+  String settingsAutoUpdateCheckSubtitle(int hours);
+
   /// No description provided for @settingsCurrentVersion.
   ///
   /// In zh, this message translates to:

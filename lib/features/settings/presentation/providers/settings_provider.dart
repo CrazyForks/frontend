@@ -229,6 +229,53 @@ final localeProvider = NotifierProvider<LocaleNotifier, Locale?>(
 );
 
 // ============================================================================
+// Auto Update Check Provider
+// ============================================================================
+
+/// 「启动时自动检查更新」开关 Notifier（热更补丁 + 整包新版本提示）。
+///
+/// 缺省开启。关掉后启动路径完全不打网络，用户改由设置页「检查客户端更新」手动触发。
+/// 仅本地持久化（SharedPreferences），不同步服务端 —— 这是设备本地策略。
+class AutoUpdateCheckNotifier extends Notifier<bool> {
+  /// 用户是否已经动过开关。`_load()` 是异步的，若它的续体在用户点击之后才落地，
+  /// 会把刚设的值覆盖回旧的持久化值 —— 那时界面显示的和实际存的正好相反。
+  bool _userTouched = false;
+
+  @override
+  bool build() {
+    _userTouched = false;
+    _load();
+    return true;
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await ref.read(appPreferencesProvider.future);
+      if (_userTouched) return; // 用户已表态，不拿旧值盖掉
+      state = prefs.isAutoUpdateCheckEnabled();
+    } catch (e) {
+      if (!_userTouched) state = true; // 加载失败使用默认值（开启）
+    }
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    _userTouched = true;
+    state = enabled;
+    try {
+      final prefs = await ref.read(appPreferencesProvider.future);
+      await prefs.setAutoUpdateCheckEnabled(enabled);
+    } catch (e) {
+      // 保存失败忽略
+    }
+  }
+}
+
+/// 「启动时自动检查更新」开关 Provider
+final autoUpdateCheckProvider = NotifierProvider<AutoUpdateCheckNotifier, bool>(
+  AutoUpdateCheckNotifier.new,
+);
+
+// ============================================================================
 // Scan Progress Provider
 // ============================================================================
 

@@ -9,7 +9,6 @@ import '../../../core/router/app_router.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/responsive.dart';
-import '../../../core/updater/patch_update_dialog.dart';
 import '../../../core/utils/url_helper.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../playlist/domain/playlist.dart';
@@ -32,9 +31,6 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  /// 每个 App 会话只做一次热更新检查（发现新版本 → 弹窗）。
-  static bool _updateChecked = false;
-
   /// 「不限行数」自动续拉的游标：每个 type 上次是在累积到多少条时发起 loadMore 的。
   /// 同一条数只请求一次，防止上游 hasMore 恒真（或续拉拿到 0 条）时把首页拖进
   /// 无限请求循环。刷新时清空以便重新续拉。
@@ -59,18 +55,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (!mounted) return;
       ref.read(playlistListProvider(type).notifier).loadMore();
     });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    if (!_updateChecked) {
-      _updateChecked = true;
-      // 首帧后触发,确保 Navigator/context 就绪可弹对话框。
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) PatchUpdateDialog.maybeShow(context, ref);
-      });
-    }
   }
 
   @override

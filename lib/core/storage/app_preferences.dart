@@ -25,6 +25,9 @@ class AppPreferences {
   static const _ignoredClientVersionKey = 'ignored_client_version';
   // Bundle 版 Android 后端热更（换 libgojni.so）被忽略的补丁版本
   static const _ignoredBackendPatchVersionKey = 'ignored_backend_patch_version';
+  // 启动更新检查的跨会话节流时间戳 + 「启动时自动检查」开关
+  static const _lastPatchCheckAtKey = 'last_patch_check_at';
+  static const _autoUpdateCheckKey = 'auto_update_check_enabled';
 
   final SharedPreferences _prefs;
 
@@ -223,6 +226,21 @@ class AppPreferences {
   /// 记住忽略某个后端补丁版本
   Future<bool> setIgnoredBackendPatchVersion(String version) =>
       _prefs.setString(_ignoredBackendPatchVersionKey, version);
+
+  /// 上次启动更新检查的时刻（millisecondsSinceEpoch）；从未检查过为 0
+  int getLastPatchCheckAt() => _prefs.getInt(_lastPatchCheckAtKey) ?? 0;
+
+  /// 记住本次启动更新检查的时刻
+  Future<bool> setLastPatchCheckAt(int millisSinceEpoch) =>
+      _prefs.setInt(_lastPatchCheckAtKey, millisSinceEpoch);
+
+  /// 启动时是否自动检查更新（热更补丁 + 整包新版本提示）；缺省开启
+  bool isAutoUpdateCheckEnabled() =>
+      _prefs.getBool(_autoUpdateCheckKey) ?? true;
+
+  /// 设置启动时是否自动检查更新
+  Future<bool> setAutoUpdateCheckEnabled(bool enabled) =>
+      _prefs.setBool(_autoUpdateCheckKey, enabled);
 
   /// 获取上次登录的用户名
   String? getLastUsername() {

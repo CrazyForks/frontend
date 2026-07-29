@@ -25,7 +25,7 @@
 
 ## 客户端流程(启动检查 + 手动)
 
-入口:首页 `initState` 每会话调一次 `PatchUpdateDialog.maybeShow`(`lib/core/updater/`)——前端补丁(本文)与后端补丁(Bundle 版)**合并为一个对话框**。
+入口:`ShellLayout.initState` 每会话调一次 `PatchUpdateDialog.maybeShow`(`lib/core/updater/`)——前端补丁(本文)与后端补丁(Bundle 版)**合并为一个对话框**。启动路径受延迟/开关/节流三道闸约束,手动入口在「设置 → 关于与更新 → 检查客户端更新」,详见 [backend_hotupdate.md](backend_hotupdate.md#客户端流程统一入口)。
 
 1. **有可热更补丁**(且未被「忽略此版本」)→ 弹**可关闭**对话框:列出待更新组件 + **GitHub 代理选择**(复用 `GithubProxySelectionMixin`)+ 按钮 **[忽略此版本] [稍后] [下载并更新]**;下载显示进度 → 完成弹「重启生效」([立即重启] = `EmbeddedBackendService.restartProcess()` **真进程冷启**,让 `libapp.so` 冷启生效)。
 2. **无补丁但同渠道有更高整包版本**(`FrontendVersionApi`,且未被忽略)→ 弹「需要下载新版本」→ **[忽略此版本] [稍后] [前往下载]**;前往下载 = 跳 `/settings`(那里有「检查客户端更新」下 APK)。

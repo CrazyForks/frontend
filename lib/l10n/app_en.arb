@@ -2131,6 +2131,15 @@
   "settingsCheckingUpdate": "Checking for updates...",
   "settingsCheckUpdateFailed": "Failed to check for updates",
   "settingsCheckClientUpdate": "Check for client updates",
+  "settingsAutoUpdateCheckTitle": "Check for updates on startup",
+  "settingsAutoUpdateCheckSubtitle": "Checks in the background shortly after launch, at most once every {hours} hours",
+  "@settingsAutoUpdateCheckSubtitle": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "settingsCurrentVersion": "Current version: {version}",
   "@settingsCurrentVersion": {
     "placeholders": {

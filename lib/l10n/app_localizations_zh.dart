@@ -3395,6 +3395,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCheckClientUpdate => '检查客户端更新';
 
   @override
+  String get settingsAutoUpdateCheckTitle => '启动时自动检查更新';
+
+  @override
+  String settingsAutoUpdateCheckSubtitle(int hours) {
+    return '启动后稍等一会儿在后台检查一次，最多每 $hours 小时一次';
+  }
+
+  @override
   String settingsCurrentVersion(String version) {
     return '当前版本: $version';
   }

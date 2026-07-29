@@ -2236,6 +2236,15 @@
   "settingsCheckingUpdate": "正在检查更新...",
   "settingsCheckUpdateFailed": "检查更新失败",
   "settingsCheckClientUpdate": "检查客户端更新",
+  "settingsAutoUpdateCheckTitle": "启动时自动检查更新",
+  "settingsAutoUpdateCheckSubtitle": "启动后稍等一会儿在后台检查一次，最多每 {hours} 小时一次",
+  "@settingsAutoUpdateCheckSubtitle": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "settingsCurrentVersion": "当前版本: {version}",
   "@settingsCurrentVersion": {
     "placeholders": {

@@ -3552,6 +3552,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCheckClientUpdate => 'Check for client updates';
 
   @override
+  String get settingsAutoUpdateCheckTitle => 'Check for updates on startup';
+
+  @override
+  String settingsAutoUpdateCheckSubtitle(int hours) {
+    return 'Checks in the background shortly after launch, at most once every $hours hours';
+  }
+
+  @override
   String settingsCurrentVersion(String version) {
     return 'Current version: $version';
   }

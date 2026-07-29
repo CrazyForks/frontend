@@ -16,6 +16,8 @@ import '../../../../core/network/servers_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/updater/patch_update_dialog.dart';
+import '../../../../core/updater/patch_update_service.dart';
 import '../../../../core/utils/platform_utils.dart';
 import '../../../../core/utils/web_cache_clearer.dart' as web_cache;
 import '../../../../shared/utils/responsive_snackbar.dart';
@@ -212,6 +214,9 @@ class _SettingsCategoryContentState
   static const int _fixedTabs = 2;
 
   bool _exportingLogs = false;
+
+  /// 「检查客户端更新」正在查热更补丁（查完才可能弹对话框，期间 tile 显示 spinner）。
+  bool _checkingPatch = false;
 
   @override
   Widget build(BuildContext context) {
@@ -802,6 +807,11 @@ class _SettingsCategoryContentState
             const Divider(height: 1),
             _buildFrontendUpdateTile(),
           ],
+          // 开关刻意在 isEmbedded 守卫**之外**:它管的是启动时的 maybeShow,而那个
+          // 检查在所有平台都会跑(embedded web 也会走整包新版本提示并引导去下载
+          // 客户端)。跟着上面的 tile 一起隐藏会让 embedded 用户没法关掉它。
+          const Divider(height: 1),
+          _buildAutoUpdateCheckTile(),
           const Divider(height: 1),
           _buildLogLevelTile(),
           const Divider(height: 1),
@@ -1111,9 +1121,8 @@ class _SettingsCategoryContentState
                 ? l10n.settingsUpdateAvailable(check.latestVersionDisplay)
                 : l10n.settingsCurrentVersionLatest(versionDisplay);
 
-        return ListTile(
-          leading: const Icon(Icons.phone_android),
-          title: Text(l10n.settingsCheckClientUpdate),
+        return _clientUpdateTile(
+          l10n: l10n,
           subtitle: Text(
             subtitle,
             style:
@@ -1131,13 +1140,14 @@ class _SettingsCategoryContentState
                     color: Theme.of(context).colorScheme.primary,
                   )
                   : const Icon(Icons.chevron_right),
-          onTap: () => FrontendUpgradeDialog.show(context),
         );
       },
+      // loading 也走公共外壳并保留 onTap:热更检查与 frontendVersionCheckProvider
+      // 毫无依赖,被墙时那个 GitHub 请求可能挂满 dio 超时,期间正是用户最需要手动查
+      // 热更的时候 —— 不能让入口在这段时间里是死的。
       loading:
-          () => ListTile(
-            leading: const Icon(Icons.phone_android),
-            title: Text(l10n.settingsCheckClientUpdate),
+          () => _clientUpdateTile(
+            l10n: l10n,
             subtitle: Text(l10n.settingsCurrentVersion(versionDisplay)),
             trailing: const SizedBox(
               width: 20,
@@ -1146,13 +1156,87 @@ class _SettingsCategoryContentState
             ),
           ),
       error:
-          (_, _) => ListTile(
-            leading: const Icon(Icons.phone_android),
-            title: Text(l10n.settingsCheckClientUpdate),
+          (_, _) => _clientUpdateTile(
+            l10n: l10n,
             subtitle: Text(l10n.settingsCurrentVersion(versionDisplay)),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => FrontendUpgradeDialog.show(context),
           ),
+    );
+  }
+
+  /// 「检查客户端更新」tile 的公共外壳:统一承担 [_checkingPatch] 的 spinner/禁用态,
+  /// 让 data / error 两个分支只负责各自的 subtitle 与 trailing。
+  Widget _clientUpdateTile({
+    required AppLocalizations l10n,
+    required Widget subtitle,
+    required Widget trailing,
+  }) {
+    return ListTile(
+      leading: const Icon(Icons.phone_android),
+      title: Text(l10n.settingsCheckClientUpdate),
+      subtitle: subtitle,
+      trailing:
+          _checkingPatch
+              ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+              : trailing,
+      enabled: !_checkingPatch,
+      onTap: _onCheckClientUpdate,
+    );
+  }
+
+  /// 手动检查客户端更新:先查 Android 热更补丁,没有再落到整包更新对话框。
+  ///
+  /// `manual: true` 让 [PatchUpdateDialog.maybeShow] 跳过启动节流与「忽略此版本」
+  /// 名单 —— 用户主动点这里就是主动求更新。无补丁（含非 Android、检查失败）时交给
+  /// [FrontendUpgradeDialog]，它自带「正在检查 / 已是最新 / 检查失败」三态，所以这里
+  /// 不需要额外的 snackbar 反馈。
+  Future<void> _onCheckClientUpdate() async {
+    if (_checkingPatch) return;
+
+    // 非 Android 永远不可能有补丁,直接开整包对话框 —— 省掉构造两个 service、
+    // 跑 runMode ensureLoaded、以及闪一下注定无结果的 spinner。
+    // （注意不是为了省 githubProxy 请求:本 tile watch 的 frontendVersionCheckProvider
+    // 自己就 await 了 githubProxyProvider,用户能点时那个值早已解析并缓存。）
+    if (PatchUpdateService.isPlatformSupported) {
+      setState(() => _checkingPatch = true);
+      try {
+        final shown = await PatchUpdateDialog.maybeShow(
+          context,
+          ref,
+          manual: true,
+        );
+        if (shown) return;
+      } catch (e) {
+        debugPrint('[Settings] 手动热更检查失败: $e'); // 落整包对话框,由它报错
+      } finally {
+        if (mounted) setState(() => _checkingPatch = false);
+      }
+    }
+
+    if (mounted) FrontendUpgradeDialog.show(context);
+  }
+
+  /// 「启动时自动检查更新」开关。关掉后启动路径完全不打网络,只能从上面那条
+  /// 「检查客户端更新」手动触发。
+  Widget _buildAutoUpdateCheckTile() {
+    final l10n = AppLocalizations.of(context);
+    final enabled = ref.watch(autoUpdateCheckProvider);
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.update_outlined),
+      title: Text(l10n.settingsAutoUpdateCheckTitle),
+      // 节流窗口从常量取,不写死在文案里 —— 否则改 kPatchCheckThrottle 后 UI 会说谎
+      subtitle: Text(
+        l10n.settingsAutoUpdateCheckSubtitle(kPatchCheckThrottle.inHours),
+      ),
+      value: enabled,
+      onChanged:
+          (value) =>
+              ref.read(autoUpdateCheckProvider.notifier).setEnabled(value),
     );
   }
 

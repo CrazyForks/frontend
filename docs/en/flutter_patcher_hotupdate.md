@@ -25,7 +25,7 @@ This doc describes songloft-player's **frontend self-hosted Android hot update**
 
 ## Client flow (startup check + manual)
 
-Entry: the home page calls `PatchUpdateDialog.maybeShow` once per session in `initState` (`lib/core/updater/`) — the frontend patch (this doc) and backend patch (Bundle build) are **merged into one dialog**.
+Entry: `ShellLayout.initState` calls `PatchUpdateDialog.maybeShow` once per session (`lib/core/updater/`) — the frontend patch (this doc) and backend patch (Bundle build) are **merged into one dialog**. The startup path is gated by a delay, a user toggle and a throttle; the manual entry lives under "Settings → About & updates → Check for client updates". See [backend_hotupdate.md](backend_hotupdate.md#client-flow-unified-entry).
 
 1. **A hot-patchable patch** (and not "ignored") → a **dismissible** dialog listing pending components + a **GitHub proxy selector** (reusing `GithubProxySelectionMixin`) + buttons **[Ignore this version] [Later] [Download & update]**; download shows progress → on success a "restart to apply" dialog ([Restart now] = `EmbeddedBackendService.restartProcess()`, a **real process cold restart** so `libapp.so` takes effect on cold start).
 2. **No patch but a newer full version on the same channel** (`FrontendVersionApi`, not ignored) → "New version required" dialog → **[Ignore] [Later] [Go to download]**; go-to-download navigates to `/settings` (which has the client-update APK download).
