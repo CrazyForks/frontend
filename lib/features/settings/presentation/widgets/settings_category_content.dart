@@ -42,6 +42,7 @@ import 'theme_selector.dart';
 import 'language_selector.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'frontend_upgrade_dialog.dart';
+import 'github_proxy_dialog.dart';
 import 'upgrade_dialog.dart';
 import '../providers/settings_provider.dart';
 
@@ -746,6 +747,8 @@ class _SettingsCategoryContentState
         children: [
           _buildHttpProxyTile(),
           const Divider(height: 1),
+          _buildGithubProxyTile(),
+          const Divider(height: 1),
           _buildHlsProxyTile(),
           const Divider(height: 1),
           _buildProxyAllowlistTile(),
@@ -1417,6 +1420,36 @@ class _SettingsCategoryContentState
             message: l10n.settingsSaveFailed(e.toString()),
           );
         }
+      },
+    );
+  }
+
+  Widget _buildGithubProxyTile() {
+    final l10n = AppLocalizations.of(context);
+    final proxyAsync = ref.watch(githubProxyProvider);
+    final proxy = proxyAsync.value ?? '';
+
+    return ListTile(
+      leading: const Icon(Icons.bolt_outlined),
+      title: Text(l10n.settingsGithubProxyTitle),
+      subtitle: Text(proxy.isEmpty ? l10n.githubProxyDirect : proxy),
+      trailing: const Icon(Icons.chevron_right),
+      enabled: !proxyAsync.isLoading,
+      onTap: () async {
+        final result = await showDialog<String>(
+          context: context,
+          builder: (_) => GithubProxyDialog(current: proxy),
+        );
+        if (result == null || result == proxy) return;
+        await ref.read(githubProxyProvider.notifier).setValue(result);
+        if (!mounted) return;
+        ResponsiveSnackBar.show(
+          context,
+          message:
+              result.isEmpty
+                  ? l10n.settingsGithubProxyCleared
+                  : l10n.settingsGithubProxySet(result),
+        );
       },
     );
   }

@@ -33,9 +33,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateRestartInterrupt => '应用将重启，可能中断当前播放。';
 
   @override
-  String get updateProxyLabel => 'GitHub 代理';
-
-  @override
   String get updateActionDownload => '下载并更新';
 
   @override
@@ -384,26 +381,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get jspluginCleanupData => '清理数据';
-
-  @override
-  String get jspluginGithubProxy => 'GitHub 代理';
-
-  @override
-  String get jspluginCustomProxy => '自定义代理';
-
-  @override
-  String get jspluginCustomProxyEllipsis => '自定义代理...';
-
-  @override
-  String jspluginCustomProxyWith(String proxy) {
-    return '自定义: $proxy';
-  }
-
-  @override
-  String get jspluginProxyHelper => '输入代理地址，如 https://ghproxy.com/';
-
-  @override
-  String get jspluginOk => '确定';
 
   @override
   String get jspluginCleanupOrphanTitle => '清理孤儿数据';
@@ -2361,16 +2338,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '相比 Web 界面，原生客户端支持后台播放、本地缓存、锁屏/通知栏媒体控制等能力。';
 
   @override
-  String get settingsClientDownloadAccelSection => '下载加速';
-
-  @override
-  String get settingsClientDownloadGithubProxy => 'GitHub 加速代理';
-
-  @override
-  String get settingsClientDownloadProxyNotConfigured =>
-      '未配置（直连 GitHub，国内可能较慢）';
-
-  @override
   String get settingsClientDownloadStandardSection => '标准版 · 连接当前服务器';
 
   @override
@@ -2399,20 +2366,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsClientDownloadNoteUnsigned => '未签名，需自行侧载';
-
-  @override
-  String get settingsClientDownloadProxyDialogDesc =>
-      '国内访问 GitHub 较慢时可选择镜像加速。此设置与「检查更新」共用。';
-
-  @override
-  String get settingsClientDownloadCustomProxy => '自定义代理';
-
-  @override
-  String get settingsClientDownloadCustomProxyHelper =>
-      '输入代理地址，如 https://ghproxy.com/';
-
-  @override
-  String get settingsClientDownloadSave => '保存';
 
   @override
   String get settingsTabConfigTitle => '菜单设置';
@@ -3535,6 +3488,27 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsGithubProxyTitle => 'GitHub 加速代理';
+
+  @override
+  String get settingsGithubProxyDialogDesc =>
+      '插件安装/更新、检查更新与客户端下载共用此代理。国内访问 GitHub 较慢时可选择镜像加速。';
+
+  @override
+  String get settingsGithubProxyCustom => '自定义代理';
+
+  @override
+  String get settingsGithubProxyCustomHelper => '输入代理地址，如 https://ghproxy.com/';
+
+  @override
+  String get settingsGithubProxyCleared => '已切换为直连';
+
+  @override
+  String settingsGithubProxySet(String proxy) {
+    return '已设置 GitHub 代理：$proxy';
+  }
+
+  @override
   String get settingsLogLevelDebug => 'Debug（详细，调试用）';
 
   @override
@@ -3640,15 +3614,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsUpgradeChecking => '正在检查更新...';
 
   @override
-  String get settingsUpgradeGithubProxy => 'GitHub 代理';
-
-  @override
-  String get settingsUpgradeCustomProxy => '自定义代理';
-
-  @override
-  String get settingsUpgradeProxyHelper => '输入代理地址，如 https://ghproxy.com/';
-
-  @override
   String get settingsUpgradeUpToDate => '已是最新版本';
 
   @override
@@ -3686,9 +3651,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsUpgradeClose => '关闭';
 
   @override
-  String get settingsUpgradeRecheck => '重新检查';
-
-  @override
   String get settingsUpgradeLater => '稍后';
 
   @override
@@ -3705,16 +3667,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFrontendUpgradeChecking => '正在检查更新...';
-
-  @override
-  String get settingsFrontendUpgradeGithubProxy => 'GitHub 代理';
-
-  @override
-  String get settingsFrontendUpgradeCustomProxy => '自定义代理';
-
-  @override
-  String get settingsFrontendUpgradeProxyHelper =>
-      '输入代理地址，如 https://ghproxy.com/';
 
   @override
   String get settingsFrontendUpgradeUpToDate => '已是最新版本';
@@ -3736,9 +3688,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFrontendUpgradeReleaseNotes => '更新说明:';
-
-  @override
-  String get settingsFrontendUpgradeRecheck => '重新检查';
 
   @override
   String get settingsFrontendUpgradeClose => '关闭';

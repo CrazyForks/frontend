@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../config/app_config.dart';
 import '../../../../core/theme/responsive.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../../shared/constants/github_proxy.dart';
 import '../../data/frontend_version_api.dart';
 import '../providers/settings_provider.dart';
 
@@ -35,24 +34,6 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
   String? _error;
   FrontendVersionCheck? _checkResult;
 
-  int _selectedProxyIndex = 0;
-  final TextEditingController _customProxyController = TextEditingController();
-
-  String _lastCheckedProxy = '';
-
-  String get _effectiveProxy {
-    if (_selectedProxyIndex == -1) {
-      return _customProxyController.text.trim();
-    }
-    if (_selectedProxyIndex >= 0 &&
-        _selectedProxyIndex < kGithubProxyPresets.length) {
-      return kGithubProxyPresets[_selectedProxyIndex].value;
-    }
-    return '';
-  }
-
-  bool get _proxyChanged => _effectiveProxy != _lastCheckedProxy;
-
   @override
   void initState() {
     super.initState();
@@ -61,19 +42,14 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
     });
   }
 
-  @override
-  void dispose() {
-    _customProxyController.dispose();
-    super.dispose();
-  }
-
   Future<void> _checkUpdate() async {
-    final proxy = _effectiveProxy;
+    // GitHub 代理来自「设置 → 网络设置」的全局配置
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() {
       _isChecking = true;
       _error = null;
       _checkResult = null;
-      _lastCheckedProxy = proxy;
     });
 
     try {
@@ -150,9 +126,6 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
                   ),
                 ),
 
-              // GitHub 代理选择
-              _buildProxySelector(theme, colorScheme),
-
               // 正在检查
               if (_isChecking)
                 Center(
@@ -173,76 +146,6 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
         ),
       ),
       actions: _buildActions(),
-    );
-  }
-
-  Widget _buildProxySelector(ThemeData theme, ColorScheme colorScheme) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.settingsFrontendUpgradeGithubProxy,
-            style: theme.textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          RadioGroup<int>(
-            groupValue: _selectedProxyIndex,
-            onChanged: (value) {
-              if (value != null) setState(() => _selectedProxyIndex = value);
-            },
-            child: Column(
-              children: [
-                ...List.generate(kGithubProxyPresets.length, (index) {
-                  final proxy = kGithubProxyPresets[index];
-                  return RadioListTile<int>(
-                    title: Text(
-                      proxy.value.isEmpty ? l10n.githubProxyDirect : proxy.label,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    value: index,
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  );
-                }),
-                RadioListTile<int>(
-                  title: Text(
-                    l10n.settingsFrontendUpgradeCustomProxy,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  value: -1,
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-          ),
-          if (_selectedProxyIndex == -1)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, top: 4),
-              child: TextField(
-                controller: _customProxyController,
-                decoration: InputDecoration(
-                  hintText: 'https://your-proxy.com/',
-                  helperText: l10n.settingsFrontendUpgradeProxyHelper,
-                  helperMaxLines: 2,
-                  isDense: true,
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                ),
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-          const Divider(height: 24),
-        ],
-      ),
     );
   }
 
@@ -379,7 +282,7 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
   /// 打开发布页。检查失败（[_checkResult] 为空）时回退到当前渠道的发布页常量，
   /// 保证 GitHub API 不可达时用户仍有下载完整安装包的退路。
   Future<void> _launchReleaseUrl() async {
-    final proxy = _effectiveProxy;
+    final proxy = ref.read(githubProxyProvider).value ?? '';
     final releaseUrl = _checkResult?.releaseUrl ?? '';
     final rawUrl =
         releaseUrl.isNotEmpty
@@ -402,14 +305,6 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
           ),
           child: Text(l10n.commonCancel),
         ),
-        if (_proxyChanged)
-          FilledButton(
-            onPressed: _checkUpdate,
-            style: FilledButton.styleFrom(
-              minimumSize: context.responsiveButtonMinSize,
-            ),
-            child: Text(l10n.settingsFrontendUpgradeRecheck),
-          ),
       ];
     }
 
@@ -442,14 +337,6 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
           ),
           child: Text(l10n.settingsFrontendUpgradeLater),
         ),
-        if (_proxyChanged)
-          OutlinedButton(
-            onPressed: _checkUpdate,
-            style: OutlinedButton.styleFrom(
-              minimumSize: context.responsiveButtonMinSize,
-            ),
-            child: Text(l10n.settingsFrontendUpgradeRecheck),
-          ),
         FilledButton.icon(
           onPressed: _launchReleaseUrl,
           style: FilledButton.styleFrom(
@@ -471,14 +358,6 @@ class _FrontendUpgradeDialogState extends ConsumerState<FrontendUpgradeDialog> {
           child: Text(l10n.settingsFrontendUpgradeClose),
         ),
         _buildDownloadFullButton(l10n),
-        if (_proxyChanged)
-          FilledButton(
-            onPressed: _checkUpdate,
-            style: FilledButton.styleFrom(
-              minimumSize: context.responsiveButtonMinSize,
-            ),
-            child: Text(l10n.settingsFrontendUpgradeRecheck),
-          ),
       ];
     }
 

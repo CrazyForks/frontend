@@ -5,12 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart'
     show appPreferencesProvider;
-import '../../features/jsplugin/presentation/widgets/github_proxy_selection.dart';
 import '../../features/settings/data/frontend_version_api.dart';
 import '../../features/settings/presentation/providers/settings_provider.dart'
     show githubProxyProvider, frontendVersionCheckProvider;
 import '../../l10n/app_localizations.dart';
-import '../../shared/constants/github_proxy.dart';
 import '../backend/embedded_backend_service.dart';
 import '../backend/run_mode_provider.dart';
 import '../network/api_client.dart' show dioProvider;
@@ -130,8 +128,7 @@ class PatchUpdateDialog extends ConsumerStatefulWidget {
 
 enum _Status { idle, downloading, done, failed }
 
-class _PatchUpdateDialogState extends ConsumerState<PatchUpdateDialog>
-    with GithubProxySelectionMixin<PatchUpdateDialog> {
+class _PatchUpdateDialogState extends ConsumerState<PatchUpdateDialog> {
   final _frontendService = PatchUpdateService();
   late final BackendPatchService _backendService = BackendPatchService(
     appDio: ref.read(dioProvider),
@@ -139,19 +136,10 @@ class _PatchUpdateDialogState extends ConsumerState<PatchUpdateDialog>
   _Status _status = _Status.idle;
   double? _fraction;
 
-  @override
-  List<String> get proxyPresetValues =>
-      kGithubProxyPresets.map((e) => e.value).toList();
-
-  @override
-  void initState() {
-    super.initState();
-    restoreGithubProxy(); // 恢复上次选择
-  }
-
   Future<void> _download() async {
-    persistGithubProxy();
-    final proxy = effectiveProxy;
+    // GitHub 代理来自「设置 → 网络设置」的全局配置
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     final proxyOrNull = proxy.isEmpty ? null : proxy;
     setState(() {
       _status = _Status.downloading;
@@ -287,8 +275,6 @@ class _PatchUpdateDialogState extends ConsumerState<PatchUpdateDialog>
                   context,
                   l10n.updateComponentBackend(widget.backendPatch!.patchLabel),
                 ),
-              const SizedBox(height: 16),
-              _buildProxySelector(context, l10n),
             ],
           ),
           actions: [
@@ -326,41 +312,6 @@ class _PatchUpdateDialogState extends ConsumerState<PatchUpdateDialog>
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Text('• $text', style: Theme.of(context).textTheme.bodyMedium),
-    );
-  }
-
-  Widget _buildProxySelector(BuildContext context, AppLocalizations l10n) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.updateProxyLabel,
-          style: Theme.of(context).textTheme.labelMedium,
-        ),
-        const SizedBox(height: 4),
-        DropdownButton<int>(
-          isExpanded: true,
-          value: selectedProxyIndex,
-          items: [
-            for (int i = 0; i < kGithubProxyPresets.length; i++)
-              DropdownMenuItem(
-                value: i,
-                child: Text(
-                  kGithubProxyPresets[i].value.isEmpty
-                      ? l10n.githubProxyDirect
-                      : kGithubProxyPresets[i].label,
-                ),
-              ),
-            DropdownMenuItem(value: -1, child: Text(l10n.jspluginCustomProxy)),
-          ],
-          onChanged: (v) => setState(() => selectedProxyIndex = v ?? 0),
-        ),
-        if (selectedProxyIndex == -1)
-          TextField(
-            controller: customProxyController,
-            decoration: InputDecoration(hintText: l10n.jspluginProxyHelper),
-          ),
-      ],
     );
   }
 }

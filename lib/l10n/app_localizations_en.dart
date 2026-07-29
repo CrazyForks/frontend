@@ -35,9 +35,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The app will restart, which may interrupt playback.';
 
   @override
-  String get updateProxyLabel => 'GitHub proxy';
-
-  @override
   String get updateActionDownload => 'Download & update';
 
   @override
@@ -394,27 +391,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get jspluginCleanupData => 'Clean Up Data';
-
-  @override
-  String get jspluginGithubProxy => 'GitHub Proxy';
-
-  @override
-  String get jspluginCustomProxy => 'Custom Proxy';
-
-  @override
-  String get jspluginCustomProxyEllipsis => 'Custom proxy...';
-
-  @override
-  String jspluginCustomProxyWith(String proxy) {
-    return 'Custom: $proxy';
-  }
-
-  @override
-  String get jspluginProxyHelper =>
-      'Enter a proxy URL, e.g. https://ghproxy.com/';
-
-  @override
-  String get jspluginOk => 'OK';
 
   @override
   String get jspluginCleanupOrphanTitle => 'Clean Up Orphan Data';
@@ -2466,16 +2442,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Compared with the web interface, the native client supports background playback, local caching, lock-screen/notification media controls and more.';
 
   @override
-  String get settingsClientDownloadAccelSection => 'Download Acceleration';
-
-  @override
-  String get settingsClientDownloadGithubProxy => 'GitHub Proxy';
-
-  @override
-  String get settingsClientDownloadProxyNotConfigured =>
-      'Not configured (direct GitHub connection, may be slow in some regions)';
-
-  @override
   String get settingsClientDownloadStandardSection =>
       'Standard · Connects to current server';
 
@@ -2508,20 +2474,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsClientDownloadNoteUnsigned =>
       'Unsigned, requires manual sideloading';
-
-  @override
-  String get settingsClientDownloadProxyDialogDesc =>
-      'If GitHub is slow in your region, you can choose a mirror to speed it up. This setting is shared with \"Check for updates\".';
-
-  @override
-  String get settingsClientDownloadCustomProxy => 'Custom proxy';
-
-  @override
-  String get settingsClientDownloadCustomProxyHelper =>
-      'Enter a proxy address, e.g. https://ghproxy.com/';
-
-  @override
-  String get settingsClientDownloadSave => 'Save';
 
   @override
   String get settingsTabConfigTitle => 'Menu Settings';
@@ -3695,6 +3647,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsGithubProxyTitle => 'GitHub Proxy';
+
+  @override
+  String get settingsGithubProxyDialogDesc =>
+      'Shared by plugin install/update, update checks and client downloads. Pick a mirror if GitHub is slow in your region.';
+
+  @override
+  String get settingsGithubProxyCustom => 'Custom proxy';
+
+  @override
+  String get settingsGithubProxyCustomHelper =>
+      'Enter a proxy address, e.g. https://ghproxy.com/';
+
+  @override
+  String get settingsGithubProxyCleared => 'Switched to direct connection';
+
+  @override
+  String settingsGithubProxySet(String proxy) {
+    return 'GitHub proxy set to $proxy';
+  }
+
+  @override
   String get settingsLogLevelDebug => 'Debug (verbose, for debugging)';
 
   @override
@@ -3806,16 +3780,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsUpgradeChecking => 'Checking for updates...';
 
   @override
-  String get settingsUpgradeGithubProxy => 'GitHub proxy';
-
-  @override
-  String get settingsUpgradeCustomProxy => 'Custom proxy';
-
-  @override
-  String get settingsUpgradeProxyHelper =>
-      'Enter a proxy address, e.g. https://ghproxy.com/';
-
-  @override
   String get settingsUpgradeUpToDate => 'You\'re on the latest version';
 
   @override
@@ -3853,9 +3817,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsUpgradeClose => 'Close';
 
   @override
-  String get settingsUpgradeRecheck => 'Check again';
-
-  @override
   String get settingsUpgradeLater => 'Later';
 
   @override
@@ -3873,16 +3834,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFrontendUpgradeChecking => 'Checking for updates...';
-
-  @override
-  String get settingsFrontendUpgradeGithubProxy => 'GitHub proxy';
-
-  @override
-  String get settingsFrontendUpgradeCustomProxy => 'Custom proxy';
-
-  @override
-  String get settingsFrontendUpgradeProxyHelper =>
-      'Enter a proxy address, e.g. https://ghproxy.com/';
 
   @override
   String get settingsFrontendUpgradeUpToDate => 'You\'re on the latest version';
@@ -3904,9 +3855,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFrontendUpgradeReleaseNotes => 'Release notes:';
-
-  @override
-  String get settingsFrontendUpgradeRecheck => 'Check again';
 
   @override
   String get settingsFrontendUpgradeClose => 'Close';

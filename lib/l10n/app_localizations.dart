@@ -134,12 +134,6 @@ abstract class AppLocalizations {
   /// **'应用将重启，可能中断当前播放。'**
   String get updateRestartInterrupt;
 
-  /// No description provided for @updateProxyLabel.
-  ///
-  /// In zh, this message translates to:
-  /// **'GitHub 代理'**
-  String get updateProxyLabel;
-
   /// No description provided for @updateActionDownload.
   ///
   /// In zh, this message translates to:
@@ -775,42 +769,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'清理数据'**
   String get jspluginCleanupData;
-
-  /// No description provided for @jspluginGithubProxy.
-  ///
-  /// In zh, this message translates to:
-  /// **'GitHub 代理'**
-  String get jspluginGithubProxy;
-
-  /// No description provided for @jspluginCustomProxy.
-  ///
-  /// In zh, this message translates to:
-  /// **'自定义代理'**
-  String get jspluginCustomProxy;
-
-  /// No description provided for @jspluginCustomProxyEllipsis.
-  ///
-  /// In zh, this message translates to:
-  /// **'自定义代理...'**
-  String get jspluginCustomProxyEllipsis;
-
-  /// No description provided for @jspluginCustomProxyWith.
-  ///
-  /// In zh, this message translates to:
-  /// **'自定义: {proxy}'**
-  String jspluginCustomProxyWith(String proxy);
-
-  /// No description provided for @jspluginProxyHelper.
-  ///
-  /// In zh, this message translates to:
-  /// **'输入代理地址，如 https://ghproxy.com/'**
-  String get jspluginProxyHelper;
-
-  /// No description provided for @jspluginOk.
-  ///
-  /// In zh, this message translates to:
-  /// **'确定'**
-  String get jspluginOk;
 
   /// No description provided for @jspluginCleanupOrphanTitle.
   ///
@@ -4328,24 +4286,6 @@ abstract class AppLocalizations {
   /// **'相比 Web 界面，原生客户端支持后台播放、本地缓存、锁屏/通知栏媒体控制等能力。'**
   String get settingsClientDownloadIntro;
 
-  /// No description provided for @settingsClientDownloadAccelSection.
-  ///
-  /// In zh, this message translates to:
-  /// **'下载加速'**
-  String get settingsClientDownloadAccelSection;
-
-  /// No description provided for @settingsClientDownloadGithubProxy.
-  ///
-  /// In zh, this message translates to:
-  /// **'GitHub 加速代理'**
-  String get settingsClientDownloadGithubProxy;
-
-  /// No description provided for @settingsClientDownloadProxyNotConfigured.
-  ///
-  /// In zh, this message translates to:
-  /// **'未配置（直连 GitHub，国内可能较慢）'**
-  String get settingsClientDownloadProxyNotConfigured;
-
   /// No description provided for @settingsClientDownloadStandardSection.
   ///
   /// In zh, this message translates to:
@@ -4393,30 +4333,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'未签名，需自行侧载'**
   String get settingsClientDownloadNoteUnsigned;
-
-  /// No description provided for @settingsClientDownloadProxyDialogDesc.
-  ///
-  /// In zh, this message translates to:
-  /// **'国内访问 GitHub 较慢时可选择镜像加速。此设置与「检查更新」共用。'**
-  String get settingsClientDownloadProxyDialogDesc;
-
-  /// No description provided for @settingsClientDownloadCustomProxy.
-  ///
-  /// In zh, this message translates to:
-  /// **'自定义代理'**
-  String get settingsClientDownloadCustomProxy;
-
-  /// No description provided for @settingsClientDownloadCustomProxyHelper.
-  ///
-  /// In zh, this message translates to:
-  /// **'输入代理地址，如 https://ghproxy.com/'**
-  String get settingsClientDownloadCustomProxyHelper;
-
-  /// No description provided for @settingsClientDownloadSave.
-  ///
-  /// In zh, this message translates to:
-  /// **'保存'**
-  String get settingsClientDownloadSave;
 
   /// No description provided for @settingsTabConfigTitle.
   ///
@@ -6397,6 +6313,42 @@ abstract class AppLocalizations {
   /// **'HTTP 代理已设置为 {proxy}'**
   String settingsHttpProxySet(String proxy);
 
+  /// No description provided for @settingsGithubProxyTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'GitHub 加速代理'**
+  String get settingsGithubProxyTitle;
+
+  /// No description provided for @settingsGithubProxyDialogDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件安装/更新、检查更新与客户端下载共用此代理。国内访问 GitHub 较慢时可选择镜像加速。'**
+  String get settingsGithubProxyDialogDesc;
+
+  /// No description provided for @settingsGithubProxyCustom.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义代理'**
+  String get settingsGithubProxyCustom;
+
+  /// No description provided for @settingsGithubProxyCustomHelper.
+  ///
+  /// In zh, this message translates to:
+  /// **'输入代理地址，如 https://ghproxy.com/'**
+  String get settingsGithubProxyCustomHelper;
+
+  /// No description provided for @settingsGithubProxyCleared.
+  ///
+  /// In zh, this message translates to:
+  /// **'已切换为直连'**
+  String get settingsGithubProxyCleared;
+
+  /// No description provided for @settingsGithubProxySet.
+  ///
+  /// In zh, this message translates to:
+  /// **'已设置 GitHub 代理：{proxy}'**
+  String settingsGithubProxySet(String proxy);
+
   /// No description provided for @settingsLogLevelDebug.
   ///
   /// In zh, this message translates to:
@@ -6577,24 +6529,6 @@ abstract class AppLocalizations {
   /// **'正在检查更新...'**
   String get settingsUpgradeChecking;
 
-  /// No description provided for @settingsUpgradeGithubProxy.
-  ///
-  /// In zh, this message translates to:
-  /// **'GitHub 代理'**
-  String get settingsUpgradeGithubProxy;
-
-  /// No description provided for @settingsUpgradeCustomProxy.
-  ///
-  /// In zh, this message translates to:
-  /// **'自定义代理'**
-  String get settingsUpgradeCustomProxy;
-
-  /// No description provided for @settingsUpgradeProxyHelper.
-  ///
-  /// In zh, this message translates to:
-  /// **'输入代理地址，如 https://ghproxy.com/'**
-  String get settingsUpgradeProxyHelper;
-
   /// No description provided for @settingsUpgradeUpToDate.
   ///
   /// In zh, this message translates to:
@@ -6661,12 +6595,6 @@ abstract class AppLocalizations {
   /// **'关闭'**
   String get settingsUpgradeClose;
 
-  /// No description provided for @settingsUpgradeRecheck.
-  ///
-  /// In zh, this message translates to:
-  /// **'重新检查'**
-  String get settingsUpgradeRecheck;
-
   /// No description provided for @settingsUpgradeLater.
   ///
   /// In zh, this message translates to:
@@ -6703,24 +6631,6 @@ abstract class AppLocalizations {
   /// **'正在检查更新...'**
   String get settingsFrontendUpgradeChecking;
 
-  /// No description provided for @settingsFrontendUpgradeGithubProxy.
-  ///
-  /// In zh, this message translates to:
-  /// **'GitHub 代理'**
-  String get settingsFrontendUpgradeGithubProxy;
-
-  /// No description provided for @settingsFrontendUpgradeCustomProxy.
-  ///
-  /// In zh, this message translates to:
-  /// **'自定义代理'**
-  String get settingsFrontendUpgradeCustomProxy;
-
-  /// No description provided for @settingsFrontendUpgradeProxyHelper.
-  ///
-  /// In zh, this message translates to:
-  /// **'输入代理地址，如 https://ghproxy.com/'**
-  String get settingsFrontendUpgradeProxyHelper;
-
   /// No description provided for @settingsFrontendUpgradeUpToDate.
   ///
   /// In zh, this message translates to:
@@ -6750,12 +6660,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'更新说明:'**
   String get settingsFrontendUpgradeReleaseNotes;
-
-  /// No description provided for @settingsFrontendUpgradeRecheck.
-  ///
-  /// In zh, this message translates to:
-  /// **'重新检查'**
-  String get settingsFrontendUpgradeRecheck;
 
   /// No description provided for @settingsFrontendUpgradeClose.
   ///

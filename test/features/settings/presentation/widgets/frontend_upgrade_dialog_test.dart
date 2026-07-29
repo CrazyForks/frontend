@@ -42,10 +42,18 @@ void main() {
         .setMockMethodCallHandler(launcherChannel, null);
   });
 
-  Future<void> pumpDialog(WidgetTester tester, FrontendVersionApi api) async {
+  Future<void> pumpDialog(
+    WidgetTester tester,
+    FrontendVersionApi api, {
+    String proxy = '',
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [frontendVersionApiProvider.overrideWithValue(api)],
+        overrides: [
+          frontendVersionApiProvider.overrideWithValue(api),
+          // 对话框静默读取「设置 → 网络设置」的全局 GitHub 代理，测试中避免真实网络请求
+          githubProxyProvider.overrideWith(() => _FakeGithubProxyNotifier(proxy)),
+        ],
         child: const MaterialApp(
           locale: Locale('zh'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -74,11 +82,13 @@ void main() {
     expect(launchedUrl, 'https://github.com/songloft-org/songloft-player/releases/tag/dev');
   });
 
-  testWidgets('选定 GitHub 代理后跳转地址带代理前缀', (tester) async {
-    await pumpDialog(tester, _apiReturning(_releaseJson()));
+  testWidgets('全局配置 GitHub 代理后跳转地址带代理前缀', (tester) async {
+    await pumpDialog(
+      tester,
+      _apiReturning(_releaseJson()),
+      proxy: 'https://ghfast.top/',
+    );
 
-    await tester.tap(find.text('ghfast.top'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('下载完整安装包'));
     await tester.pumpAndSettle();
 
@@ -110,6 +120,21 @@ Map<String, dynamic> _releaseJson() => {
   'published_at': '2026-07-01T00:00:00Z',
   'assets': <dynamic>[],
 };
+
+/// 内存版 GitHub 代理 Notifier：不发网络请求，模拟「设置 → 网络设置」中的全局配置。
+class _FakeGithubProxyNotifier extends GithubProxyNotifier {
+  _FakeGithubProxyNotifier(this._initial);
+
+  final String _initial;
+
+  @override
+  Future<String> build() async => _initial;
+
+  @override
+  Future<void> setValue(String value) async {
+    state = AsyncValue.data(value);
+  }
+}
 
 /// [payload] 为 null 时模拟网络失败，触发对话框的 error 分支。
 FrontendVersionApi _apiReturning(Map<String, dynamic>? payload) {

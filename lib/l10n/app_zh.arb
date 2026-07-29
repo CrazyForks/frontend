@@ -9,7 +9,6 @@
   "updateComponentBackend": "后端补丁 {version}",
   "@updateComponentBackend": { "placeholders": { "version": { "type": "String" } } },
   "updateRestartInterrupt": "应用将重启，可能中断当前播放。",
-  "updateProxyLabel": "GitHub 代理",
   "updateActionDownload": "下载并更新",
   "updateActionLater": "稍后",
   "updateActionIgnore": "忽略此版本",
@@ -243,19 +242,6 @@
   "jspluginUploadPlugin": "上传插件",
   "jspluginUpdateAll": "全部更新",
   "jspluginCleanupData": "清理数据",
-  "jspluginGithubProxy": "GitHub 代理",
-  "jspluginCustomProxy": "自定义代理",
-  "jspluginCustomProxyEllipsis": "自定义代理...",
-  "jspluginCustomProxyWith": "自定义: {proxy}",
-  "@jspluginCustomProxyWith": {
-    "placeholders": {
-      "proxy": {
-        "type": "String"
-      }
-    }
-  },
-  "jspluginProxyHelper": "输入代理地址，如 https://ghproxy.com/",
-  "jspluginOk": "确定",
   "jspluginCleanupOrphanTitle": "清理孤儿数据",
   "jspluginCleanupOrphanContent": "将清理已卸载插件遗留的持久化存储数据，此操作不可撤销。",
   "jspluginCleanup": "清理",
@@ -1532,9 +1518,6 @@
   "settingsMetadataRefreshAgain": "重新刷新",
   "settingsClientDownloadTitle": "下载客户端 App",
   "settingsClientDownloadIntro": "相比 Web 界面，原生客户端支持后台播放、本地缓存、锁屏/通知栏媒体控制等能力。",
-  "settingsClientDownloadAccelSection": "下载加速",
-  "settingsClientDownloadGithubProxy": "GitHub 加速代理",
-  "settingsClientDownloadProxyNotConfigured": "未配置（直连 GitHub，国内可能较慢）",
   "settingsClientDownloadStandardSection": "标准版 · 连接当前服务器",
   "settingsClientDownloadBundleSection": "Bundle 版 · 内嵌后端，无需服务器",
   "settingsClientDownloadStandardAllVersions": "标准版全部版本",
@@ -1564,10 +1547,6 @@
     }
   },
   "settingsClientDownloadNoteUnsigned": "未签名，需自行侧载",
-  "settingsClientDownloadProxyDialogDesc": "国内访问 GitHub 较慢时可选择镜像加速。此设置与「检查更新」共用。",
-  "settingsClientDownloadCustomProxy": "自定义代理",
-  "settingsClientDownloadCustomProxyHelper": "输入代理地址，如 https://ghproxy.com/",
-  "settingsClientDownloadSave": "保存",
   "settingsTabConfigTitle": "菜单设置",
   "settingsTabConfigBuiltInSection": "内置页面",
   "settingsTabConfigLibrary": "曲库",
@@ -2305,6 +2284,19 @@
       }
     }
   },
+  "settingsGithubProxyTitle": "GitHub 加速代理",
+  "settingsGithubProxyDialogDesc": "插件安装/更新、检查更新与客户端下载共用此代理。国内访问 GitHub 较慢时可选择镜像加速。",
+  "settingsGithubProxyCustom": "自定义代理",
+  "settingsGithubProxyCustomHelper": "输入代理地址，如 https://ghproxy.com/",
+  "settingsGithubProxyCleared": "已切换为直连",
+  "settingsGithubProxySet": "已设置 GitHub 代理：{proxy}",
+  "@settingsGithubProxySet": {
+    "placeholders": {
+      "proxy": {
+        "type": "String"
+      }
+    }
+  },
   "settingsLogLevelDebug": "Debug（详细，调试用）",
   "settingsLogLevelInfo": "Info（默认）",
   "settingsLogLevelWarn": "Warn",
@@ -2390,9 +2382,6 @@
   },
   "settingsUpgradeTitle": "检查更新",
   "settingsUpgradeChecking": "正在检查更新...",
-  "settingsUpgradeGithubProxy": "GitHub 代理",
-  "settingsUpgradeCustomProxy": "自定义代理",
-  "settingsUpgradeProxyHelper": "输入代理地址，如 https://ghproxy.com/",
   "settingsUpgradeUpToDate": "已是最新版本",
   "settingsUpgradeCurrentVersion": "当前版本: {version}",
   "@settingsUpgradeCurrentVersion": {
@@ -2418,16 +2407,12 @@
   "settingsUpgradeRestartSoon": "应用即将重启",
   "settingsUpgradeFailed": "升级失败",
   "settingsUpgradeClose": "关闭",
-  "settingsUpgradeRecheck": "重新检查",
   "settingsUpgradeLater": "稍后",
   "settingsUpgradeGoDownload": "前往下载",
   "settingsUpgradeUpgradeNow": "立即升级",
   "settingsFrontendUpgradeCheckTimeout": "检查更新超时，请尝试切换代理后重试",
   "settingsFrontendUpgradeTitle": "客户端更新",
   "settingsFrontendUpgradeChecking": "正在检查更新...",
-  "settingsFrontendUpgradeGithubProxy": "GitHub 代理",
-  "settingsFrontendUpgradeCustomProxy": "自定义代理",
-  "settingsFrontendUpgradeProxyHelper": "输入代理地址，如 https://ghproxy.com/",
   "settingsFrontendUpgradeUpToDate": "已是最新版本",
   "settingsFrontendUpgradeCurrentVersion": "当前版本: {version}",
   "@settingsFrontendUpgradeCurrentVersion": {
@@ -2454,7 +2439,6 @@
     }
   },
   "settingsFrontendUpgradeReleaseNotes": "更新说明:",
-  "settingsFrontendUpgradeRecheck": "重新检查",
   "settingsFrontendUpgradeClose": "关闭",
   "settingsFrontendUpgradeLater": "稍后",
   "settingsFrontendUpgradeGoDownload": "前往下载",

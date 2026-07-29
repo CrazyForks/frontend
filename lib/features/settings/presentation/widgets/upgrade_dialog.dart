@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/network/api_exceptions.dart';
 import '../../../../core/theme/responsive.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../../shared/constants/github_proxy.dart';
 import '../../data/upgrade_api.dart';
 import '../providers/settings_provider.dart';
 
@@ -39,77 +38,23 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
   /// 当前选中的版本类型索引（在 availableUpdates 列表中的索引）
   int _selectedVersionIndex = 0;
 
-  /// 当前选中的代理索引，-1 表示自定义
-  int _selectedProxyIndex = 0;
-  final TextEditingController _customProxyController = TextEditingController();
-
-  /// 上次检查时使用的代理地址，用于检测代理是否变化
-  String _lastCheckedProxy = '';
-
-  /// 获取当前生效的代理地址
-  String get _effectiveProxy {
-    if (_selectedProxyIndex == -1) {
-      return _customProxyController.text.trim();
-    }
-    if (_selectedProxyIndex >= 0 &&
-        _selectedProxyIndex < kGithubProxyPresets.length) {
-      return kGithubProxyPresets[_selectedProxyIndex].value;
-    }
-    return '';
-  }
-
   @override
   void initState() {
     super.initState();
     // 使用 addPostFrameCallback 延迟调用，避免在 initState 中访问 inherited widget
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      _initProxyAndCheck();
+      _checkUpgrade();
     });
   }
 
-  /// 读取已记住的 GitHub 代理作为默认选中，然后检查更新
-  Future<void> _initProxyAndCheck() async {
-    try {
-      final saved = await ref.read(githubProxyProvider.future);
-      if (mounted) setState(() => _applySavedProxy(saved));
-    } catch (_) {
-      // 读取失败则保持默认（直连）
-    }
-    await _checkUpgrade();
-  }
-
-  /// 将已保存的代理值映射到当前选择状态
-  void _applySavedProxy(String saved) {
-    final value = saved.trim();
-    if (value.isEmpty) {
-      _selectedProxyIndex = 0;
-      return;
-    }
-    final index = kGithubProxyPresets.indexWhere((p) => p.value == value);
-    if (index >= 0) {
-      _selectedProxyIndex = index;
-    } else {
-      _selectedProxyIndex = -1;
-      _customProxyController.text = value;
-    }
-  }
-
-  @override
-  void dispose() {
-    _customProxyController.dispose();
-    super.dispose();
-  }
-
-  /// 代理是否在上次检查后发生了变化
-  bool get _proxyChanged => _effectiveProxy != _lastCheckedProxy;
-
   Future<void> _checkUpgrade() async {
-    final proxy = _effectiveProxy;
+    // GitHub 代理来自「设置 → 网络设置」的全局配置
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() {
       _isChecking = true;
       _error = null;
       _checkResult = null;
-      _lastCheckedProxy = proxy;
     });
 
     try {
@@ -119,8 +64,6 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           .timeout(const Duration(seconds: 15));
       if (!mounted) return;
       setState(() => _checkResult = result);
-      // 记住本次使用的代理，下次打开对话框及设置页自动检查都会带上
-      unawaited(ref.read(githubProxyProvider.notifier).setValue(proxy));
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } on TimeoutException {
@@ -179,23 +122,20 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     final version = _selectedVersion;
     if (version == null) return;
 
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() {
       _isStarting = true;
       _error = null;
     });
 
     try {
-      final proxy = _effectiveProxy;
       await ref
           .read(upgradeProgressProvider.notifier)
           .startUpgrade(
             versionType: version.type,
             githubProxy: proxy.isNotEmpty ? proxy : null,
           );
-      // 记住本次升级使用的代理
-      if (mounted) {
-        unawaited(ref.read(githubProxyProvider.notifier).setValue(proxy));
-      }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
@@ -309,10 +249,6 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
                   ),
                 ),
 
-              // GitHub 代理选择（升级过程中不显示）
-              if (!upgradeProgress.isUpgrading && !upgradeProgress.isCompleted)
-                _buildProxySelector(theme, colorScheme),
-
               // 正在检查
               if (_isChecking)
                 Center(
@@ -344,76 +280,6 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
         ),
       ),
       actions: _buildActions(upgradeProgress),
-    );
-  }
-
-  Widget _buildProxySelector(ThemeData theme, ColorScheme colorScheme) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(l10n.settingsUpgradeGithubProxy, style: theme.textTheme.titleSmall),
-          const SizedBox(height: 8),
-          // 预设代理选项 + 自定义代理选项
-          RadioGroup<int>(
-            groupValue: _selectedProxyIndex,
-            onChanged: (value) {
-              if (value != null) setState(() => _selectedProxyIndex = value);
-            },
-            child: Column(
-              children: [
-                ...List.generate(kGithubProxyPresets.length, (index) {
-                  final proxy = kGithubProxyPresets[index];
-                  return RadioListTile<int>(
-                    title: Text(
-                      proxy.value.isEmpty ? l10n.githubProxyDirect : proxy.label,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    value: index,
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  );
-                }),
-                // 自定义代理选项
-                RadioListTile<int>(
-                  title: Text(
-                    l10n.settingsUpgradeCustomProxy,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  value: -1,
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-          ),
-          // 自定义代理输入框
-          if (_selectedProxyIndex == -1)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, top: 4),
-              child: TextField(
-                controller: _customProxyController,
-                decoration: InputDecoration(
-                  hintText: 'https://your-proxy.com/',
-                  helperText: l10n.settingsUpgradeProxyHelper,
-                  helperMaxLines: 2,
-                  isDense: true,
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                ),
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-          const Divider(height: 24),
-        ],
-      ),
     );
   }
 
@@ -700,14 +566,6 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           ),
           child: Text(l10n.commonCancel),
         ),
-        if (_proxyChanged)
-          FilledButton(
-            onPressed: _checkUpgrade,
-            style: FilledButton.styleFrom(
-              minimumSize: context.responsiveButtonMinSize,
-            ),
-            child: Text(l10n.settingsUpgradeRecheck),
-          ),
       ];
     }
 
@@ -743,14 +601,6 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
             ),
             child: Text(l10n.settingsUpgradeLater),
           ),
-          if (_proxyChanged)
-            OutlinedButton(
-              onPressed: _checkUpgrade,
-              style: OutlinedButton.styleFrom(
-                minimumSize: context.responsiveButtonMinSize,
-              ),
-              child: Text(l10n.settingsUpgradeRecheck),
-            ),
           FilledButton.icon(
             onPressed: () => _launchReleaseUrl(),
             style: FilledButton.styleFrom(
@@ -771,14 +621,6 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           ),
           child: Text(l10n.settingsUpgradeLater),
         ),
-        if (_proxyChanged)
-          OutlinedButton(
-            onPressed: _checkUpgrade,
-            style: OutlinedButton.styleFrom(
-              minimumSize: context.responsiveButtonMinSize,
-            ),
-            child: Text(l10n.settingsUpgradeRecheck),
-          ),
         FilledButton(
           onPressed: _isStarting ? null : _startUpgrade,
           style: FilledButton.styleFrom(
@@ -805,14 +647,6 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           ),
           child: Text(l10n.settingsUpgradeClose),
         ),
-        if (_proxyChanged)
-          FilledButton(
-            onPressed: _checkUpgrade,
-            style: FilledButton.styleFrom(
-              minimumSize: context.responsiveButtonMinSize,
-            ),
-            child: Text(l10n.settingsUpgradeRecheck),
-          ),
       ];
     }
 

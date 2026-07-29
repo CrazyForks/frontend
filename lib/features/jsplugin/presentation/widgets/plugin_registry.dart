@@ -7,13 +7,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/network/api_exceptions.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../../shared/constants/github_proxy.dart';
 import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../../settings/data/settings_api.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../data/jsplugin_api.dart';
 import '../providers/jsplugin_provider.dart';
-import 'github_proxy_selection.dart';
 
 /// 官方插件源 URL
 const _kOfficialRegistryUrl =
@@ -31,12 +29,7 @@ class PluginRegistryPage extends ConsumerStatefulWidget {
       _PluginRegistryPageState();
 }
 
-class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
-    with GithubProxySelectionMixin<PluginRegistryPage> {
-  @override
-  List<String> get proxyPresetValues =>
-      kGithubProxyPresets.map((e) => e.value).toList();
-
+class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
   List<PluginRegistryConfig> _registries = [];
   PluginRegistryConfig? _selectedRegistry;
   bool _allSources = false;
@@ -55,13 +48,7 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
   @override
   void initState() {
     super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    // 先恢复上次使用的代理，保证首次刷新用到持久化的代理设置。
-    await restoreGithubProxy();
-    await _loadRegistries();
+    _loadRegistries();
   }
 
   @override
@@ -97,6 +84,8 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
 
   Future<void> _refreshPlugins() async {
     if (!_allSources && _selectedRegistry == null) return;
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() {
       _loadingPlugins = true;
       _pluginError = null;
@@ -109,7 +98,7 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
         page: _currentPage,
         pageSize: _pageSize,
         search: _searchText.isEmpty ? null : _searchText,
-        githubProxy: effectiveProxy.isEmpty ? null : effectiveProxy,
+        githubProxy: proxy.isEmpty ? null : proxy,
         // 「全部」模式各源用自身存储的 token，前端不传
         token: _allSources || _selectedRegistry!.token.isEmpty
             ? null
@@ -216,83 +205,6 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
     );
   }
 
-  /// 当前代理的展示文案
-  String get _proxyLabel {
-    if (selectedProxyIndex == -1) {
-      final v = customProxyController.text.trim();
-      return v.isEmpty ? AppLocalizations.of(context).jspluginCustomProxy : v;
-    }
-    if (selectedProxyIndex >= 0 && selectedProxyIndex < kGithubProxyPresets.length) {
-      return kGithubProxyPresets[selectedProxyIndex].label;
-    }
-    return kGithubProxyPresets.first.label;
-  }
-
-  /// 统一的 GitHub 代理选择入口（下拉菜单），与插件管理样式一致
-  Widget _buildProxySelectorTile(ThemeData theme) {
-    final l10n = AppLocalizations.of(context);
-    return PopupMenuButton<int>(
-      tooltip: l10n.jspluginGithubProxy,
-      onSelected: (value) {
-        if (value == -1) {
-          _showCustomProxyDialog();
-        } else {
-          setState(() => selectedProxyIndex = value);
-          persistGithubProxy();
-          _refreshPlugins();
-        }
-      },
-      itemBuilder: (context) => [
-        ...List.generate(kGithubProxyPresets.length, (index) {
-          return PopupMenuItem<int>(
-            value: index,
-            child: Row(
-              children: [
-                if (selectedProxyIndex == index)
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary)
-                else
-                  const SizedBox(width: 18),
-                const SizedBox(width: 8),
-                Text(kGithubProxyPresets[index].label),
-              ],
-            ),
-          );
-        }),
-        const PopupMenuDivider(),
-        PopupMenuItem<int>(
-          value: -1,
-          child: Row(
-            children: [
-              if (selectedProxyIndex == -1)
-                Icon(Icons.check, size: 18, color: theme.colorScheme.primary)
-              else
-                const SizedBox(width: 18),
-              const SizedBox(width: 8),
-              Text(
-                selectedProxyIndex == -1
-                    ? l10n.jspluginCustomProxyWith(customProxyController.text)
-                    : l10n.jspluginCustomProxyEllipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
-      child: ListTile(
-        leading: Icon(
-          Icons.vpn_key_outlined,
-          color: effectiveProxy.isNotEmpty ? theme.colorScheme.primary : null,
-        ),
-        title: Text(l10n.jspluginGithubProxy),
-        subtitle: Text(
-          effectiveProxy.isEmpty ? l10n.githubProxyDirect : _proxyLabel,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: const Icon(Icons.arrow_drop_down),
-      ),
-    );
-  }
-
   Widget _buildEmptyState(ThemeData theme) {
     final l10n = AppLocalizations.of(context);
     return Center(
@@ -326,9 +238,6 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
 
     return Column(
       children: [
-        // GitHub 代理（统一下拉选择）
-        _buildProxySelectorTile(theme),
-        const Divider(height: 1),
         // 订阅源选择 + 搜索
         Padding(
           padding: const EdgeInsets.all(16),
@@ -508,7 +417,6 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
             itemBuilder: (context, index) =>
                 _RegistryPluginItem(
                   entry: plugins[index],
-                  githubProxy: effectiveProxy,
                   // 「全部」模式无法确定插件来源，token 留空（私有源需切到具体源安装）
                   token: _allSources ? '' : (_selectedRegistry?.token ?? ''),
                   onInstalled: () {
@@ -554,46 +462,6 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
     );
   }
 
-  void _showCustomProxyDialog() {
-    final l10n = AppLocalizations.of(context);
-    final controller = TextEditingController(text: customProxyController.text);
-    showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.jspluginCustomProxy),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'https://your-proxy.com/',
-            helperText: l10n.jspluginProxyHelper,
-            border: const OutlineInputBorder(),
-          ),
-          onSubmitted: (_) =>
-              Navigator.of(context).pop(controller.text.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(context).pop(controller.text.trim()),
-            child: Text(l10n.jspluginOk),
-          ),
-        ],
-      ),
-    ).then((value) {
-      if (value != null) {
-        customProxyController.text = value;
-        setState(() => selectedProxyIndex = -1);
-        persistGithubProxy();
-        _refreshPlugins();
-      }
-    });
-  }
-
   void _showRegistryManagement() {
     showDialog(
       context: context,
@@ -629,13 +497,11 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage>
 /// 单个注册表插件项
 class _RegistryPluginItem extends ConsumerStatefulWidget {
   final RegistryPluginEntry entry;
-  final String githubProxy;
   final String token;
   final VoidCallback onInstalled;
 
   const _RegistryPluginItem({
     required this.entry,
-    required this.githubProxy,
     this.token = '',
     required this.onInstalled,
   });
@@ -649,12 +515,14 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
   bool _installing = false;
 
   Future<void> _install() async {
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() => _installing = true);
     try {
       final api = ref.read(jsPluginApiProvider);
       final result = await api.installFromRegistry(
         downloadUrl: widget.entry.downloadUrl,
-        githubProxy: widget.githubProxy.isEmpty ? null : widget.githubProxy,
+        githubProxy: proxy.isEmpty ? null : proxy,
         token: widget.token.isEmpty ? null : widget.token,
         sourceUrl: widget.entry.sourceUrl,
       );

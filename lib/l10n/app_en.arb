@@ -9,7 +9,6 @@
   "updateComponentBackend": "Backend patch {version}",
   "@updateComponentBackend": { "placeholders": { "version": { "type": "String" } } },
   "updateRestartInterrupt": "The app will restart, which may interrupt playback.",
-  "updateProxyLabel": "GitHub proxy",
   "updateActionDownload": "Download & update",
   "updateActionLater": "Later",
   "updateActionIgnore": "Ignore this version",
@@ -138,19 +137,6 @@
   "jspluginUploadPlugin": "Upload Plugin",
   "jspluginUpdateAll": "Update All",
   "jspluginCleanupData": "Clean Up Data",
-  "jspluginGithubProxy": "GitHub Proxy",
-  "jspluginCustomProxy": "Custom Proxy",
-  "jspluginCustomProxyEllipsis": "Custom proxy...",
-  "jspluginCustomProxyWith": "Custom: {proxy}",
-  "@jspluginCustomProxyWith": {
-    "placeholders": {
-      "proxy": {
-        "type": "String"
-      }
-    }
-  },
-  "jspluginProxyHelper": "Enter a proxy URL, e.g. https://ghproxy.com/",
-  "jspluginOk": "OK",
   "jspluginCleanupOrphanTitle": "Clean Up Orphan Data",
   "jspluginCleanupOrphanContent": "This will remove persistent storage data left by uninstalled plugins. This action cannot be undone.",
   "jspluginCleanup": "Clean Up",
@@ -1427,9 +1413,6 @@
   "settingsMetadataRefreshAgain": "Refresh Again",
   "settingsClientDownloadTitle": "Download Client App",
   "settingsClientDownloadIntro": "Compared with the web interface, the native client supports background playback, local caching, lock-screen/notification media controls and more.",
-  "settingsClientDownloadAccelSection": "Download Acceleration",
-  "settingsClientDownloadGithubProxy": "GitHub Proxy",
-  "settingsClientDownloadProxyNotConfigured": "Not configured (direct GitHub connection, may be slow in some regions)",
   "settingsClientDownloadStandardSection": "Standard · Connects to current server",
   "settingsClientDownloadBundleSection": "Bundle · Embedded backend, no server needed",
   "settingsClientDownloadStandardAllVersions": "All standard versions",
@@ -1459,10 +1442,6 @@
     }
   },
   "settingsClientDownloadNoteUnsigned": "Unsigned, requires manual sideloading",
-  "settingsClientDownloadProxyDialogDesc": "If GitHub is slow in your region, you can choose a mirror to speed it up. This setting is shared with \"Check for updates\".",
-  "settingsClientDownloadCustomProxy": "Custom proxy",
-  "settingsClientDownloadCustomProxyHelper": "Enter a proxy address, e.g. https://ghproxy.com/",
-  "settingsClientDownloadSave": "Save",
   "settingsTabConfigTitle": "Menu Settings",
   "settingsTabConfigBuiltInSection": "Built-in Pages",
   "settingsTabConfigLibrary": "Library",
@@ -2200,6 +2179,19 @@
       }
     }
   },
+  "settingsGithubProxyTitle": "GitHub Proxy",
+  "settingsGithubProxyDialogDesc": "Shared by plugin install/update, update checks and client downloads. Pick a mirror if GitHub is slow in your region.",
+  "settingsGithubProxyCustom": "Custom proxy",
+  "settingsGithubProxyCustomHelper": "Enter a proxy address, e.g. https://ghproxy.com/",
+  "settingsGithubProxyCleared": "Switched to direct connection",
+  "settingsGithubProxySet": "GitHub proxy set to {proxy}",
+  "@settingsGithubProxySet": {
+    "placeholders": {
+      "proxy": {
+        "type": "String"
+      }
+    }
+  },
   "settingsLogLevelDebug": "Debug (verbose, for debugging)",
   "settingsLogLevelInfo": "Info (default)",
   "settingsLogLevelWarn": "Warn",
@@ -2285,9 +2277,6 @@
   },
   "settingsUpgradeTitle": "Check for updates",
   "settingsUpgradeChecking": "Checking for updates...",
-  "settingsUpgradeGithubProxy": "GitHub proxy",
-  "settingsUpgradeCustomProxy": "Custom proxy",
-  "settingsUpgradeProxyHelper": "Enter a proxy address, e.g. https://ghproxy.com/",
   "settingsUpgradeUpToDate": "You're on the latest version",
   "settingsUpgradeCurrentVersion": "Current version: {version}",
   "@settingsUpgradeCurrentVersion": {
@@ -2313,16 +2302,12 @@
   "settingsUpgradeRestartSoon": "The app will restart shortly",
   "settingsUpgradeFailed": "Upgrade failed",
   "settingsUpgradeClose": "Close",
-  "settingsUpgradeRecheck": "Check again",
   "settingsUpgradeLater": "Later",
   "settingsUpgradeGoDownload": "Go to download",
   "settingsUpgradeUpgradeNow": "Upgrade now",
   "settingsFrontendUpgradeCheckTimeout": "Update check timed out. Try switching the proxy and retry.",
   "settingsFrontendUpgradeTitle": "Client update",
   "settingsFrontendUpgradeChecking": "Checking for updates...",
-  "settingsFrontendUpgradeGithubProxy": "GitHub proxy",
-  "settingsFrontendUpgradeCustomProxy": "Custom proxy",
-  "settingsFrontendUpgradeProxyHelper": "Enter a proxy address, e.g. https://ghproxy.com/",
   "settingsFrontendUpgradeUpToDate": "You're on the latest version",
   "settingsFrontendUpgradeCurrentVersion": "Current version: {version}",
   "@settingsFrontendUpgradeCurrentVersion": {
@@ -2349,7 +2334,6 @@
     }
   },
   "settingsFrontendUpgradeReleaseNotes": "Release notes:",
-  "settingsFrontendUpgradeRecheck": "Check again",
   "settingsFrontendUpgradeClose": "Close",
   "settingsFrontendUpgradeLater": "Later",
   "settingsFrontendUpgradeGoDownload": "Go to download",

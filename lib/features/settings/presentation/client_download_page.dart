@@ -6,7 +6,6 @@ import '../../../config/app_config.dart';
 import '../../../core/theme/app_dimensions.dart';
 import '../../../core/utils/web_os.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/constants/github_proxy.dart';
 import 'providers/settings_provider.dart';
 import 'widgets/section_card.dart';
 
@@ -16,7 +15,7 @@ import 'widgets/section_card.dart';
 /// - 标准版：连接当前服务器（`songloft-org/songloft-player` releases）
 /// - Bundle 版：内嵌后端、无需服务器（`songloft-org/songloft` releases）
 ///
-/// 下载链接自动套用已配置的 GitHub 加速代理（[githubProxyProvider]）。
+/// 下载链接自动套用「设置 → 网络设置」配置的 GitHub 加速代理（[githubProxyProvider]）。
 class ClientDownloadPage extends ConsumerWidget {
   const ClientDownloadPage({super.key});
 
@@ -128,24 +127,6 @@ class ClientDownloadPage extends ConsumerWidget {
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          SectionCard(
-            title: l10n.settingsClientDownloadAccelSection,
-            icon: Icons.bolt_outlined,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.public),
-                title: Text(l10n.settingsClientDownloadGithubProxy),
-                subtitle: Text(
-                  proxy.isEmpty
-                      ? l10n.settingsClientDownloadProxyNotConfigured
-                      : proxy,
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _editProxy(context, ref, proxy),
-              ),
-            ],
           ),
           const SizedBox(height: AppSpacing.lg),
           if (_recommendedCard(context, os, proxy) case final card?) ...[
@@ -298,20 +279,6 @@ class ClientDownloadPage extends ConsumerWidget {
     );
   }
 
-  /// 打开 GitHub 加速代理选择弹窗，选定后持久化到 [githubProxyProvider]（全局生效）。
-  Future<void> _editProxy(
-    BuildContext context,
-    WidgetRef ref,
-    String current,
-  ) async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (_) => _GithubProxyDialog(current: current),
-    );
-    if (result == null || result == current) return;
-    await ref.read(githubProxyProvider.notifier).setValue(result);
-  }
-
   static _ClientAsset? _firstFor(List<_ClientAsset> assets, WebOS os) {
     for (final a in assets) {
       if (a.os == os) return a;
@@ -357,128 +324,4 @@ class _ClientAsset {
     required this.asset,
     this.unsigned = false,
   });
-}
-
-/// GitHub 加速代理选择弹窗：预设常用镜像 + 自定义地址，返回选定的代理前缀（空串表示直连）。
-class _GithubProxyDialog extends StatefulWidget {
-  final String current;
-
-  const _GithubProxyDialog({required this.current});
-
-  @override
-  State<_GithubProxyDialog> createState() => _GithubProxyDialogState();
-}
-
-class _GithubProxyDialogState extends State<_GithubProxyDialog> {
-  late int _selected;
-  late final TextEditingController _customController;
-
-  @override
-  void initState() {
-    super.initState();
-    const presets = kGithubProxyPresets;
-    final idx = presets.indexWhere((p) => p.value == widget.current);
-    // 命中预设则选中，否则视为自定义（-1）
-    _selected = idx >= 0 ? idx : -1;
-    _customController = TextEditingController(
-      text: idx >= 0 ? '' : widget.current,
-    );
-  }
-
-  @override
-  void dispose() {
-    _customController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
-    const presets = kGithubProxyPresets;
-
-    return AlertDialog(
-      title: Text(l10n.settingsClientDownloadGithubProxy),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              l10n.settingsClientDownloadProxyDialogDesc,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            RadioGroup<int>(
-              groupValue: _selected,
-              onChanged: (v) {
-                if (v != null) setState(() => _selected = v);
-              },
-              child: Column(
-                children: [
-                  ...List.generate(presets.length, (i) {
-                    return RadioListTile<int>(
-                      title: Text(
-                        presets[i].value.isEmpty
-                            ? l10n.githubProxyDirect
-                            : presets[i].label,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                      value: i,
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                    );
-                  }),
-                  RadioListTile<int>(
-                    title: Text(
-                      l10n.settingsClientDownloadCustomProxy,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    value: -1,
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-            ),
-            if (_selected == -1)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, top: 4),
-                child: TextField(
-                  controller: _customController,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: 'https://your-proxy.com/',
-                    helperText: l10n.settingsClientDownloadCustomProxyHelper,
-                    helperMaxLines: 2,
-                    isDense: true,
-                    border: const OutlineInputBorder(),
-                  ),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.commonCancel),
-        ),
-        FilledButton(
-          onPressed: () {
-            final value = _selected == -1
-                ? _customController.text.trim()
-                : presets[_selected].value;
-            Navigator.pop(context, value);
-          },
-          child: Text(l10n.settingsClientDownloadSave),
-        ),
-      ],
-    );
-  }
 }

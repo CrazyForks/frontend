@@ -10,12 +10,10 @@ import '../../../../core/network/api_exceptions.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/theme/responsive.dart';
-import '../../../../shared/constants/github_proxy.dart';
 import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../data/jsplugin_api.dart';
 import '../providers/jsplugin_provider.dart';
-import 'github_proxy_selection.dart';
 import 'plugin_icon.dart';
 
 /// JS 插件管理组件
@@ -26,30 +24,7 @@ class JSPluginManager extends ConsumerStatefulWidget {
   ConsumerState<JSPluginManager> createState() => _JSPluginManagerState();
 }
 
-class _JSPluginManagerState extends ConsumerState<JSPluginManager>
-    with GithubProxySelectionMixin<JSPluginManager> {
-  @override
-  List<String> get proxyPresetValues =>
-      kGithubProxyPresets.map((e) => e.value).toList();
-
-  @override
-  void initState() {
-    super.initState();
-    restoreGithubProxy();
-  }
-
-  /// 当前代理的展示文案
-  String get _proxyLabel {
-    if (selectedProxyIndex == -1) {
-      final v = customProxyController.text.trim();
-      return v.isEmpty ? AppLocalizations.of(context).jspluginCustomProxy : v;
-    }
-    if (selectedProxyIndex >= 0 && selectedProxyIndex < kGithubProxyPresets.length) {
-      return kGithubProxyPresets[selectedProxyIndex].label;
-    }
-    return kGithubProxyPresets.first.label;
-  }
-
+class _JSPluginManagerState extends ConsumerState<JSPluginManager> {
   /// 插件自动更新开关
   Widget _buildAutoUpdateTile(AppLocalizations l10n) {
     final autoUpdateAsync = ref.watch(pluginAutoUpdateProvider);
@@ -90,9 +65,6 @@ class _JSPluginManagerState extends ConsumerState<JSPluginManager>
         if (expanded) ref.invalidate(jsPluginsProvider);
       },
       children: [
-        // 统一的 GitHub 代理选择（更新/批量更新/强制更新共用）
-        _buildProxySelectorTile(),
-        const Divider(height: 1),
         // 顶部操作栏
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -155,114 +127,6 @@ class _JSPluginManagerState extends ConsumerState<JSPluginManager>
         ),
       ],
     );
-  }
-
-  /// 统一的 GitHub 代理选择入口（下拉菜单）
-  Widget _buildProxySelectorTile() {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    return PopupMenuButton<int>(
-      tooltip: l10n.jspluginGithubProxy,
-      onSelected: (value) {
-        if (value == -1) {
-          _showCustomProxyDialog();
-        } else {
-          setState(() => selectedProxyIndex = value);
-          persistGithubProxy();
-        }
-      },
-      itemBuilder: (context) => [
-        ...List.generate(kGithubProxyPresets.length, (index) {
-          return PopupMenuItem<int>(
-            value: index,
-            child: Row(
-              children: [
-                if (selectedProxyIndex == index)
-                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary)
-                else
-                  const SizedBox(width: 18),
-                const SizedBox(width: 8),
-                Text(
-                  kGithubProxyPresets[index].value.isEmpty
-                      ? l10n.githubProxyDirect
-                      : kGithubProxyPresets[index].label,
-                ),
-              ],
-            ),
-          );
-        }),
-        const PopupMenuDivider(),
-        PopupMenuItem<int>(
-          value: -1,
-          child: Row(
-            children: [
-              if (selectedProxyIndex == -1)
-                Icon(Icons.check, size: 18, color: theme.colorScheme.primary)
-              else
-                const SizedBox(width: 18),
-              const SizedBox(width: 8),
-              Text(
-                selectedProxyIndex == -1
-                    ? l10n.jspluginCustomProxyWith(customProxyController.text)
-                    : l10n.jspluginCustomProxyEllipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
-      child: ListTile(
-        leading: Icon(
-          Icons.vpn_key_outlined,
-          color: effectiveProxy.isNotEmpty ? theme.colorScheme.primary : null,
-        ),
-        title: Text(l10n.jspluginGithubProxy),
-        subtitle: Text(
-          effectiveProxy.isEmpty ? l10n.githubProxyDirect : _proxyLabel,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: const Icon(Icons.arrow_drop_down),
-      ),
-    );
-  }
-
-  void _showCustomProxyDialog() {
-    final l10n = AppLocalizations.of(context);
-    final controller = TextEditingController(text: customProxyController.text);
-    showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.jspluginCustomProxy),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'https://your-proxy.com/',
-            helperText: l10n.jspluginProxyHelper,
-            border: const OutlineInputBorder(),
-          ),
-          onSubmitted: (_) =>
-              Navigator.of(context).pop(controller.text.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(context).pop(controller.text.trim()),
-            child: Text(l10n.jspluginOk),
-          ),
-        ],
-      ),
-    ).then((value) {
-      if (value != null && mounted) {
-        customProxyController.text = value;
-        setState(() => selectedProxyIndex = -1);
-        persistGithubProxy();
-      }
-    });
   }
 
   void _showUploadDialog() {
@@ -712,7 +576,8 @@ class _JSPluginItemState extends ConsumerState<_JSPluginItem> {
     );
     if (confirmed != true || !mounted) return;
 
-    final proxy = ref.read(githubProxyProvider).value ?? '';
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() => _isForceUpdating = true);
     try {
       final api = ref.read(jsPluginApiProvider);
@@ -1243,11 +1108,9 @@ class _JSPluginUpdateDialogState extends ConsumerState<_JSPluginUpdateDialog> {
   String? _error;
   JSPluginUpdateCheck? _checkResult;
 
-  /// 当前生效的 GitHub 代理，来自插件管理顶部的统一选择。
-  String get _proxy => ref.read(githubProxyProvider).value ?? '';
-
   Future<void> _checkUpdate() async {
-    final proxy = _proxy;
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() {
       _isChecking = true;
       _error = null;
@@ -1278,7 +1141,8 @@ class _JSPluginUpdateDialogState extends ConsumerState<_JSPluginUpdateDialog> {
   }
 
   Future<void> _executeUpdate() async {
-    final proxy = _proxy;
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() {
       _isUpdating = true;
       _error = null;
@@ -1574,11 +1438,9 @@ class _JSPluginBatchUpdateDialogState
   JSPluginBatchUpdateResponse? _response;
   String? _error;
 
-  /// 当前生效的 GitHub 代理，来自插件管理顶部的统一选择。
-  String get _proxy => ref.read(githubProxyProvider).value ?? '';
-
   Future<void> _executeBatchUpdate() async {
-    final proxy = _proxy;
+    final proxy = await ref.read(githubProxyProvider.future);
+    if (!mounted) return;
     setState(() {
       _isUpdating = true;
       _error = null;
@@ -1798,7 +1660,7 @@ class _JSPluginBatchUpdateDialogState
 }
 
 /// 强制更新确认对话框：确认返回 true，取消返回 null。
-/// GitHub 代理沿用插件管理顶部的统一选择，此处不再单独选择。
+/// GitHub 代理沿用「设置 → 网络设置」中的全局配置，此处不再单独选择。
 class _ForceUpdateConfirmDialog extends StatelessWidget {
   final String pluginName;
 
