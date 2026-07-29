@@ -12,6 +12,11 @@ class GithubProxyOption {
 /// 预设 GitHub 代理列表（首项为「直连」）。
 const List<GithubProxyOption> kGithubProxyPresets = [
   GithubProxyOption(label: '直连 (不使用代理)', value: ''),
+  // 本项目自建代理（cloudflare-github-proxy），排在其他镜像之前
+  GithubProxyOption(
+    label: 'gproxy.hanxi.cc',
+    value: 'https://gproxy.hanxi.cc/',
+  ),
   GithubProxyOption(label: 'ghproxy.com', value: 'https://ghproxy.com/'),
   GithubProxyOption(label: 'ghfast.top', value: 'https://ghfast.top/'),
   GithubProxyOption(label: 'gh.con.sh', value: 'https://gh.con.sh/'),
