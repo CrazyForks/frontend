@@ -34,16 +34,18 @@ class BrowseCollectionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = layout == BrowseCardLayout.grid
-        ? _buildGrid(context)
-        : _buildList(context);
+    final content =
+        layout == BrowseCardLayout.grid
+            ? _buildGrid(context)
+            : _buildList(context);
 
     final centered = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1200),
-        child: onRefresh != null
-            ? RefreshIndicator(onRefresh: onRefresh!, child: content)
-            : content,
+        child:
+            onRefresh != null
+                ? RefreshIndicator(onRefresh: onRefresh!, child: content)
+                : content,
       ),
     );
 
@@ -108,6 +110,9 @@ class BrowseCollectionView extends StatelessWidget {
   }
 
   Widget _loadingCell() => const Center(
-    child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()),
+    child: Padding(
+      padding: EdgeInsets.all(16),
+      child: CircularProgressIndicator(),
+    ),
   );
 }

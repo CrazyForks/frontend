@@ -145,12 +145,13 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
             Expanded(
               child: playlistsAsync.when(
                 data: (state) => _buildContent(context, state),
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (error, _) => ErrorView(
-                  message: error.toString(),
-                  onRetry: () => ref.invalidate(playlistListProvider(_type)),
-                ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error:
+                    (error, _) => ErrorView(
+                      message: error.toString(),
+                      onRetry:
+                          () => ref.invalidate(playlistListProvider(_type)),
+                    ),
               ),
             ),
           ],
@@ -173,13 +174,14 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
         decoration: InputDecoration(
           hintText: l10n.playlistListSearchHint,
           prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  tooltip: l10n.clearSearch,
-                  onPressed: _clearSearch,
-                )
-              : null,
+          suffixIcon:
+              _searchController.text.isNotEmpty
+                  ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    tooltip: l10n.clearSearch,
+                    onPressed: _clearSearch,
+                  )
+                  : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
@@ -196,9 +198,10 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
   Widget _buildContent(BuildContext context, PaginatedPlaylistsState state) {
     if (state.items.isEmpty) return _buildEmpty(context);
 
-    final layout = ref.watch(playlistViewModeProvider) == PlaylistViewMode.list
-        ? BrowseCardLayout.list
-        : BrowseCardLayout.grid;
+    final layout =
+        ref.watch(playlistViewModeProvider) == PlaylistViewMode.list
+            ? BrowseCardLayout.list
+            : BrowseCardLayout.grid;
     final currentPlaylistId = ref.watch(sourcePlaylistIdProvider);
     final isPlaying = ref.watch(isPlayingProvider);
 
@@ -311,7 +314,9 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
                   coverUrl: playlist.coverImageUrl,
                   size: 48,
                   placeholderIcon:
-                      playlist.type == 'radio' ? Icons.radio : Icons.queue_music,
+                      playlist.type == 'radio'
+                          ? Icons.radio
+                          : Icons.queue_music,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -557,18 +562,20 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
     final l10n = AppLocalizations.of(context);
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => PlaylistFormDialog(
-        title: playlist.isBuiltIn
-            ? l10n.playlistEditCover
-            : l10n.playlistEditPlaylist,
-        initialName: playlist.name,
-        initialDescription: playlist.description,
-        initialType: playlist.type,
-        initialCoverUrl: playlist.coverUrl,
-        playlistId: playlist.id,
-        isEdit: true,
-        isBuiltIn: playlist.isBuiltIn,
-      ),
+      builder:
+          (context) => PlaylistFormDialog(
+            title:
+                playlist.isBuiltIn
+                    ? l10n.playlistEditCover
+                    : l10n.playlistEditPlaylist,
+            initialName: playlist.name,
+            initialDescription: playlist.description,
+            initialType: playlist.type,
+            initialCoverUrl: playlist.coverUrl,
+            playlistId: playlist.id,
+            isEdit: true,
+            isBuiltIn: playlist.isBuiltIn,
+          ),
     );
     if (result == null || !mounted) return;
 
@@ -640,39 +647,42 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
     var deleteSongs = false;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(l10n.playlistConfirmBatchDelete),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.playlistBatchDeleteConfirm(count)),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: deleteSongs,
-                onChanged: (v) =>
-                    setDialogState(() => deleteSongs = v ?? false),
-                title: Text(l10n.playlistDeleteWithSongs),
-              ),
-            ],
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: Text(l10n.playlistConfirmBatchDelete),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.playlistBatchDeleteConfirm(count)),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: deleteSongs,
+                        onChanged:
+                            (v) =>
+                                setDialogState(() => deleteSongs = v ?? false),
+                        title: Text(l10n.playlistDeleteWithSongs),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text(l10n.commonCancel),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                      child: Text(l10n.commonDelete),
+                    ),
+                  ],
+                ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(l10n.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-              child: Text(l10n.commonDelete),
-            ),
-          ],
-        ),
-      ),
     );
     if (confirmed == true && mounted) {
       final deleted = await ref
@@ -707,39 +717,42 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
     var deleteSongs = false;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(l10n.playlistConfirmDelete),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.playlistDeleteConfirm(playlist.name)),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: deleteSongs,
-                onChanged: (v) =>
-                    setDialogState(() => deleteSongs = v ?? false),
-                title: Text(l10n.playlistDeleteWithSongs),
-              ),
-            ],
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: Text(l10n.playlistConfirmDelete),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.playlistDeleteConfirm(playlist.name)),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: deleteSongs,
+                        onChanged:
+                            (v) =>
+                                setDialogState(() => deleteSongs = v ?? false),
+                        title: Text(l10n.playlistDeleteWithSongs),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text(l10n.commonCancel),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                      child: Text(l10n.commonDelete),
+                    ),
+                  ],
+                ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(l10n.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-              child: Text(l10n.commonDelete),
-            ),
-          ],
-        ),
-      ),
     );
     if (confirmed == true && mounted) {
       final success = await ref

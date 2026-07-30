@@ -59,9 +59,10 @@ class _VolumeControlState extends State<VolumeControl> {
       return IconButton(
         onPressed: _toggleMute,
         icon: Icon(_volumeIcon),
-        tooltip: widget.volume > 0
-            ? AppLocalizations.of(context).playerMute
-            : AppLocalizations.of(context).playerUnmute,
+        tooltip:
+            widget.volume > 0
+                ? AppLocalizations.of(context).playerMute
+                : AppLocalizations.of(context).playerUnmute,
       );
     }
 
@@ -95,9 +96,10 @@ class _VolumeControlState extends State<VolumeControl> {
         IconButton(
           onPressed: _toggleMute,
           icon: Icon(_volumeIcon),
-          tooltip: widget.volume > 0
-            ? AppLocalizations.of(context).playerMute
-            : AppLocalizations.of(context).playerUnmute,
+          tooltip:
+              widget.volume > 0
+                  ? AppLocalizations.of(context).playerMute
+                  : AppLocalizations.of(context).playerUnmute,
           style: IconButton.styleFrom(
             foregroundColor: theme.colorScheme.onSurfaceVariant,
           ),
@@ -131,8 +133,10 @@ class _VolumeControlState extends State<VolumeControl> {
                 min: 0,
                 max: 100,
                 onChanged: widget.onVolumeChanged,
-                semanticFormatterCallback: (value) =>
-                    AppLocalizations.of(context).playerVolumePercent(value.round()),
+                semanticFormatterCallback:
+                    (value) => AppLocalizations.of(
+                      context,
+                    ).playerVolumePercent(value.round()),
               ),
             ),
           ),
@@ -268,7 +272,8 @@ class ResponsiveVolumeControl extends StatelessWidget {
       builder: (context, constraints) {
         // 宽度足够时显示完整的音量控制；
         // 无界约束（FittedBox / 横向滚动等场景）下退化为弹出式，避免内部 Flexible 报错
-        if (constraints.maxWidth.isFinite && constraints.maxWidth >= threshold) {
+        if (constraints.maxWidth.isFinite &&
+            constraints.maxWidth >= threshold) {
           return VolumeControl(
             volume: volume,
             onVolumeChanged: onVolumeChanged,
@@ -424,67 +429,73 @@ class _VolumeOverlayPanelState extends State<_VolumeOverlayPanel> {
               child: FocusScope(
                 autofocus: true,
                 child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 顶部：音量百分比
-                  Text(
-                    '${_currentVolume.round()}%',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 顶部：音量百分比
+                    Text(
+                      '${_currentVolume.round()}%',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  // 中间：垂直滑块
-                  Expanded(
-                    child: RotatedBox(
-                      quarterTurns: 3, // 旋转270度，让滑块垂直显示
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: trackHeight,
-                          thumbShape: RoundSliderThumbShape(
-                            enabledThumbRadius: thumbRadius,
+                    const SizedBox(height: 8),
+                    // 中间：垂直滑块
+                    Expanded(
+                      child: RotatedBox(
+                        quarterTurns: 3, // 旋转270度，让滑块垂直显示
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: trackHeight,
+                            thumbShape: RoundSliderThumbShape(
+                              enabledThumbRadius: thumbRadius,
+                            ),
+                            overlayShape: RoundSliderOverlayShape(
+                              overlayRadius: overlayRadius,
+                            ),
+                            activeTrackColor: theme.colorScheme.primary,
+                            inactiveTrackColor:
+                                theme.colorScheme.surfaceContainerHighest,
+                            thumbColor: theme.colorScheme.primary,
+                            overlayColor: theme.colorScheme.primary.withValues(
+                              alpha: 0.2,
+                            ),
                           ),
-                          overlayShape: RoundSliderOverlayShape(
-                            overlayRadius: overlayRadius,
+                          child: Slider(
+                            value: _currentVolume,
+                            min: 0,
+                            max: 100,
+                            onChanged: (value) {
+                              setState(() => _currentVolume = value);
+                              widget.onVolumeChanged(value);
+                            },
+                            semanticFormatterCallback:
+                                (value) => AppLocalizations.of(
+                                  context,
+                                ).playerVolumePercent(value.round()),
                           ),
-                          activeTrackColor: theme.colorScheme.primary,
-                          inactiveTrackColor:
-                              theme.colorScheme.surfaceContainerHighest,
-                          thumbColor: theme.colorScheme.primary,
-                          overlayColor: theme.colorScheme.primary.withValues(
-                            alpha: 0.2,
-                          ),
-                        ),
-                        child: Slider(
-                          value: _currentVolume,
-                          min: 0,
-                          max: 100,
-                          onChanged: (value) {
-                            setState(() => _currentVolume = value);
-                            widget.onVolumeChanged(value);
-                          },
-                          semanticFormatterCallback: (value) =>
-                    AppLocalizations.of(context).playerVolumePercent(value.round()),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  // 底部：静音按钮
-                  IconButton(
-                    onPressed: widget.onToggleMute,
-                    icon: Icon(_volumeIcon, color: theme.colorScheme.onSurface),
-                    iconSize: iconSize,
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    tooltip: _currentVolume > 0
-                        ? AppLocalizations.of(context).playerMute
-                        : AppLocalizations.of(context).playerUnmute,
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 8),
+                    // 底部：静音按钮
+                    IconButton(
+                      onPressed: widget.onToggleMute,
+                      icon: Icon(
+                        _volumeIcon,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      iconSize: iconSize,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip:
+                          _currentVolume > 0
+                              ? AppLocalizations.of(context).playerMute
+                              : AppLocalizations.of(context).playerUnmute,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

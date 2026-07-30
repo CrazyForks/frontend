@@ -559,12 +559,14 @@ class _SettingsCategoryContentState
                             children:
                                 MiniPlayerControls.values
                                     .map(
-                                      (mode) => RadioListTile<MiniPlayerControls>(
-                                        title: Text(
-                                          miniPlayerControlsLabels[mode] ?? '',
-                                        ),
-                                        value: mode,
-                                      ),
+                                      (mode) =>
+                                          RadioListTile<MiniPlayerControls>(
+                                            title: Text(
+                                              miniPlayerControlsLabels[mode] ??
+                                                  '',
+                                            ),
+                                            value: mode,
+                                          ),
                                     )
                                     .toList(),
                           ),
@@ -573,9 +575,7 @@ class _SettingsCategoryContentState
                     ),
               );
               if (picked == null) return;
-              ref
-                  .read(miniPlayerControlsProvider.notifier)
-                  .setControls(picked);
+              ref.read(miniPlayerControlsProvider.notifier).setControls(picked);
             },
           ),
           const Divider(height: 1),
@@ -597,9 +597,7 @@ class _SettingsCategoryContentState
             subtitle: Text(l10n.settingsNotificationLyricInTitleDesc),
             value: lyricInTitle,
             onChanged: (v) {
-              ref
-                  .read(notificationLyricInTitleProvider.notifier)
-                  .setEnabled(v);
+              ref.read(notificationLyricInTitleProvider.notifier).setEnabled(v);
             },
           ),
           // 键盘快捷键（仅桌面）
@@ -669,7 +667,9 @@ class _SettingsCategoryContentState
                   value: desktopLyricOpacity,
                   label: '${(desktopLyricOpacity * 100).round()}%',
                   onChanged: (v) {
-                    ref.read(desktopLyricOpacityProvider.notifier).setOpacity(v);
+                    ref
+                        .read(desktopLyricOpacityProvider.notifier)
+                        .setOpacity(v);
                   },
                 ),
               ),
@@ -1439,7 +1439,9 @@ class _SettingsCategoryContentState
     return ListTile(
       leading: const Icon(Icons.vpn_lock_outlined),
       title: Text(l10n.settingsHttpProxyTitle),
-      subtitle: Text(proxy.isEmpty ? l10n.settingsHttpProxyNotConfigured : proxy),
+      subtitle: Text(
+        proxy.isEmpty ? l10n.settingsHttpProxyNotConfigured : proxy,
+      ),
       trailing: const Icon(Icons.chevron_right),
       enabled: !proxyAsync.isLoading,
       onTap: () async {
@@ -1621,7 +1623,9 @@ class _SettingsCategoryContentState
         try {
           final result = await ref
               .read(logExportServiceProvider)
-              .exportAndShare(shareSubject: l10n.settingsExportLogsShareSubject);
+              .exportAndShare(
+                shareSubject: l10n.settingsExportLogsShareSubject,
+              );
           if (!mounted) return;
           ResponsiveSnackBar.show(
             context,
@@ -1699,7 +1703,8 @@ class _SettingsCategoryContentState
     final l10n = AppLocalizations.of(context);
     // 与设置页顶部版本标签一致：开发版显示「开发版」、正式版显示 vX.Y.Z，
     // 两者都在后面附上构建时间（缺失时省略）。
-    final versionBase = version == 'dev' ? l10n.settingsDevVersion : 'v$version';
+    final versionBase =
+        version == 'dev' ? l10n.settingsDevVersion : 'v$version';
     final versionLabel =
         buildTime != null ? '$versionBase ($buildTime)' : versionBase;
     showAboutDialog(

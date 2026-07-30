@@ -202,7 +202,10 @@ class SongsRepository {
   }
 
   /// 批量删除歌曲
-  Future<int> batchDeleteSongs(List<int> ids, {bool deleteFiles = false}) async {
+  Future<int> batchDeleteSongs(
+    List<int> ids, {
+    bool deleteFiles = false,
+  }) async {
     try {
       return await songsApi.batchDeleteSongs(ids, deleteFiles: deleteFiles);
     } on DioException catch (e) {
@@ -239,7 +242,9 @@ class SongsRepository {
         case 500:
           return Exception(l10n.libraryErrorServer);
         default:
-          return Exception(l10n.libraryErrorRequestFailed(response.statusCode ?? 0));
+          return Exception(
+            l10n.libraryErrorRequestFailed(response.statusCode ?? 0),
+          );
       }
     }
     switch (e.type) {

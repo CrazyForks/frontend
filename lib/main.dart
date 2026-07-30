@@ -69,7 +69,9 @@ void main(List<String> args) async {
   // 参数固定是 ["multi_window", <windowId>, <arguments>]，同步可判、不依赖任何 channel
   // 调用。fromCurrentEngine 要跨 channel 往返，一旦失败（插件未注册/时序异常）子 engine
   // 会继续往下跑主窗口初始化——那会在同一进程里第二次跑单实例检测把整个进程带走。
-  if (!kIsWeb && Platform.isWindows && args.length >= 3 &&
+  if (!kIsWeb &&
+      Platform.isWindows &&
+      args.length >= 3 &&
       args.first == 'multi_window') {
     if (args[2] == kDesktopLyricWindowArguments) {
       await runDesktopLyricWindow();
@@ -184,13 +186,13 @@ void main(List<String> args) async {
   // 初始化 Windows WebView2 环境（指定可写用户数据目录），使免安装版插件页 WebView
   // 能正常创建（songloft-org/songloft#271）。仅 Windows 生效，失败不阻塞启动。
   try {
-    await SongloftWebViewEnvironment.ensureInitialized()
-        .timeout(_desktopPluginStartupTimeout);
+    await SongloftWebViewEnvironment.ensureInitialized().timeout(
+      _desktopPluginStartupTimeout,
+    );
   } catch (e, stackTrace) {
     debugPrint('[Main] WebView2 环境初始化失败，继续启动: $e');
     debugPrint('[Main] Stack trace: $stackTrace');
   }
-
 
   if (AppConfig.isEmbedded) {
     // 嵌入模式：Flutter Web 嵌入 Go 后端，直接使用当前页面的 origin 作为后端 API 地址

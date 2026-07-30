@@ -60,9 +60,7 @@ class AppTheme {
       filledButtonTheme:
           isDesktop
               ? FilledButtonThemeData(
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(88, 44),
-                ),
+                style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
               )
               : null,
       // 响应式 OutlinedButton 主题
@@ -78,9 +76,7 @@ class AppTheme {
       textButtonTheme:
           isDesktop
               ? TextButtonThemeData(
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(88, 44),
-                ),
+                style: TextButton.styleFrom(minimumSize: const Size(88, 44)),
               )
               : null,
     );

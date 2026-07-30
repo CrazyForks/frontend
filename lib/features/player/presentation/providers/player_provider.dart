@@ -682,12 +682,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _playedIndices.clear();
     _preSelectedNextIndex = null;
 
-    final resolvedContext = keepContext
-        ? state.playbackContext
-        : (context ??
-              (sourcePlaylistId == null
-                  ? null
-                  : PlaybackContext.playlist(sourcePlaylistId)));
+    final resolvedContext =
+        keepContext
+            ? state.playbackContext
+            : (context ??
+                (sourcePlaylistId == null
+                    ? null
+                    : PlaybackContext.playlist(sourcePlaylistId)));
 
     state = state.copyWith(
       playlist: List.from(songs),
@@ -1253,15 +1254,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
       return const [];
     }
     final f = categorySongsFilter((field: context.type, value: context.key));
-    return ref.read(songsApiProvider).getSongIds(
-      genre: f.genre,
-      artist: f.artist,
-      album: f.album,
-      language: f.language,
-      style: f.style,
-      year: f.year,
-      decade: f.decade,
-    );
+    return ref
+        .read(songsApiProvider)
+        .getSongIds(
+          genre: f.genre,
+          artist: f.artist,
+          album: f.album,
+          language: f.language,
+          style: f.style,
+          year: f.year,
+          decade: f.decade,
+        );
   }
 
   /// 返回按 offset/limit 抓取该上下文歌曲的函数。

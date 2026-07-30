@@ -275,10 +275,7 @@ class PlayHistorySheet extends ConsumerWidget {
       await ref.read(playHistoryApiProvider).clearHistory(playbackContext);
       if (!context.mounted) return;
       ref.invalidate(playHistoryProvider(playbackContext));
-      ResponsiveSnackBar.showSuccess(
-        context,
-        message: l10n.playHistoryCleared,
-      );
+      ResponsiveSnackBar.showSuccess(context, message: l10n.playHistoryCleared);
     } catch (e) {
       if (context.mounted) {
         ResponsiveSnackBar.showError(

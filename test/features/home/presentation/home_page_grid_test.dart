@@ -81,9 +81,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
-  SliverGridDelegateWithFixedCrossAxisCount firstDelegate(
-    WidgetTester tester,
-  ) {
+  SliverGridDelegateWithFixedCrossAxisCount firstDelegate(WidgetTester tester) {
     final grid = tester.widget<GridView>(find.byType(GridView).first);
     return grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
   }
@@ -271,8 +269,7 @@ class _FakePlaylistsNotifier extends PaginatedPlaylistsNotifier {
 
 /// 可分页的假上游：模拟 total 条数据，按 pageLimit 分页，记录 loadMore 调用次数。
 class _PagedNotifier extends PaginatedPlaylistsNotifier {
-  _PagedNotifier(String super.typeArg, {required this.total})
-    : _type = typeArg;
+  _PagedNotifier(String super.typeArg, {required this.total}) : _type = typeArg;
 
   final String _type;
   final int total;

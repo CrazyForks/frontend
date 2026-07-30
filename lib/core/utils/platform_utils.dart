@@ -39,7 +39,6 @@ class PlatformUtils {
     return Platform.isWindows;
   }
 
-
   /// 是否支持触摸操作
   static bool get supportsTouchInput {
     if (kIsWeb) return true;

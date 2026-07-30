@@ -142,7 +142,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                   begin: const Offset(0, 1),
                   end: Offset.zero,
                 ).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
                 ),
                 child: c,
               );
@@ -160,9 +163,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.home,
             pageBuilder:
-                (context, state) => const NoTransitionPage(
-                  child: HomePage(),
-                ),
+                (context, state) => const NoTransitionPage(child: HomePage()),
           ),
 
           // 曲库
@@ -212,9 +213,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.settings,
             pageBuilder:
-                (context, state) => const NoTransitionPage(
-                  child: SettingsPage(),
-                ),
+                (context, state) =>
+                    const NoTransitionPage(child: SettingsPage()),
           ),
 
           // 服务器列表管理

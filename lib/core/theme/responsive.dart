@@ -48,12 +48,7 @@ extension ResponsiveContext on BuildContext {
   bool get useWideLayout => isWideScreen;
 
   /// 根据屏幕类型返回不同值
-  T responsive<T>({
-    required T mobile,
-    T? tablet,
-    T? desktop,
-    T? auto_,
-  }) {
+  T responsive<T>({required T mobile, T? tablet, T? desktop, T? auto_}) {
     switch (screenType) {
       case ScreenType.auto_:
         return auto_ ?? desktop ?? tablet ?? mobile;

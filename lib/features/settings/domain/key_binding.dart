@@ -95,7 +95,9 @@ Map<PlayerShortcutAction, KeyBinding> defaultBindings(TargetPlatform platform) {
   final isMac = platform == TargetPlatform.macOS;
   // 主修饰键：macOS = Cmd(meta)，其余 = Ctrl
   KeyBinding primary(int keyId) =>
-      isMac ? KeyBinding(keyId: keyId, meta: true) : KeyBinding(keyId: keyId, ctrl: true);
+      isMac
+          ? KeyBinding(keyId: keyId, meta: true)
+          : KeyBinding(keyId: keyId, ctrl: true);
   KeyBinding withShift(int keyId) => KeyBinding(keyId: keyId, shift: true);
 
   return {

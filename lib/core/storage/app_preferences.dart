@@ -331,7 +331,8 @@ class AppPreferences {
   /// 导致 [getSourceContext] 读回过期的上下文 —— 写入一律走 [setSourceContext]。
   @Deprecated('改用 setSourceContext()，否则新旧 key 会不一致')
   Future<bool> setSourcePlaylistId(int? id) {
-    if (id == null) return _prefs.remove(_sourcePlaylistIdKey).then((_) => true);
+    if (id == null)
+      return _prefs.remove(_sourcePlaylistIdKey).then((_) => true);
     return _prefs.setInt(_sourcePlaylistIdKey, id);
   }
 

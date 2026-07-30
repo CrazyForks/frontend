@@ -82,9 +82,8 @@ class AdaptiveScaffold extends StatelessWidget {
       );
     }
 
-    final barSelectedIndex = currentIndex < _mobileRealSlots
-        ? currentIndex
-        : _mobileRealSlots;
+    final barSelectedIndex =
+        currentIndex < _mobileRealSlots ? currentIndex : _mobileRealSlots;
 
     return Scaffold(
       body: body,
@@ -167,9 +166,8 @@ class AdaptiveScaffold extends StatelessWidget {
     return ListTile(
       leading: IconTheme(
         data: IconThemeData(
-          color: isSelected
-              ? colorScheme.primary
-              : colorScheme.onSurfaceVariant,
+          color:
+              isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
         ),
         child: isSelected ? dest.selectedIcon : dest.icon,
       ),
@@ -182,9 +180,7 @@ class AdaptiveScaffold extends StatelessWidget {
       ),
       selected: isSelected,
       selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onTap: () {
         Navigator.pop(sheetContext);
         onDestinationSelected(originalIndex);
@@ -291,9 +287,7 @@ class AdaptiveScaffold extends StatelessWidget {
                                       ? colorScheme.primary
                                       : colorScheme.onSurfaceVariant,
                             ),
-                            child: isSelected
-                                ? dest.selectedIcon
-                                : dest.icon,
+                            child: isSelected ? dest.selectedIcon : dest.icon,
                           ),
                           title: Text(
                             dest.label,
@@ -416,9 +410,10 @@ class _AutoDock extends StatelessWidget {
                 final dest = destinations[index];
                 final isSelected = index == currentIndex;
                 return Material(
-                  color: isSelected
-                      ? colorScheme.secondaryContainer
-                      : Colors.transparent,
+                  color:
+                      isSelected
+                          ? colorScheme.secondaryContainer
+                          : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
@@ -431,24 +426,25 @@ class _AutoDock extends StatelessWidget {
                           IconTheme(
                             data: IconThemeData(
                               size: 26,
-                              color: isSelected
-                                  ? colorScheme.onSecondaryContainer
-                                  : colorScheme.onSurfaceVariant,
+                              color:
+                                  isSelected
+                                      ? colorScheme.onSecondaryContainer
+                                      : colorScheme.onSurfaceVariant,
                             ),
-                            child: isSelected
-                                ? dest.selectedIcon
-                                : dest.icon,
+                            child: isSelected ? dest.selectedIcon : dest.icon,
                           ),
                           const SizedBox(height: 2),
                           Text(
                             dest.label,
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: isSelected
-                                  ? colorScheme.onSecondaryContainer
-                                  : colorScheme.onSurfaceVariant,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
+                              color:
+                                  isSelected
+                                      ? colorScheme.onSecondaryContainer
+                                      : colorScheme.onSurfaceVariant,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

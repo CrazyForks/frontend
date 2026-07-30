@@ -77,20 +77,22 @@ class SongTile extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       tileColor: isCurrentSong ? colorScheme.secondaryContainer : null,
-      shape: isCurrentSong
-          ? RoundedRectangleBorder(borderRadius: AppRadius.mdAll)
-          : null,
+      shape:
+          isCurrentSong
+              ? RoundedRectangleBorder(borderRadius: AppRadius.mdAll)
+              : null,
       leading: _buildLeading(context),
       title: Text(
         song.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: isCurrentSong
-            ? TextStyle(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              )
-            : null,
+        style:
+            isCurrentSong
+                ? TextStyle(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                )
+                : null,
       ),
       subtitle: Text(
         _subtitleText(l10n),
@@ -190,26 +192,28 @@ class SongTile extends StatelessWidget {
               }
             }
           },
-          itemBuilder: (context) => [
-            for (final a in menuActions)
-              PopupMenuItem<String>(
-                value: a.value,
-                child: ListTile(
-                  leading: Icon(
-                    a.icon,
-                    color: a.destructive ? colorScheme.error : null,
+          itemBuilder:
+              (context) => [
+                for (final a in menuActions)
+                  PopupMenuItem<String>(
+                    value: a.value,
+                    child: ListTile(
+                      leading: Icon(
+                        a.icon,
+                        color: a.destructive ? colorScheme.error : null,
+                      ),
+                      title: Text(
+                        a.label,
+                        style:
+                            a.destructive
+                                ? TextStyle(color: colorScheme.error)
+                                : null,
+                      ),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                  title: Text(
-                    a.label,
-                    style: a.destructive
-                        ? TextStyle(color: colorScheme.error)
-                        : null,
-                  ),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-          ],
+              ],
         ),
     ];
 

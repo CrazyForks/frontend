@@ -51,7 +51,6 @@ class AppConfig {
     defaultValue: false,
   );
 
-
   /// 前端版本号，通过 --dart-define=FRONTEND_VERSION=x.y.z 在构建时注入
   /// 本地开发时默认为 'dev'
   static const String frontendVersion = String.fromEnvironment(

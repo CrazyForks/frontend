@@ -310,9 +310,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           icon: Icon(
             _obscurePassword ? Icons.visibility_off : Icons.visibility,
           ),
-          tooltip: _obscurePassword
-              ? AppLocalizations.of(context).authShowPassword
-              : AppLocalizations.of(context).authHidePassword,
+          tooltip:
+              _obscurePassword
+                  ? AppLocalizations.of(context).authShowPassword
+                  : AppLocalizations.of(context).authHidePassword,
           onPressed: () {
             setState(() {
               _obscurePassword = !_obscurePassword;
@@ -457,8 +458,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         if (musicDir == null || musicDir.isEmpty) return;
         await ref.read(localMusicDirProvider.notifier).set(musicDir);
         setState(
-          () => _localModeHint =
-              AppLocalizations.of(context).authStartingLocalBackend,
+          () =>
+              _localModeHint =
+                  AppLocalizations.of(context).authStartingLocalBackend,
         );
         final dataDir = (await getApplicationSupportDirectory()).path;
         final port = await EmbeddedBackendService.start(
@@ -489,7 +491,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (mounted) {
         ResponsiveSnackBar.showError(
           context,
-          message: AppLocalizations.of(context).authAutoLoginFailed(e.toString()),
+          message: AppLocalizations.of(
+            context,
+          ).authAutoLoginFailed(e.toString()),
         );
       }
     } finally {
@@ -548,8 +552,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       await EmbeddedBackendService.ensureStoragePermission();
 
       setState(
-        () => _localModeHint =
-            AppLocalizations.of(context).authStartingLocalBackend,
+        () =>
+            _localModeHint =
+                AppLocalizations.of(context).authStartingLocalBackend,
       );
       final dataDir = (await getApplicationSupportDirectory()).path;
       final port = await EmbeddedBackendService.start(
@@ -560,7 +565,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       final baseUrl = 'http://127.0.0.1:$port';
       ref.read(baseUrlProvider.notifier).set(baseUrl);
 
-      setState(() => _localModeHint = AppLocalizations.of(context).authConnecting);
+      setState(
+        () => _localModeHint = AppLocalizations.of(context).authConnecting,
+      );
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 2)));
       for (var i = 0; i < 10; i++) {
         try {
@@ -609,7 +616,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (mounted) {
         ResponsiveSnackBar.showError(
           context,
-          message: AppLocalizations.of(context).authLocalModeFailed(e.toString()),
+          message: AppLocalizations.of(
+            context,
+          ).authLocalModeFailed(e.toString()),
         );
       }
     } finally {
@@ -619,4 +628,3 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 }
-

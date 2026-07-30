@@ -19,11 +19,7 @@ class AudioTrackControl extends ConsumerWidget {
   /// 仅当所在行的兄弟按钮整体为 compact（如 desktop_player 次要操作行）时才显式传 compact 保持一致。
   final VisualDensity? visualDensity;
 
-  const AudioTrackControl({
-    super.key,
-    this.iconSize = 20,
-    this.visualDensity,
-  });
+  const AudioTrackControl({super.key, this.iconSize = 20, this.visualDensity});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

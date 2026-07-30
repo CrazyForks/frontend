@@ -235,12 +235,12 @@ class PlayerState {
           clearPreviousVolume ? null : (previousVolume ?? this.previousVolume),
       errorMessage:
           clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
-      infoMessage:
-          clearInfoMessage ? null : (infoMessage ?? this.infoMessage),
+      infoMessage: clearInfoMessage ? null : (infoMessage ?? this.infoMessage),
       isRetrying: isRetrying ?? this.isRetrying,
-      playbackContext: clearPlaybackContext
-          ? null
-          : (playbackContext ?? this.playbackContext),
+      playbackContext:
+          clearPlaybackContext
+              ? null
+              : (playbackContext ?? this.playbackContext),
       playbackSource: playbackSource ?? this.playbackSource,
     );
   }

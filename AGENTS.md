@@ -73,6 +73,16 @@ flutter test                                           # 运行测试
 
 ---
 
+## 代码格式化（铁律）
+
+每次修改代码后**必须**格式化，提交前确认无格式差异：
+
+```bash
+dart format lib/ test/
+```
+
+---
+
 ## 编码约定
 
 - **状态管理**：flutter_riverpod 手写 Provider（**不使用** code generation / build_runner），三种类型：`Provider`、`NotifierProvider`、`FutureProvider`（含 `AsyncNotifierProvider`）

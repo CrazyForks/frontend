@@ -251,5 +251,4 @@ class PlaylistApi {
     );
     return response.data as Map<String, dynamic>;
   }
-
 }
