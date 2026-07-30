@@ -55,7 +55,6 @@ class BrowseCollectionView extends StatelessWidget {
     mobile: AppSpacing.md,
     tablet: AppSpacing.lg,
     desktop: AppSpacing.xl,
-    tv: AppSpacing.xxl,
   );
 
   Widget _buildGrid(BuildContext context) {
@@ -63,7 +62,6 @@ class BrowseCollectionView extends StatelessWidget {
       mobile: 2,
       tablet: 3,
       desktop: 4,
-      tv: 5,
     );
     final hp = _horizontalPadding(context);
     return GridView.builder(

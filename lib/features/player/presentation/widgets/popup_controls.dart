@@ -159,25 +159,21 @@ class _PlayModeOverlayPanel extends StatelessWidget {
       mobile: 44,
       tablet: 48,
       desktop: 48,
-      tv: 56,
     );
     final panelWidth = context.responsive<double>(
       mobile: 140,
       tablet: 160,
       desktop: 160,
-      tv: 200,
     );
     final iconSize = context.responsive<double>(
       mobile: 20,
       tablet: 20,
       desktop: 20,
-      tv: 24,
     );
     final fontSize = context.responsive<double>(
       mobile: 14,
       tablet: 14,
       desktop: 14,
-      tv: 16,
     );
 
     final panelHeight = PlayMode.values.length * itemHeight + 16;
@@ -282,7 +278,7 @@ class _PlayModeOverlayPanel extends StatelessWidget {
   }
 }
 
-/// 睡眠定时入口按钮：桌面/平板/TV 用按钮上方浮层；移动端用底部抽屉 BottomSheet
+/// 睡眠定时入口按钮：桌面/平板用按钮上方浮层；移动端用底部抽屉 BottomSheet
 class PopupSleepTimerControl extends StatefulWidget {
   final SleepTimerStatus? status;
 
@@ -397,7 +393,7 @@ class _PopupSleepTimerControlState extends State<PopupSleepTimerControl> {
   }
 }
 
-/// 睡眠定时浮层（桌面/平板/TV）
+/// 睡眠定时浮层（桌面/平板）
 class _SleepTimerOverlayPanel extends StatelessWidget {
   final SleepTimerStatus? status;
   final bool isLive;

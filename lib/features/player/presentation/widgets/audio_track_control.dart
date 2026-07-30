@@ -53,7 +53,7 @@ String audioTrackLabel(BuildContext context, AudioTrack track, int index) {
   return AppLocalizations.of(context).playerAudioTrackNumbered(index + 1);
 }
 
-/// 弹出音轨选择底部抽屉。供 [AudioTrackControl] 与 TV 布局的音轨按钮共用。
+/// 弹出音轨选择底部抽屉。供 [AudioTrackControl] 共用。
 Future<void> showAudioTrackSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,

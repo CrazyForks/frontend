@@ -165,7 +165,6 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
       mobile: AppSpacing.md,
       tablet: AppSpacing.lg,
       desktop: AppSpacing.xl,
-      tv: AppSpacing.xxl,
     );
     return Padding(
       padding: EdgeInsets.fromLTRB(hp, AppSpacing.sm, hp, 0),

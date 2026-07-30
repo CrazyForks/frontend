@@ -121,7 +121,6 @@ class _FacetGridViewState extends ConsumerState<FacetGridView> {
       mobile: AppSpacing.md,
       tablet: AppSpacing.lg,
       desktop: AppSpacing.xl,
-      tv: AppSpacing.xxl,
     );
     return Padding(
       padding: EdgeInsets.fromLTRB(

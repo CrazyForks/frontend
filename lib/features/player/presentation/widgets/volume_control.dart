@@ -70,7 +70,6 @@ class _VolumeControlState extends State<VolumeControl> {
       mobile: 80,
       tablet: 80,
       desktop: 140,
-      tv: 200,
     );
 
     // 响应式滑块尺寸
@@ -78,19 +77,16 @@ class _VolumeControlState extends State<VolumeControl> {
       mobile: 6,
       tablet: 6,
       desktop: 6,
-      tv: 10,
     );
     final overlayRadius = context.responsive<double>(
       mobile: 12,
       tablet: 12,
       desktop: 12,
-      tv: 18,
     );
     final trackHeight = context.responsive<double>(
       mobile: 4,
       tablet: 4,
       desktop: 4,
-      tv: 6,
     );
 
     return Row(
@@ -353,39 +349,33 @@ class _VolumeOverlayPanelState extends State<_VolumeOverlayPanel> {
       mobile: 56,
       tablet: 60,
       desktop: 64,
-      tv: 80,
     );
     final panelHeight = context.responsive<double>(
       mobile: 180,
       tablet: 200,
       desktop: 200,
-      tv: 240,
     );
 
-    // 响应式滑块尺寸（TV 模式下更大便于操作）
+    // 响应式滑块尺寸
     final thumbRadius = context.responsive<double>(
       mobile: 8,
       tablet: 8,
       desktop: 8,
-      tv: 12,
     );
     final overlayRadius = context.responsive<double>(
       mobile: 14,
       tablet: 14,
       desktop: 14,
-      tv: 20,
     );
     final trackHeight = context.responsive<double>(
       mobile: 4,
       tablet: 4,
       desktop: 4,
-      tv: 6,
     );
     final iconSize = context.responsive<double>(
       mobile: 20,
       tablet: 20,
       desktop: 20,
-      tv: 28,
     );
 
     // 计算面板位置（居中对齐按钮）

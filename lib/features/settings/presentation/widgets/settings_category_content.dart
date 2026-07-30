@@ -54,7 +54,7 @@ const int settingsCategoryCount = 9;
 
 /// 设置分类列表（外观/播放/音乐库/扩展/缓存/网络/数据/关于/账户）。
 ///
-/// 桌面/移动 [SettingsPage] 与 TV `TvSettingsPage` 共用同一来源，避免分类漂移。
+/// 桌面/移动 [SettingsPage] 共用同一来源，避免分类漂移。
 List<SettingsCategory> buildSettingsCategories(AppLocalizations l10n) => [
   SettingsCategory(
     icon: Icons.palette_outlined,
@@ -103,7 +103,7 @@ List<SettingsCategory> buildSettingsCategories(AppLocalizations l10n) => [
   ),
 ];
 
-/// 服务器信息卡片（主从布局 header / TV 设置顶部）。
+/// 服务器信息卡片（主从布局 header）。
 class SettingsServerInfoCard extends ConsumerWidget {
   const SettingsServerInfoCard({super.key});
 
@@ -196,7 +196,7 @@ class SettingsServerInfoCard extends ConsumerWidget {
   }
 }
 
-/// 单个设置分类的内容（SectionCard 列表）。桌面/移动主从右栏与 TV push 详情共用。
+/// 单个设置分类的内容（SectionCard 列表）。桌面/移动主从右栏共用。
 class SettingsCategoryContent extends ConsumerStatefulWidget {
   /// 分类索引（对应 [buildSettingsCategories] 的顺序）。
   final int index;

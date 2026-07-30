@@ -15,8 +15,6 @@ import 'package:songloft_flutter/l10n/app_localizations.dart';
 /// （见 FrontendVersionApi._isNewerVersion：本地 build_time 为 unknown → false）。
 /// 本文件覆盖「已是最新 / 检查失败时仍能拿到完整安装包下载入口」这条退路。
 void main() {
-  // 对话框经 context.responsiveDialogMaxWidth → isTv 读取 AppConfig.isTvMode（late final）
-  AppConfig.isTvMode = false;
 
   const launcherChannel = MethodChannel('plugins.flutter.io/url_launcher');
   String? launchedUrl;

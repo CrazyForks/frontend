@@ -451,7 +451,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     required double headerExtent,
   }) {
     final total = songsAsync.value?.total ?? 0;
-    final hide = _isSortMode || _isSelectMode || context.isTv;
+    final hide = _isSortMode || _isSelectMode;
 
     return Stack(
       children: [
@@ -568,7 +568,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     );
   }
 
-  /// 宽屏布局（Desktop / TV）：左右分栏
+  /// 宽屏布局（Desktop）：左右分栏
   Widget _buildWideContent(
     BuildContext context,
     Playlist playlist,
@@ -1370,7 +1370,6 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
                   mobile: 200,
                   tablet: 240,
                   desktop: 280,
-                  tv: 320,
                 ),
               ),
               child: FilledButton.icon(

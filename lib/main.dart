@@ -22,7 +22,7 @@ import 'core/audio/smtc_service.dart';
 import 'core/audio/songloft_just_audio_platform.dart';
 import 'core/audio/web_audio_platform.dart';
 import 'core/backend/embedded_backend_service.dart';
-import 'core/env/tv_detector.dart';
+
 import 'core/network/dio_insecure.dart' show applyGlobalInsecureHttpOverrides;
 
 import 'core/platform/home_widget_service.dart';
@@ -191,10 +191,6 @@ void main(List<String> args) async {
     debugPrint('[Main] Stack trace: $stackTrace');
   }
 
-  // 开发期可用 --dart-define=FORCE_TV=true 在桌面/Web 上模拟 TV 布局（窗口需 ≥1920 宽）。
-  // bool.fromEnvironment 是编译时常量，release 默认 false 会被 tree-shaking 移除。
-  const forceTv = bool.fromEnvironment('FORCE_TV', defaultValue: false);
-  AppConfig.isTvMode = forceTv || await TvDetector.isTv();
 
   if (AppConfig.isEmbedded) {
     // 嵌入模式：Flutter Web 嵌入 Go 后端，直接使用当前页面的 origin 作为后端 API 地址
@@ -263,7 +259,7 @@ void main(List<String> args) async {
   }
 
   // Android 13+ 需要运行时请求通知权限
-  // 通知权限为非关键功能，TV/低版本设备上可能失败，不应阻塞启动
+  // 通知权限为非关键功能，低版本设备上可能失败，不应阻塞启动
   if (!kIsWeb && Platform.isAndroid) {
     try {
       final status = await Permission.notification.status;
@@ -460,12 +456,7 @@ class SongloftApp extends ConsumerWidget {
   const SongloftApp({super.key});
 
   /// 根据屏幕宽度获取 ScreenType（供响应式主题选择）。
-  /// TV 需同时满足真实电视系统（[AppConfig.isTvMode]）+ 宽度达标，避免高分桌面/Web
-  /// 大屏被误判为 TV 而套用放大字号的电视主题（与 [ResponsiveContext.isTv] 保持一致）。
   ScreenType _getScreenType(double width) {
-    if (AppConfig.isTvMode && width >= ResponsiveBreakpoints.tv) {
-      return ScreenType.tv;
-    }
     if (width >= ResponsiveBreakpoints.desktop) return ScreenType.desktop;
     if (width >= ResponsiveBreakpoints.tablet) return ScreenType.tablet;
     return ScreenType.mobile;
@@ -517,7 +508,7 @@ class SongloftApp extends ConsumerWidget {
         // 桌面端在 MaterialApp.builder（Navigator 之上、WidgetsApp 默认 Shortcuts
         // 之下）挂载全局播放快捷键监听：此处是所有路由的公共祖先，故 push 的全屏
         // 播放页 / 队列 BottomSheet 等脱离 ShellRoute 的页面也能命中快捷键
-        // （songloft-org/songloft#279）。移动/Web/TV 不包裹（零开销、零行为变化）。
+        // （songloft-org/songloft#279）。移动/Web 不包裹（零开销、零行为变化）。
         if (!PlatformUtils.isDesktop) return gated;
         return PlayerShortcutScope(child: gated);
       },
