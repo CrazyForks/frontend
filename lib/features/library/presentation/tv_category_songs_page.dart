@@ -7,6 +7,7 @@ import '../../../shared/models/song.dart';
 import '../../../shared/utils/responsive_snackbar.dart';
 import '../../../shared/widgets/tv_song_tile.dart';
 import '../../../shared/widgets/tv_entity_detail_view.dart';
+import '../../player/domain/playback_context.dart';
 import '../../player/presentation/providers/player_provider.dart';
 import '../../playlist/presentation/providers/playlist_provider.dart'
     show PaginatedSongsState;
@@ -37,6 +38,10 @@ class TvCategorySongsPage extends ConsumerStatefulWidget {
 class _TvCategorySongsPageState extends ConsumerState<TvCategorySongsPage> {
   final _scrollController = ScrollController();
 
+  /// 本页对应的播放上下文：分面维度 + 取值，播放历史按它归档。
+  PlaybackContext get _playbackContext =>
+      PlaybackContext(widget.field, widget.value);
+
   ({String field, String value}) get _key =>
       (field: widget.field, value: widget.value);
 
@@ -62,7 +67,7 @@ class _TvCategorySongsPageState extends ConsumerState<TvCategorySongsPage> {
   void _onSongTap(List<Song> songs, int index) {
     final state = ref.read(categorySongsProvider(_key)).value;
     final notifier = ref.read(playerStateProvider.notifier);
-    notifier.playPlaylist(songs, startIndex: index);
+    notifier.playPlaylist(songs, startIndex: index, context: _playbackContext);
     // 分类下歌曲超过一页时，后台补齐整个分类队列，避免队列被截断到已加载页
     // （songloft-org/songloft#299）。
     if (state != null && state.hasMore) {
@@ -90,7 +95,9 @@ class _TvCategorySongsPageState extends ConsumerState<TvCategorySongsPage> {
       ResponsiveSnackBar.show(context, message: l10n.libraryNoPlayableSongs);
       return;
     }
-    ref.read(playerStateProvider.notifier).playPlaylist(songs, startIndex: 0);
+    ref
+        .read(playerStateProvider.notifier)
+        .playPlaylist(songs, startIndex: 0, context: _playbackContext);
     if (!mounted) return;
     ResponsiveSnackBar.show(
       context,

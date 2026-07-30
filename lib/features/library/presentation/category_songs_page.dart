@@ -10,7 +10,9 @@ import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/entity_detail_scaffold.dart';
 import '../../../shared/mixins/song_list_actions.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../player/domain/playback_context.dart';
 import '../../player/presentation/providers/player_provider.dart';
+import '../../player/presentation/widgets/play_history_sheet.dart';
 import '../../playlist/presentation/providers/playlist_provider.dart'
     show PaginatedSongsState;
 import 'providers/category_provider.dart';
@@ -44,6 +46,10 @@ class _CategorySongsPageState extends ConsumerState<CategorySongsPage>
   bool _isSelectMode = false;
   final Set<int> _selectedIds = {};
 
+  /// 本页对应的播放上下文：分面维度 + 取值，播放历史按它归档。
+  PlaybackContext get _playbackContext =>
+      PlaybackContext(widget.field, widget.value);
+
   ({String field, String value}) get _key =>
       (field: widget.field, value: widget.value);
 
@@ -70,7 +76,7 @@ class _CategorySongsPageState extends ConsumerState<CategorySongsPage>
   void _onSongTap(List<Song> songs, int index) {
     final state = ref.read(categorySongsProvider(_key)).value;
     final notifier = ref.read(playerStateProvider.notifier);
-    notifier.playPlaylist(songs, startIndex: index);
+    notifier.playPlaylist(songs, startIndex: index, context: _playbackContext);
     // 分类下歌曲超过一页时，后台补齐整个分类队列，避免队列被截断到已加载页
     // （songloft-org/songloft#299）。
     if (state != null && state.hasMore) {
@@ -89,6 +95,18 @@ class _CategorySongsPageState extends ConsumerState<CategorySongsPage>
     }
   }
 
+  /// 打开本分类的播放历史面板
+  void _showPlayHistory() {
+    final l10n = AppLocalizations.of(context);
+    PlayHistorySheet.show(
+      context,
+      playbackContext: _playbackContext,
+      title: l10n.playHistoryTitle(
+        categoryValueLabel(l10n, widget.field, widget.value),
+      ),
+    );
+  }
+
   Future<void> _playAll() async {
     final l10n = AppLocalizations.of(context);
     await ref.read(categorySongsProvider(_key).notifier).loadAll();
@@ -98,7 +116,9 @@ class _CategorySongsPageState extends ConsumerState<CategorySongsPage>
       ResponsiveSnackBar.show(context, message: l10n.libraryNoPlayableSongs);
       return;
     }
-    ref.read(playerStateProvider.notifier).playPlaylist(songs, startIndex: 0);
+    ref
+        .read(playerStateProvider.notifier)
+        .playPlaylist(songs, startIndex: 0, context: _playbackContext);
     if (!mounted) return;
     ResponsiveSnackBar.show(
       context,
@@ -283,6 +303,13 @@ class _CategorySongsPageState extends ConsumerState<CategorySongsPage>
               ),
             ]
           : [
+              // 播放历史：本页覆盖全部分面维度（歌手 / 专辑 / 流派 / 年份 …），
+              // 一处入口即可，无条件显示（空态由面板承担）
+              IconButton(
+                icon: const Icon(Icons.history),
+                tooltip: l10n.playHistory,
+                onPressed: _showPlayHistory,
+              ),
               IconButton(
                 icon: const Icon(Icons.checklist),
                 tooltip: l10n.librarySelectMode,

@@ -27,10 +27,13 @@ import '../../../../shared/models/song.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import 'web_video_playback_provider.dart';
 import '../../../library/data/songs_api.dart';
+import '../../../library/presentation/providers/category_provider.dart'
+    show categoryFields, categorySongsFilter;
 import '../../../library/presentation/providers/favorite_provider.dart';
 import '../../../library/presentation/providers/songs_provider.dart';
 import '../../../playlist/data/playlist_api.dart';
 import '../../../playlist/presentation/providers/playlist_provider.dart';
+import '../../domain/playback_context.dart';
 import '../../domain/player_state.dart';
 import 'lyric_provider.dart';
 
@@ -237,14 +240,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
       final savedIndex = prefs.getCurrentIndex();
       final safeIndex = savedIndex.clamp(0, savedQueue.length - 1);
       _savedPositionMs = prefs.getPositionMs();
-      final savedSourcePlaylistId = prefs.getSourcePlaylistId();
+      final savedContext = prefs.getSourceContext();
 
       state = state.copyWith(
         playlist: savedQueue,
         currentIndex: safeIndex,
         currentSong: savedQueue[safeIndex],
-        sourcePlaylistId: savedSourcePlaylistId,
-        clearSourcePlaylistId: savedSourcePlaylistId == null,
+        playbackContext: savedContext,
+        clearPlaybackContext: savedContext == null,
       );
 
       debugPrint(
@@ -270,7 +273,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
             await _playbackStorage.saveQueue(state.playlist);
             await prefs.setCurrentIndex(state.currentIndex);
             await prefs.setPositionMs(state.currentTime.inMilliseconds);
-            await prefs.setSourcePlaylistId(state.sourcePlaylistId);
+            await prefs.setSourceContext(state.playbackContext);
           }
         } catch (e) {
           debugPrint('[Player] Failed to save playback state: $e');
@@ -451,10 +454,18 @@ class PlayerNotifier extends Notifier<PlayerState> {
     }
   }
 
-  void _notifyPlayEvent(int songId, String type) {
-    ref.read(songsApiProvider).songPlayed(songId, type: type).catchError((e) {
-      debugPrint('[Player] playEvent($type) notify failed: $e');
-    });
+  /// 上报播放事件（fire-and-forget，失败只打日志，不影响播放）。
+  ///
+  /// [context] 只在 type=play 时传：后端据此写入播放历史。
+  /// finish 是同一首歌的重复信息；skip 上报的是**上一首**歌，那时 state 里的上下文
+  /// 可能已经切到新歌单了，带上会把上一首错记到新上下文名下。
+  void _notifyPlayEvent(int songId, String type, {PlaybackContext? context}) {
+    ref
+        .read(songsApiProvider)
+        .songPlayed(songId, type: type, context: context)
+        .catchError((e) {
+          debugPrint('[Player] playEvent($type) notify failed: $e');
+        });
   }
 
   /// 歌曲播放完成处理
@@ -564,7 +575,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         playlist: newPlaylist,
         currentIndex: newIndex,
         currentSong: song,
-        clearSourcePlaylistId: true,
+        clearPlaybackContext: true,
       );
       final gen = ++_playGeneration;
       await _playCurrent(gen);
@@ -634,10 +645,20 @@ class PlayerNotifier extends Notifier<PlayerState> {
   }
 
   /// 播放歌单
+  /// 替换整个播放队列并起播。
+  ///
+  /// [context] 是队列的来源上下文（歌单 / 歌手 / 专辑 等），决定播放历史记到哪儿、
+  /// 以及各处「正在播放」高亮。[sourcePlaylistId] 是它的歌单专用简写，保留下来供
+  /// JS 插件的 `player.setQueue` 使用；两者都传时 [context] 优先。
+  ///
+  /// [keepContext] 用于「在当前队列内换一首歌」（队列页 / 播放抽屉）：那种场景没有新
+  /// 上下文可传，但也不该把已有的清空。
   Future<void> playPlaylist(
     List<Song> songs, {
     int startIndex = 0,
     int? sourcePlaylistId,
+    PlaybackContext? context,
+    bool keepContext = false,
   }) async {
     debugPrint(
       '[Player] playPlaylist: ${songs.length} songs, startIndex: $startIndex',
@@ -661,12 +682,19 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _playedIndices.clear();
     _preSelectedNextIndex = null;
 
+    final resolvedContext = keepContext
+        ? state.playbackContext
+        : (context ??
+              (sourcePlaylistId == null
+                  ? null
+                  : PlaybackContext.playlist(sourcePlaylistId)));
+
     state = state.copyWith(
       playlist: List.from(songs),
       currentIndex: safeIndex,
       currentSong: songs[safeIndex],
-      sourcePlaylistId: sourcePlaylistId,
-      clearSourcePlaylistId: sourcePlaylistId == null,
+      playbackContext: resolvedContext,
+      clearPlaybackContext: resolvedContext == null,
     );
 
     final gen = ++_playGeneration;
@@ -1063,7 +1091,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       isPlaying: false,
       currentTime: Duration.zero,
       duration: Duration.zero,
-      clearSourcePlaylistId: true,
+      clearPlaybackContext: true,
     );
     _syncLiveActivitySong(null);
     _syncHomeWidgetSong(null);
@@ -1107,7 +1135,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       await playPlaylist(
         firstPageSongs,
         startIndex: startIndex,
-        sourcePlaylistId: playlistId,
+        context: PlaybackContext.playlist(playlistId),
       );
 
       if (total > firstPageSongs.length) {
@@ -1156,7 +1184,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     await playPlaylist(
       loadedSongs,
       startIndex: startIndex,
-      sourcePlaylistId: playlistId,
+      context: PlaybackContext.playlist(playlistId),
     );
 
     if (total > loadedSongs.length) {
@@ -1178,6 +1206,197 @@ class PlayerNotifier extends Notifier<PlayerState> {
     } else {
       ref.read(playlistNotifierProvider.notifier).touchPlaylist(playlistId);
     }
+  }
+
+  /// 从播放历史条目起播。
+  ///
+  /// 历史条目自带完整 Song，所以先用这一首当队列立即出声（**零额外请求**），
+  /// 再在后台把整个上下文补齐成环形旋转队列：
+  /// `[目标歌, 目标之后…, 上下文开头…目标之前]`。
+  ///
+  /// 这样 currentIndex 全程为 0 不动（不牵连随机模式的 _playedIndices /
+  /// _preSelectedNextIndex），且歌单与各分面维度走完全同一条路径 —— 不依赖后端
+  /// 计算「第几首」，因为分面列表默认按 added_at 排序且无 id tie-break，
+  /// 批量扫描导入的歌曲 added_at 会大量相同，序数并不可靠。
+  Future<void> playFromHistory({
+    required PlaybackContext context,
+    required Song song,
+  }) async {
+    // 刻意不 await 起播就启动补齐：playPlaylist 会一路 await 到音频真正加载完成，
+    // 首曲加载慢或播放失败重试（网络歌曲最多 7 次指数退避，可达数十秒）时，
+    // 队列补齐会被整段推迟 —— 用户看到队列里只有这一首、切不了歌。
+    // playPlaylist 在它的第一个 await 之前已同步递增 _loadGeneration 并写好 state，
+    // 所以紧接着读到的代次就是本次播放的代次。
+    final playing = playPlaylist([song], startIndex: 0, context: context);
+    final generation = _loadGeneration;
+    unawaited(
+      _fillQueueAroundSong(
+        context: context,
+        songId: song.id,
+        generation: generation,
+      ),
+    );
+    await playing;
+  }
+
+  /// 拉取上下文的有序歌曲 ID 列表。顺序与该上下文的分页列表一致。
+  Future<List<int>> _fetchContextSongIds(PlaybackContext context) async {
+    final playlistId = context.playlistId;
+    if (playlistId != null) {
+      return ref.read(playlistApiProvider).getPlaylistSongIds(playlistId);
+    }
+    // 上下文类型不认识（prefs 被写坏、手工深链、playlist 的 key 不是数字…）时必须早退：
+    // categorySongsFilter 对未知 field 返回全 null 的过滤器，会退化成「无条件查询」，
+    // 把整个曲库拉进播放队列。
+    if (!categoryFields.contains(context.type)) {
+      debugPrint('[Player] 未知播放上下文类型，跳过队列补齐: ${context.type}');
+      return const [];
+    }
+    final f = categorySongsFilter((field: context.type, value: context.key));
+    return ref.read(songsApiProvider).getSongIds(
+      genre: f.genre,
+      artist: f.artist,
+      album: f.album,
+      language: f.language,
+      style: f.style,
+      year: f.year,
+      decade: f.decade,
+    );
+  }
+
+  /// 返回按 offset/limit 抓取该上下文歌曲的函数。
+  Future<List<Song>> Function(int offset, int limit) _contextFetcher(
+    PlaybackContext context,
+  ) {
+    final playlistId = context.playlistId;
+    if (playlistId != null) {
+      final playlistApi = ref.read(playlistApiProvider);
+      return (offset, limit) async {
+        final resp = await playlistApi.getPlaylistSongs(
+          playlistId,
+          limit: limit,
+          offset: offset,
+        );
+        return resp.songs;
+      };
+    }
+    final songsApi = ref.read(songsApiProvider);
+    final f = categorySongsFilter((field: context.type, value: context.key));
+    return (offset, limit) async {
+      final resp = await songsApi.getSongs(
+        genre: f.genre,
+        artist: f.artist,
+        album: f.album,
+        language: f.language,
+        style: f.style,
+        year: f.year,
+        decade: f.decade,
+        limit: limit,
+        offset: offset,
+      );
+      return resp.songs;
+    };
+  }
+
+  /// 把目标歌之后、再回卷到开头的上下文歌曲补进队列（环形旋转）。
+  Future<void> _fillQueueAroundSong({
+    required PlaybackContext context,
+    required int songId,
+    required int generation,
+  }) async {
+    try {
+      final ids = await _fetchContextSongIds(context);
+      if (_loadGeneration != generation || ids.isEmpty) return;
+
+      final fetch = _contextFetcher(context);
+      final absIndex = ids.indexOf(songId);
+
+      if (absIndex < 0) {
+        // 该歌曲已不在此上下文中（被移出歌单 / 元数据被改）。
+        // 队列里保留它继续播，把整个上下文追加到它后面。
+        await _appendRange(
+          generation: generation,
+          offset: 0,
+          endExclusive: ids.length,
+          fetch: fetch,
+        );
+        // 提示必须放在补齐之后：_playCurrent 播放成功时会 clearInfoMessage，
+        // 而 ids 拉取通常快于音频加载，提前设置会被它清掉、用户什么都看不到。
+        if (_loadGeneration == generation) {
+          final message = l10nOrNull?.playHistorySongMissing;
+          if (message != null) {
+            state = state.copyWith(infoMessage: message);
+          }
+        }
+        return;
+      }
+
+      // 先接上目标歌之后的部分，让「往下播」立刻可用
+      final tailDone = await _appendRange(
+        generation: generation,
+        offset: absIndex + 1,
+        endExclusive: ids.length,
+        fetch: fetch,
+      );
+      if (!tailDone) return;
+      // 再回卷补上开头到目标歌之前的部分
+      await _appendRange(
+        generation: generation,
+        offset: 0,
+        endExclusive: absIndex,
+        fetch: fetch,
+      );
+    } catch (e, st) {
+      debugPrint('[Player] _fillQueueAroundSong failed: $e\n$st');
+    }
+  }
+
+  /// 分批抓取 `[offset, endExclusive)` 区间的歌曲并追加到队列。
+  ///
+  /// 返回 false 表示被新的播放操作抢占（代次过期）或抓取失败，调用方应停止后续区间。
+  /// [addToPlaylist] 按 (id, type) 去重，故已在队列里的目标歌不会重复。
+  Future<bool> _appendRange({
+    required int generation,
+    required int offset,
+    required int endExclusive,
+    required Future<List<Song>> Function(int offset, int limit) fetch,
+  }) async {
+    const batchLimit = 100;
+    const maxRetries = 3;
+    var cursor = offset;
+    while (cursor < endExclusive) {
+      if (_loadGeneration != generation) return false;
+
+      final limit = (endExclusive - cursor).clamp(1, batchLimit);
+      List<Song>? batch;
+      for (var retry = 0; retry < maxRetries; retry++) {
+        try {
+          batch = await fetch(cursor, limit);
+          break;
+        } catch (e) {
+          debugPrint(
+            '[Player] _appendRange: fetch failed at offset=$cursor'
+            ' retry=$retry/$maxRetries: $e',
+          );
+          if (retry == maxRetries - 1) return false;
+          await Future<void>.delayed(Duration(milliseconds: 500 * (retry + 1)));
+        }
+      }
+
+      if (_loadGeneration != generation) return false;
+      if (batch == null || batch.isEmpty) break;
+
+      addToPlaylist(batch);
+      // 队列增长后必须重算预选的下一首：起播时队列只有 1 首，
+      // random 模式的 _getRandomIndex() 对单曲队列直接返回 0（= 当前这首），
+      // 而 playNext 会优先用这个预选值 —— 不重算就会把同一首立刻重播一遍。
+      _preSelectNextIndex();
+      cursor += batch.length;
+    }
+    if (_loadGeneration == generation) {
+      _savePlaybackState();
+    }
+    return _loadGeneration == generation;
   }
 
   /// 合并播放多个歌单
@@ -1827,7 +2046,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
           // 回填播放来源（本地缓存 / 远端流串），供播放页「歌曲信息」展示。
           playbackSource: _audioHandler.lastPlaybackSource,
         );
-        _notifyPlayEvent(song.id, 'play');
+        _notifyPlayEvent(song.id, 'play', context: state.playbackContext);
 
         // 恢复上次保存的播放进度
         if (_savedPositionMs > 0) {

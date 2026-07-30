@@ -22,7 +22,9 @@ import '../../../shared/widgets/scroll_to_top_fab.dart';
 import '../../../shared/widgets/song_picker_modal.dart';
 import '../../library/presentation/providers/songs_provider.dart';
 import '../../library/presentation/song_edit_page.dart';
+import '../../player/domain/playback_context.dart';
 import '../../player/presentation/providers/player_provider.dart';
+import '../../player/presentation/widgets/play_history_sheet.dart';
 import '../../settings/presentation/providers/cache_download_provider.dart';
 import '../../settings/presentation/providers/song_cache_provider.dart';
 import '../domain/playlist.dart';
@@ -1190,6 +1192,9 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
             case 'add_songs':
               _addSongs();
               break;
+            case 'play_history':
+              _showPlayHistory(playlist);
+              break;
             case 'cache_playlist':
               _cachePlaylistToDevice();
               break;
@@ -1211,6 +1216,16 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
                 child: ListTile(
                   leading: const Icon(Icons.add),
                   title: Text(l10n.playlistAddSongs),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              // 播放历史：无条件显示（有无记录要请求才知道，空态由面板承担）
+              PopupMenuItem(
+                value: 'play_history',
+                child: ListTile(
+                  leading: const Icon(Icons.history),
+                  title: Text(l10n.playHistory),
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -1672,6 +1687,15 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
         message: l10n.playlistPlayingCount(total),
       );
     }
+  }
+
+  /// 打开该歌单的播放历史面板（点某条历史可从那首接着往下播）
+  void _showPlayHistory(Playlist playlist) {
+    PlayHistorySheet.show(
+      context,
+      playbackContext: PlaybackContext.playlist(playlist.id),
+      title: AppLocalizations.of(context).playHistoryTitle(playlist.name),
+    );
   }
 
   /// 播放单曲

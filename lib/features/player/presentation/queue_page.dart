@@ -253,7 +253,11 @@ class _QueueBottomSheetState extends ConsumerState<QueueBottomSheet>
           index: index,
           isCurrentSong: isCurrentSong,
           isPlaying: isPlaying,
-          onTap: () => notifier.playPlaylist(state.playlist, startIndex: index),
+          onTap: () => notifier.playPlaylist(
+            state.playlist,
+            startIndex: index,
+            keepContext: true,
+          ),
           onRemove: () => _removeSong(context, notifier, index, song),
         );
       },

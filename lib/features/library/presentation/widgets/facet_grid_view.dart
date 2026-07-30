@@ -12,6 +12,7 @@ import '../../../../shared/widgets/browse_card.dart';
 import '../../../../shared/widgets/browse_collection_view.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/error_view.dart';
+import '../../../player/domain/playback_context.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../playlist/presentation/providers/playlist_view_provider.dart';
 import '../providers/category_provider.dart';
@@ -80,7 +81,11 @@ class _FacetGridViewState extends ConsumerState<FacetGridView> {
       ResponsiveSnackBar.show(context, message: l10n.libraryNoPlayableSongs);
       return;
     }
-    ref.read(playerStateProvider.notifier).playPlaylist(songs, startIndex: 0);
+    ref.read(playerStateProvider.notifier).playPlaylist(
+      songs,
+      startIndex: 0,
+      context: PlaybackContext(widget.field, value),
+    );
     if (!mounted) return;
     ResponsiveSnackBar.show(
       context,
