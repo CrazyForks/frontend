@@ -1,6 +1,6 @@
-import '../../../core/storage/song_cache_service.dart' show PlaybackSource;
 import '../../../shared/models/song.dart';
 import 'playback_context.dart';
+import 'playback_source.dart';
 
 /// 播放模式
 enum PlayMode {

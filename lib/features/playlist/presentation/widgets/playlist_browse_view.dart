@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +16,7 @@ import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/error_view.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../domain/playlist.dart';
+import '../../domain/use_cases/playlist_sort.dart';
 import '../providers/playlist_provider.dart';
 import '../providers/playlist_view_provider.dart';
 import 'playlist_card.dart';
@@ -454,46 +454,36 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
     await ref.read(playlistListProvider(_type).notifier).loadAll();
     if (!mounted) return;
     final full = ref.read(playlistListProvider(_type)).value?.items ?? [];
-    final sorted = List<Playlist>.from(full)..sort((a, b) {
-      final r = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      return ascending ? r : -r;
-    });
-    await _applyReorder(sorted, full, ascending ? _L.nameAsc : _L.nameDesc);
-  }
 
-  int? _extractFirstNumber(String title) {
-    final match = RegExp(r'(\d+)').firstMatch(title);
-    if (match == null) return null;
-    return int.tryParse(match.group(1)!);
+    // TODO(i18n): 启用中文拼音排序时，注入拼音比较器：
+    // PlaylistSort(compareStrings: lpinyinCompare)
+    final playlistIds = PlaylistSort().sortPlaylistsByName(
+      full,
+      ascending: ascending,
+    );
+    await _applyReorder(
+      playlistIds,
+      ascending ? _L.nameAsc : _L.nameDesc,
+    );
   }
 
   Future<void> autoSortByNumberPrefix() async {
     await ref.read(playlistListProvider(_type).notifier).loadAll();
     if (!mounted) return;
     final full = ref.read(playlistListProvider(_type)).value?.items ?? [];
-    final sorted = List<Playlist>.from(full)..sort((a, b) {
-      final numA = _extractFirstNumber(a.name);
-      final numB = _extractFirstNumber(b.name);
-      if (numA != null && numB != null) {
-        final cmp = numA.compareTo(numB);
-        if (cmp != 0) return cmp;
-        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      }
-      if (numA != null) return -1;
-      if (numB != null) return 1;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
-    await _applyReorder(sorted, full, _L.number);
+
+    // TODO(i18n): 启用中文拼音排序时，注入拼音比较器：
+    // PlaylistSort(compareStrings: lpinyinCompare)
+    final playlistIds = PlaylistSort().sortPlaylistsByNumberPrefix(full);
+    await _applyReorder(playlistIds, _L.number);
   }
 
   Future<void> _applyReorder(
-    List<Playlist> sorted,
-    List<Playlist> original,
+    List<int>? playlistIds,
     _L kind,
   ) async {
-    final playlistIds = sorted.map((p) => p.id).toList();
     final l10n = AppLocalizations.of(context);
-    if (listEquals(playlistIds, original.map((p) => p.id).toList())) {
+    if (playlistIds == null) {
       ResponsiveSnackBar.show(
         context,
         message: l10n.playlistAlreadySortedPlaylists,

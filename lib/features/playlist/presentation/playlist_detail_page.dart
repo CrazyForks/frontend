@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import '../../../shared/widgets/network_cover_image.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,6 +28,7 @@ import '../../player/presentation/widgets/play_history_sheet.dart';
 import '../../settings/presentation/providers/cache_download_provider.dart';
 import '../../settings/presentation/providers/song_cache_provider.dart';
 import '../domain/playlist.dart';
+import '../domain/use_cases/playlist_sort.dart';
 import 'providers/playlist_provider.dart';
 import 'widgets/playlist_edit_dialog.dart';
 import 'widgets/playlist_song_tile.dart';
@@ -175,17 +176,14 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     final fullSongs =
         ref.read(playlistSongsProvider(_playlistIdInt)).value?.items ?? songs;
 
-    final sorted = List<Song>.from(fullSongs);
-    sorted.sort((a, b) {
-      final result = a.title.toLowerCase().compareTo(b.title.toLowerCase());
-      return ascending ? result : -result;
-    });
+    // TODO(i18n): 启用中文拼音排序时，注入拼音比较器：
+    // PlaylistSort(compareStrings: lpinyinCompare)
+    final songIds = PlaylistSort().sortSongsByName(
+      fullSongs,
+      ascending: ascending,
+    );
 
-    final songIds = sorted.map((s) => s.id).toList();
-
-    // 检查排序前后是否有变化，避免无意义的 API 调用
-    final originalIds = fullSongs.map((s) => s.id).toList();
-    if (listEquals(songIds, originalIds)) {
+    if (songIds == null) {
       if (mounted) {
         ResponsiveSnackBar.show(
           context,
@@ -218,15 +216,6 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     }
   }
 
-  /// 提取标题中第一个出现的数字（支持开头和中间位置）
-  /// 例如: "04.校园故事" → 4, "干得漂亮 | 01 好意被辜负" → 1
-  /// 如果没有数字，返回 null
-  int? _extractFirstNumber(String title) {
-    final match = RegExp(r'(\d+)').firstMatch(title);
-    if (match == null) return null;
-    return int.tryParse(match.group(1)!);
-  }
-
   /// 自动按数字前缀排序
   Future<void> _autoSortByNumberPrefix(List<Song> songs) async {
     // 排序需要全部歌曲在内存中
@@ -235,30 +224,11 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     final fullSongs =
         ref.read(playlistSongsProvider(_playlistIdInt)).value?.items ?? songs;
 
-    final sorted = List<Song>.from(fullSongs);
-    sorted.sort((a, b) {
-      final numA = _extractFirstNumber(a.title);
-      final numB = _extractFirstNumber(b.title);
+    // TODO(i18n): 启用中文拼音排序时，注入拼音比较器：
+    // PlaylistSort(compareStrings: lpinyinCompare)
+    final songIds = PlaylistSort().sortSongsByNumberPrefix(fullSongs);
 
-      // 都有数字前缀：按数值排序
-      if (numA != null && numB != null) {
-        final cmp = numA.compareTo(numB);
-        if (cmp != 0) return cmp;
-        // 数值相同时按标题字母序
-        return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-      }
-      // 有数字前缀的排在前面
-      if (numA != null) return -1;
-      if (numB != null) return 1;
-      // 都没有数字前缀：按标题字母序
-      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-    });
-
-    final songIds = sorted.map((s) => s.id).toList();
-
-    // 检查排序前后是否有变化
-    final originalIds = fullSongs.map((s) => s.id).toList();
-    if (listEquals(songIds, originalIds)) {
+    if (songIds == null) {
       if (mounted) {
         ResponsiveSnackBar.show(
           context,
@@ -288,7 +258,6 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     }
   }
 
-  /// 比较两个整数列表是否相等
   /// 取消排序模式（不保存）
   void _cancelSortMode() {
     setState(() {
