@@ -52,6 +52,27 @@ void main() {
     });
   });
 
+  group('withCacheBuster', () {
+    test('无查询参数时用 ? 追加 _cb 时间戳', () {
+      final busted = withCacheBuster(raw);
+      expect(busted, matches(RegExp('^${RegExp.escape(raw)}\\?_cb=\\d+\$')));
+    });
+
+    test('已有查询参数时用 & 追加', () {
+      final busted = withCacheBuster('$raw?a=1');
+      expect(
+        busted,
+        matches(RegExp('^${RegExp.escape(raw)}\\?a=1&_cb=\\d+\$')),
+      );
+    });
+
+    test('两次调用产生不同 URL(缓存键必然不同)', () async {
+      final a = withCacheBuster(raw);
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      expect(withCacheBuster(raw), isNot(a));
+    });
+  });
+
   group('githubGetWithProxyFallback', () {
     test('代理返回 5xx 时降级直连', () async {
       final adapter = _FakeAdapter((url) {

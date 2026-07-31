@@ -64,9 +64,10 @@ class ChannelReleaseResolver {
     try {
       const rawApi =
           'https://api.github.com/repos/${AppConfig.frontendUpdateRepo}/releases/latest';
+      // /releases/latest 是滚动内容,击穿代理缓存(见 withCacheBuster)。
       final resp = await githubGetWithProxyFallback<dynamic>(
         _dio,
-        rawApi,
+        withCacheBuster(rawApi),
         proxy: githubProxy,
       );
       final data = resp.data;

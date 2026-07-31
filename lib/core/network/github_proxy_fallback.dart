@@ -14,6 +14,16 @@ String applyGithubProxy(String rawUrl, String? proxy) {
   return '$prefix$rawUrl';
 }
 
+/// 给 URL 追加一次性时间戳参数，击穿加速代理/CDN 对**滚动内容**（dev tag 的热更
+/// manifest、/releases/latest）的缓存。GitHub 忽略未知查询参数；代理以完整 URL 为
+/// 缓存键,参数每次不同 → 必然回源。**只用于小体积的滚动资源**,补丁包本体是带
+/// commit 的不可变文件名,无需也不应击穿缓存。
+String withCacheBuster(String rawUrl) {
+  final sep = rawUrl.contains('?') ? '&' : '?';
+  return '$rawUrl$sep'
+      '_cb=${DateTime.now().millisecondsSinceEpoch}';
+}
+
 /// GET [rawUrl]（套 [proxy]）。设置了代理且请求失败（连接错/超时/非 2xx）时，
 /// 打日志后改用原始 URL 直连重试一次；直连的结果/异常原样抛给调用方。
 Future<Response<T>> githubGetWithProxyFallback<T>(

@@ -7,7 +7,7 @@
 ## 核心模型:无基线 + 自动发布 + 工具链兼容键
 
 - **无基线**:客户端查**本渠道最新**——dev→滚动 tag `dev`;stable→GitHub `/releases/latest`(dev 是 prerelease,latest 天然返回最新正式版)。由 `lib/core/updater/channel_release_resolver.dart` 解析,复用 `FrontendVersionApi` 思路。
-- **自动发布**:`release.yml` 的 `build-bundled-android` job 每次发版自动产出并上传:前端 `patch-<abi>.zip`+`manifest-<abi>.json`、后端 `libgojni-<abi>.so`+`backend-manifest-<abi>.json`(arm64-v8a / armeabi-v7a / x86_64,gomobile bind 含 android/amd64 目标)。**无手动 workflow、无 versionCode 绑定**。
+- **自动发布**:`release.yml` 的 `build-bundled-android` job 每次发版自动产出并上传:前端 `patch-<abi>-<commit>.zip`+`manifest-<abi>.json`、后端 `libgojni-<abi>-<commit>.so`+`backend-manifest-<abi>.json`(arm64-v8a / armeabi-v7a / x86_64,gomobile bind 含 android/amd64 目标)。**无手动 workflow、无 versionCode 绑定**。
 - **兼容键取代 versionCode**(自动、非手改):
   - **前端 libapp.so**:flutter_patcher 天然按 **versionCode** 绑定(libapp.so ↔ 引擎)。`--split-per-abi` 下 gradle 会把各 ABI APK 的 versionCode 改写为「ABI偏移×1000+pubspec基础值」(如 arm64-v8a=2001),CI 用 aapt 从分 ABI APK 读**真实值**写入 manifest/补丁;本项目 pubspec 的 `+N` **恒定**(CI 不随构建 bump),同 ABI 的新旧构建 versionCode 相同,自然绑定即可跨版本热更——versionCode 是**自动的兼容代理**,不是手挑的基线。客户端额外比对 `AppConfig.flutterBinding`(= CI `FLUTTER_VERSION`)与 manifest 的 `flutterBinding`:不同 → 不热更(防同 versionCode 但换了 Flutter 引擎导致崩溃),交「整包不兼容」分支下 APK。仅当有意 bump pubspec `+N`(通常伴随引擎/原生变更)时前端才走整包。
   - **后端 libgojni.so**:兼容边界是 gomobile 导出面(`mobile/export_surface.txt` + `release.yml` 导出面守卫,自动)。**去掉 versionCode**,靠「导出面冻结 + 崩溃回滚黑名单」保证任意老包热更到最新。
@@ -117,4 +117,4 @@
 ## 注意
 
 - Google Play 等渠道可能限制动态下发 `.so`,本项目走自控/侧载分发。
-- **标准版(非 bundle)也是无基线**:player 仓库 `build-and-release.yml` 的 `build-android` 每次发版自动产出前端 `patch-<abi>.zip`+`manifest`(无后端);手动 `patch-release.yml` 已删除。客户端逻辑对老式 manifest 仍向后兼容(无新字段时退回 hasUpdate + versionCode 绑定旧行为)。
+- **标准版(非 bundle)也是无基线**:player 仓库 `build-and-release.yml` 的 `build-android` 每次发版自动产出前端 `patch-<abi>-<commit>.zip`+`manifest`(无后端);手动 `patch-release.yml` 已删除。客户端逻辑对老式 manifest 仍向后兼容(无新字段时退回 hasUpdate + versionCode 绑定旧行为)。

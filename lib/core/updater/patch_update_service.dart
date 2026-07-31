@@ -73,12 +73,15 @@ class PatchUpdateService {
         return null;
       }
 
+      // manifest 是滚动内容,必须击穿代理缓存:陈旧 manifest 的 md5 对不上滚动更新后的
+      // 补丁包,是线上 md5Mismatch 的根因。
+      final manifestUrl = withCacheBuster(rawUrl);
       debugPrint(
-        '[Patcher] checkPatch: 拉取 manifest ${applyProxy(rawUrl, githubProxy)}',
+        '[Patcher] checkPatch: 拉取 manifest ${applyProxy(manifestUrl, githubProxy)}',
       );
       final resp = await githubGetWithProxyFallback<dynamic>(
         _dio,
-        rawUrl,
+        manifestUrl,
         proxy: githubProxy,
       );
       final map = _asMap(resp.data);
@@ -207,21 +210,42 @@ class PatchUpdateService {
   /// 下载并安装补丁（阻塞到完成)。成功返回 true,冷启动生效。
   ///
   /// 约定传入的 [patch] 的 `patchUrl` 为**原始地址**；[githubProxy] 非空时先经
-  /// 代理下载，失败则降级为原始 URL 直连重试一次。
+  /// 代理下载，失败则降级为原始 URL 直连重试一次。仍失败时重拉一次 manifest
+  /// （[checkPatch]）刷新 md5/patchUrl 再试——防手上的 [patch] 来自陈旧的代理缓存
+  /// manifest,与滚动更新后的补丁包必然 md5Mismatch,重试多少次都没用。
   Future<bool> applyPatch(
     PatchInfo patch, {
     String? githubProxy,
     void Function(PatchApplyProgress)? onProgress,
+    bool allowManifestRefresh = true,
   }) async {
     if (!isSupported) return false;
     final proxiedUrl = applyProxy(patch.patchUrl, githubProxy);
-    final ok = await _applyPatchOnce(
+    var ok = await _applyPatchOnce(
       _withPatchUrl(patch, proxiedUrl),
       onProgress,
     );
-    if (ok || proxiedUrl == patch.patchUrl) return ok;
-    debugPrint('[Patcher] applyPatch 经代理失败,降级直连重试: 失败URL=$proxiedUrl');
-    return _applyPatchOnce(patch, onProgress);
+    if (!ok && proxiedUrl != patch.patchUrl) {
+      debugPrint('[Patcher] applyPatch 经代理失败,降级直连重试: 失败URL=$proxiedUrl');
+      ok = await _applyPatchOnce(patch, onProgress);
+    }
+    if (ok || !allowManifestRefresh) return ok;
+
+    final fresh = await checkPatch(githubProxy: githubProxy);
+    if (fresh == null ||
+        (fresh.md5 == patch.md5 && fresh.patchUrl == patch.patchUrl)) {
+      return false;
+    }
+    debugPrint(
+      '[Patcher] applyPatch 刷新 manifest 后重试: '
+      '${patch.version} -> ${fresh.version}',
+    );
+    return applyPatch(
+      fresh,
+      githubProxy: githubProxy,
+      onProgress: onProgress,
+      allowManifestRefresh: false,
+    );
   }
 
   Future<bool> _applyPatchOnce(

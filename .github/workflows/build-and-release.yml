@@ -373,8 +373,11 @@ jobs:
             rm -rf dist
             dart run flutter_patcher:pack --apk "$apk" --version "$LABEL" \
               --target-version-code "$ABI_VC" --abi "$abi"
-            cp dist/patch.zip "apk-output/patch-${abi}.zip"
-            ZIP_MD5=$(md5sum "apk-output/patch-${abi}.zip" | cut -d' ' -f1)
+            # 补丁包文件名带 commit(不可变 URL):滚动 tag 下 manifest 与 zip 是两次独立
+            # 请求,代理/CDN 缓存住旧 manifest 时,固定文件名会让旧 md5 对上新 zip → 永远
+            # md5Mismatch。commit 后缀保证「manifest 指向的 URL 内容永不变」。
+            cp dist/patch.zip "apk-output/patch-${abi}-${GIT_COMMIT}.zip"
+            ZIP_MD5=$(md5sum "apk-output/patch-${abi}-${GIT_COMMIT}.zip" | cut -d' ' -f1)
             cat > "apk-output/manifest-${abi}.json" <<EOF
           {
             "hasUpdate": true,
@@ -385,7 +388,7 @@ jobs:
               "flutterBinding": "${FLUTTER_BINDING}",
               "contractHash": "${DART_CONTRACT_HASH}",
               "targetVersionCode": ${ABI_VC},
-              "patchUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/patch-${abi}.zip",
+              "patchUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/patch-${abi}-${GIT_COMMIT}.zip",
               "md5": "${ZIP_MD5}"
             }
           }

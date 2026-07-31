@@ -169,13 +169,15 @@ class BackendPatchService {
         );
         return null;
       }
+      // manifest 是滚动内容,击穿代理缓存,防陈旧 md5 与滚动更新后的 .so 错配。
+      final manifestUrl = withCacheBuster(rawUrl);
       debugPrint(
         '[BackendPatch] checkPatch: 拉取 manifest '
-        '${PatchUpdateService.applyProxy(rawUrl, githubProxy)}',
+        '${PatchUpdateService.applyProxy(manifestUrl, githubProxy)}',
       );
       final resp = await githubGetWithProxyFallback<dynamic>(
         _githubDio,
-        rawUrl,
+        manifestUrl,
         proxy: githubProxy,
       );
       final map = _asMap(resp.data);
@@ -255,10 +257,14 @@ class BackendPatchService {
   }
 
   /// 下载 .so → md5 校验 → 交原生落地为「待生效补丁」。成功返回 true，冷重启后生效。
+  ///
+  /// md5 不匹配时重拉一次 manifest（[checkPatch]）刷新 md5/soUrl 再试——防手上的
+  /// [info] 来自陈旧的代理缓存 manifest,与滚动更新后的 .so 必然错配。
   Future<bool> downloadAndStage(
     BackendPatchInfo info, {
     String? githubProxy,
     void Function(double? fraction)? onProgress,
+    bool allowManifestRefresh = true,
   }) async {
     if (!isSupported) return false;
     File? tmp;
@@ -285,7 +291,22 @@ class BackendPatchService {
         if (actual.toLowerCase() != info.md5.toLowerCase()) {
           debugPrint('[BackendPatch] md5 不匹配: 期望 ${info.md5} 实际 $actual');
           await tmp.delete().catchError((_) => tmp!);
-          return false;
+          if (!allowManifestRefresh) return false;
+          final fresh = await checkPatch(githubProxy: githubProxy);
+          if (fresh == null ||
+              (fresh.md5 == info.md5 && fresh.soUrl == info.soUrl)) {
+            return false;
+          }
+          debugPrint(
+            '[BackendPatch] 刷新 manifest 后重试: '
+            '${info.patchLabel} -> ${fresh.patchLabel}',
+          );
+          return downloadAndStage(
+            fresh,
+            githubProxy: githubProxy,
+            onProgress: onProgress,
+            allowManifestRefresh: false,
+          );
         }
       }
 
