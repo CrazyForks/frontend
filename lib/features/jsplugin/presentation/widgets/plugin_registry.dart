@@ -81,7 +81,9 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
     }
   }
 
-  Future<void> _refreshPlugins() async {
+  /// [force] 为 true 时让后端绕过缓存重拉。翻页与搜索**不要**传：它们在后端
+  /// 缓存的完整列表上切片/过滤，传了会让每次翻页都重拉整棵注册表树。
+  Future<void> _refreshPlugins({bool force = false}) async {
     if (!_allSources && _selectedRegistry == null) return;
     final proxy = await ref.read(githubProxyProvider.future);
     if (!mounted) return;
@@ -103,6 +105,7 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
             _allSources || _selectedRegistry!.token.isEmpty
                 ? null
                 : _selectedRegistry!.token,
+        force: force,
       );
       if (!mounted) return;
       setState(() {
@@ -208,7 +211,9 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
             IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: l10n.jspluginRefreshList,
-              onPressed: _loadingPlugins ? null : _refreshPlugins,
+              // 用户主动刷新：绕过缓存拉最新的源内容
+              onPressed:
+                  _loadingPlugins ? null : () => _refreshPlugins(force: true),
             ),
           IconButton(
             icon: const Icon(Icons.settings),
@@ -403,7 +408,8 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: _refreshPlugins,
+              // 拉取失败后的重试：同样绕过缓存
+              onPressed: () => _refreshPlugins(force: true),
               child: Text(l10n.commonRetry),
             ),
           ],

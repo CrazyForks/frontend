@@ -592,6 +592,9 @@ class JSPluginApi {
 
   /// 刷新插件注册表
   /// POST /api/v1/jsplugins/registry/refresh
+  ///
+  /// [force] 为 true 时绕过服务端缓存强制重拉。只有用户主动点「刷新」才该传，
+  /// 翻页与搜索必须走缓存——否则每翻一页都会重新递归拉取整棵注册表树。
   Future<RegistryRefreshResponse> refreshRegistry({
     String registryUrl = '',
     bool allSources = false,
@@ -600,9 +603,15 @@ class JSPluginApi {
     String? search,
     String? githubProxy,
     String? token,
+    bool force = false,
   }) async {
     try {
       final body = <String, dynamic>{'page': page, 'page_size': pageSize};
+      // 服务端缓存拉取结果 5 分钟，翻页/搜索直接命中缓存；
+      // 只有用户主动刷新时才 force 重拉整棵注册表树
+      if (force) {
+        body['force'] = true;
+      }
       // 聚合「全部」模式：忽略单源 URL 与 token，后端遍历所有启用源
       if (allSources) {
         body['all_sources'] = true;
