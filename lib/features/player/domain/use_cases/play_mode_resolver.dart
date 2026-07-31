@@ -7,11 +7,9 @@ import '../player_state.dart';
 ///
 /// 纯 Dart 有状态类，不依赖 Flutter 或 Riverpod。
 class PlayModeResolver {
-  PlayModeResolver({
-    required PlayMode mode,
-    Random? random,
-  })  : _mode = mode,
-        _random = random ?? Random();
+  PlayModeResolver({required PlayMode mode, Random? random})
+    : _mode = mode,
+      _random = random ?? Random();
 
   final Random _random;
   PlayMode _mode;
@@ -43,10 +41,9 @@ class PlayModeResolver {
       case PlayMode.singlePlay:
         return currentIndex;
       case PlayMode.random:
-        final index = _preSelectedNextIndex ?? _getRandomIndex(
-          currentIndex: currentIndex,
-          length: length,
-        );
+        final index =
+            _preSelectedNextIndex ??
+            _getRandomIndex(currentIndex: currentIndex, length: length);
         _preSelectedNextIndex = null;
         return index;
     }
@@ -144,9 +141,11 @@ class PlayModeResolver {
     }
 
     // 获取未播放的索引列表
-    final availableIndices = List<int>.generate(length, (i) => i)
-        .where((i) => !_playedIndices.contains(i))
-        .toList();
+    final availableIndices =
+        List<int>.generate(
+          length,
+          (i) => i,
+        ).where((i) => !_playedIndices.contains(i)).toList();
 
     if (availableIndices.isEmpty) {
       return _random.nextInt(length);

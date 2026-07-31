@@ -96,22 +96,24 @@ class FavoriteNotifier extends Notifier<FavoriteState> {
     try {
       // 初始化歌曲收藏服务
       await _songFavoriteService.initialize(
-        findOrCreatePlaylist: () => _findOrCreatePlaylist(
-          _favoriteSongPlaylistName,
-          'normal',
-          '我喜欢的歌曲',
-        ),
+        findOrCreatePlaylist:
+            () => _findOrCreatePlaylist(
+              _favoriteSongPlaylistName,
+              'normal',
+              '我喜欢的歌曲',
+            ),
         loadSongIds: _loadPlaylistSongIds,
       );
       if (_disposed) return;
 
       // 初始化电台收藏服务
       await _radioFavoriteService.initialize(
-        findOrCreatePlaylist: () => _findOrCreatePlaylist(
-          _favoriteRadioPlaylistName,
-          'radio',
-          '我喜欢的电台',
-        ),
+        findOrCreatePlaylist:
+            () => _findOrCreatePlaylist(
+              _favoriteRadioPlaylistName,
+              'radio',
+              '我喜欢的电台',
+            ),
         loadSongIds: _loadPlaylistSongIds,
       );
       if (_disposed) return;
@@ -216,9 +218,7 @@ class FavoriteNotifier extends Notifier<FavoriteState> {
         },
       );
 
-      state = state.copyWith(
-        favoriteSongIds: _songFavoriteService.favoriteIds,
-      );
+      state = state.copyWith(favoriteSongIds: _songFavoriteService.favoriteIds);
 
       return isFavorited;
     } catch (e) {

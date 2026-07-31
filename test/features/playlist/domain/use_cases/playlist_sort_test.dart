@@ -148,7 +148,11 @@ void main() {
 
         final result = sorter.sortSongsByNumberPrefix(songs);
 
-        expect(result, [2, 3, 1]); // 01.Has number, Another without, No number here
+        expect(result, [
+          2,
+          3,
+          1,
+        ]); // 01.Has number, Another without, No number here
       });
 
       test('mixed with and without number prefix', () {
@@ -166,10 +170,7 @@ void main() {
       });
 
       test('same number prefix sorted by name', () {
-        final songs = [
-          _song(1, '01. Banana'),
-          _song(2, '01. Apple'),
-        ];
+        final songs = [_song(1, '01. Banana'), _song(2, '01. Apple')];
 
         final result = sorter.sortSongsByNumberPrefix(songs);
 
@@ -189,11 +190,7 @@ void main() {
       });
 
       test('no-number songs sorted alphabetically among themselves', () {
-        final songs = [
-          _song(1, 'Zebra'),
-          _song(2, 'Apple'),
-          _song(3, 'Mango'),
-        ];
+        final songs = [_song(1, 'Zebra'), _song(2, 'Apple'), _song(3, 'Mango')];
 
         final result = sorter.sortSongsByNumberPrefix(songs);
 
@@ -239,10 +236,7 @@ void main() {
       });
 
       test('case insensitive', () {
-        final playlists = [
-          _playlist(1, 'banana'),
-          _playlist(2, 'Apple'),
-        ];
+        final playlists = [_playlist(1, 'banana'), _playlist(2, 'Apple')];
 
         final result = sorter.sortPlaylistsByName(playlists);
 
@@ -330,10 +324,7 @@ void main() {
           compareStrings: (a, b) => b.toLowerCase().compareTo(a.toLowerCase()),
         );
 
-        final songs = [
-          _song(1, '01. Apple'),
-          _song(2, '01. Cherry'),
-        ];
+        final songs = [_song(1, '01. Apple'), _song(2, '01. Cherry')];
 
         // 数字相同，反转序：01. Cherry, 01. Apple
         final result = reverseSorter.sortSongsByNumberPrefix(songs);
@@ -359,20 +350,23 @@ void main() {
         expect(result, [2, 3, 1]);
       });
 
-      test('default comparator produces stable behavior for Chinese characters', () {
-        // 文档化：默认比较器对中文字符使用 Unicode code point 顺序
-        // 这不是拼音序，但行为是确定且一致的
-        final songs = [
-          _song(1, '爱'),   // Unicode: U+7231
-          _song(2, '不'),   // Unicode: U+4E0D
-          _song(3, '从'),   // Unicode: U+4ECE
-        ];
+      test(
+        'default comparator produces stable behavior for Chinese characters',
+        () {
+          // 文档化：默认比较器对中文字符使用 Unicode code point 顺序
+          // 这不是拼音序，但行为是确定且一致的
+          final songs = [
+            _song(1, '爱'), // Unicode: U+7231
+            _song(2, '不'), // Unicode: U+4E0D
+            _song(3, '从'), // Unicode: U+4ECE
+          ];
 
-        final result = sorter.sortSongsByName(songs);
+          final result = sorter.sortSongsByName(songs);
 
-        // Unicode code point 顺序：不(4E0D) < 从(4ECE) < 爱(7231)
-        expect(result, [2, 3, 1]);
-      });
+          // Unicode code point 顺序：不(4E0D) < 从(4ECE) < 爱(7231)
+          expect(result, [2, 3, 1]);
+        },
+      );
 
       test('pinyin comparator sorts Chinese by pinyin order', () {
         // 模拟拼音比较器：提供一个简单的映射表
@@ -396,15 +390,17 @@ void main() {
         }
 
         final pinyinSorter = PlaylistSort(
-          compareStrings: (a, b) =>
-              toPinyin(a).toLowerCase().compareTo(toPinyin(b).toLowerCase()),
+          compareStrings:
+              (a, b) => toPinyin(
+                a,
+              ).toLowerCase().compareTo(toPinyin(b).toLowerCase()),
         );
 
         final songs = [
-          _song(1, '风'),   // feng
-          _song(2, '爱'),   // ai
-          _song(3, '大'),   // da
-          _song(4, '不'),   // bu
+          _song(1, '风'), // feng
+          _song(2, '爱'), // ai
+          _song(3, '大'), // da
+          _song(4, '不'), // bu
         ];
 
         // 拼音序：爱(ai) < 不(bu) < 大(da) < 风(feng)
@@ -414,11 +410,7 @@ void main() {
       });
 
       test('pinyin comparator works with mixed Chinese and English', () {
-        final pinyinMap = {
-          '我': 'wo',
-          '的': 'de',
-          '歌': 'ge',
-        };
+        final pinyinMap = {'我': 'wo', '的': 'de', '歌': 'ge'};
 
         String toPinyin(String s) {
           final buffer = StringBuffer();
@@ -430,14 +422,16 @@ void main() {
         }
 
         final pinyinSorter = PlaylistSort(
-          compareStrings: (a, b) =>
-              toPinyin(a).toLowerCase().compareTo(toPinyin(b).toLowerCase()),
+          compareStrings:
+              (a, b) => toPinyin(
+                a,
+              ).toLowerCase().compareTo(toPinyin(b).toLowerCase()),
         );
 
         final playlists = [
-          _playlist(1, '我的歌'),    // wodege
-          _playlist(2, 'Apple'),     // apple
-          _playlist(3, '歌'),        // ge
+          _playlist(1, '我的歌'), // wodege
+          _playlist(2, 'Apple'), // apple
+          _playlist(3, '歌'), // ge
         ];
 
         // 拼音序：Apple(apple) < 歌(ge) < 我的歌(wodege)

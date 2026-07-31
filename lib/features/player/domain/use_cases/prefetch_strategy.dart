@@ -14,9 +14,9 @@ class PrefetchDecision {
   });
 
   const PrefetchDecision.skip()
-      : shouldPrefetch = false,
-        songToPrefetch = null,
-        nextIndex = null;
+    : shouldPrefetch = false,
+      songToPrefetch = null,
+      nextIndex = null;
 }
 
 /// 预加载策略：纯决策逻辑，不负责网络请求执行。

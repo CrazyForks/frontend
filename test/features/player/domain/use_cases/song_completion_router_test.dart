@@ -84,11 +84,7 @@ void main() {
   group('PlayMode.loop', () {
     test('always returns playNext', () {
       expect(
-        router.resolve(
-          mode: PlayMode.loop,
-          currentIndex: 4,
-          playlistLength: 5,
-        ),
+        router.resolve(mode: PlayMode.loop, currentIndex: 4, playlistLength: 5),
         CompletionAction.playNext,
       );
     });

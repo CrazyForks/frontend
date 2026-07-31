@@ -173,15 +173,18 @@ void main() {
   });
 
   group('interleaving modes', () {
-    test('single mode does not affect consecutive count between order calls', () {
-      policy.onAllRetriesExhausted(mode: PlayMode.order); // count = 1
-      policy.onAllRetriesExhausted(mode: PlayMode.single); // count stays 1
-      policy.onAllRetriesExhausted(mode: PlayMode.order); // count = 2
-      expect(policy.consecutiveFailures, 2);
-      expect(policy.shouldStopCompletely, isFalse);
+    test(
+      'single mode does not affect consecutive count between order calls',
+      () {
+        policy.onAllRetriesExhausted(mode: PlayMode.order); // count = 1
+        policy.onAllRetriesExhausted(mode: PlayMode.single); // count stays 1
+        policy.onAllRetriesExhausted(mode: PlayMode.order); // count = 2
+        expect(policy.consecutiveFailures, 2);
+        expect(policy.shouldStopCompletely, isFalse);
 
-      policy.onAllRetriesExhausted(mode: PlayMode.order); // count = 3
-      expect(policy.shouldStopCompletely, isTrue);
-    });
+        policy.onAllRetriesExhausted(mode: PlayMode.order); // count = 3
+        expect(policy.shouldStopCompletely, isTrue);
+      },
+    );
   });
 }

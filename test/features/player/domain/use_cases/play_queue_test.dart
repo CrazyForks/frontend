@@ -65,10 +65,7 @@ void main() {
       });
 
       test('does nothing when adding empty list', () {
-        final queue = PlayQueue(
-          songs: [_makeSong(1)],
-          currentIndex: 0,
-        );
+        final queue = PlayQueue(songs: [_makeSong(1)], currentIndex: 0);
         final result = queue.add([]);
         expect(identical(result, queue), isTrue);
       });
@@ -197,10 +194,7 @@ void main() {
       });
 
       test('invalid index does nothing', () {
-        final queue = PlayQueue(
-          songs: [_makeSong(1)],
-          currentIndex: 0,
-        );
+        final queue = PlayQueue(songs: [_makeSong(1)], currentIndex: 0);
         final result = queue.removeAt(-1);
         expect(identical(result.queue, queue), isTrue);
 

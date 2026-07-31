@@ -461,10 +461,7 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
       full,
       ascending: ascending,
     );
-    await _applyReorder(
-      playlistIds,
-      ascending ? _L.nameAsc : _L.nameDesc,
-    );
+    await _applyReorder(playlistIds, ascending ? _L.nameAsc : _L.nameDesc);
   }
 
   Future<void> autoSortByNumberPrefix() async {
@@ -478,10 +475,7 @@ class PlaylistBrowseViewState extends ConsumerState<PlaylistBrowseView> {
     await _applyReorder(playlistIds, _L.number);
   }
 
-  Future<void> _applyReorder(
-    List<int>? playlistIds,
-    _L kind,
-  ) async {
+  Future<void> _applyReorder(List<int>? playlistIds, _L kind) async {
     final l10n = AppLocalizations.of(context);
     if (playlistIds == null) {
       ResponsiveSnackBar.show(

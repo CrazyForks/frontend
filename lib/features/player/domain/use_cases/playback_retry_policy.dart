@@ -68,8 +68,7 @@ class PlaybackRetryPolicy {
 
   /// Whether consecutive failures have reached the threshold and playback
   /// should halt entirely.
-  bool get shouldStopCompletely =>
-      _consecutiveFailures >= _maxConsecutiveSkips;
+  bool get shouldStopCompletely => _consecutiveFailures >= _maxConsecutiveSkips;
 
   /// The current consecutive-failure count (exposed for error messages).
   int get consecutiveFailures => _consecutiveFailures;

@@ -46,8 +46,11 @@ void main() {
         // Play through all songs - should not repeat
         for (var i = 0; i < length; i++) {
           final next = resolver.nextIndex(currentIndex: i, length: length)!;
-          expect(played.contains(next), isFalse,
-              reason: 'Index $next was repeated before all songs were played');
+          expect(
+            played.contains(next),
+            isFalse,
+            reason: 'Index $next was repeated before all songs were played',
+          );
           played.add(next);
           resolver.markPlayed(next);
         }
@@ -55,45 +58,50 @@ void main() {
         expect(played.length, length);
       });
 
-      test('random mode: resets after all played and does not immediately repeat current', () {
-        final resolver = PlayModeResolver(
-          mode: PlayMode.random,
-          random: Random(42),
-        );
+      test(
+        'random mode: resets after all played and does not immediately repeat current',
+        () {
+          final resolver = PlayModeResolver(
+            mode: PlayMode.random,
+            random: Random(42),
+          );
 
-        const length = 3;
-        // Mark all as played
-        for (var i = 0; i < length; i++) {
-          resolver.markPlayed(i);
-        }
-
-        // Next call should reset and avoid current index
-        final currentIndex = 1;
-        final results = <int>{};
-        // Run multiple times to verify it doesn't always return currentIndex
-        for (var i = 0; i < 20; i++) {
-          final next = resolver.nextIndex(currentIndex: currentIndex, length: length)!;
-          results.add(next);
-          // After reset, mark played again for clean state on next iteration
-          resolver.onQueueChanged();
-          for (var j = 0; j < length; j++) {
-            resolver.markPlayed(j);
+          const length = 3;
+          // Mark all as played
+          for (var i = 0; i < length; i++) {
+            resolver.markPlayed(i);
           }
-        }
 
-        // Should never immediately return the current index after reset
-        // (because current index is added to _playedIndices on reset)
-        // Actually, the first call after reset should not return currentIndex
-        final resolverSingle = PlayModeResolver(
-          mode: PlayMode.random,
-          random: Random(42),
-        );
-        for (var i = 0; i < length; i++) {
-          resolverSingle.markPlayed(i);
-        }
-        final next = resolverSingle.nextIndex(currentIndex: 1, length: length)!;
-        expect(next, isNot(equals(1)));
-      });
+          // Next call should reset and avoid current index
+          final currentIndex = 1;
+          final results = <int>{};
+          // Run multiple times to verify it doesn't always return currentIndex
+          for (var i = 0; i < 20; i++) {
+            final next =
+                resolver.nextIndex(currentIndex: currentIndex, length: length)!;
+            results.add(next);
+            // After reset, mark played again for clean state on next iteration
+            resolver.onQueueChanged();
+            for (var j = 0; j < length; j++) {
+              resolver.markPlayed(j);
+            }
+          }
+
+          // Should never immediately return the current index after reset
+          // (because current index is added to _playedIndices on reset)
+          // Actually, the first call after reset should not return currentIndex
+          final resolverSingle = PlayModeResolver(
+            mode: PlayMode.random,
+            random: Random(42),
+          );
+          for (var i = 0; i < length; i++) {
+            resolverSingle.markPlayed(i);
+          }
+          final next =
+              resolverSingle.nextIndex(currentIndex: 1, length: length)!;
+          expect(next, isNot(equals(1)));
+        },
+      );
 
       test('empty list (length=0) returns null', () {
         final resolver = PlayModeResolver(mode: PlayMode.order);
@@ -380,14 +388,17 @@ void main() {
         expect(resolver.nextIndex(currentIndex: -1, length: 5), 0);
       });
 
-      test('nextIndex with currentIndex=-1 in random mode returns valid index', () {
-        final resolver = PlayModeResolver(
-          mode: PlayMode.random,
-          random: Random(42),
-        );
-        final result = resolver.nextIndex(currentIndex: -1, length: 5);
-        expect(result, inInclusiveRange(0, 4));
-      });
+      test(
+        'nextIndex with currentIndex=-1 in random mode returns valid index',
+        () {
+          final resolver = PlayModeResolver(
+            mode: PlayMode.random,
+            random: Random(42),
+          );
+          final result = resolver.nextIndex(currentIndex: -1, length: 5);
+          expect(result, inInclusiveRange(0, 4));
+        },
+      );
     });
   });
 }

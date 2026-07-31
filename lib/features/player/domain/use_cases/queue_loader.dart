@@ -157,9 +157,7 @@ class QueueLoader {
           break;
         } catch (e) {
           if (retry == maxRetries - 1) return false;
-          await Future<void>.delayed(
-            Duration(milliseconds: 500 * (retry + 1)),
-          );
+          await Future<void>.delayed(Duration(milliseconds: 500 * (retry + 1)));
         }
       }
 

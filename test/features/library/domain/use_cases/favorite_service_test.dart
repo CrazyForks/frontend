@@ -61,21 +61,24 @@ void main() {
         expect(service.favoriteIds, {10});
       });
 
-      test('throws and remains uninitialized when findOrCreatePlaylist fails',
-          () async {
-        expect(
-          () => service.initialize(
-            findOrCreatePlaylist: () async => throw Exception('network error'),
-            loadSongIds: (id) async => {},
-          ),
-          throwsException,
-        );
+      test(
+        'throws and remains uninitialized when findOrCreatePlaylist fails',
+        () async {
+          expect(
+            () => service.initialize(
+              findOrCreatePlaylist:
+                  () async => throw Exception('network error'),
+              loadSongIds: (id) async => {},
+            ),
+            throwsException,
+          );
 
-        // Service should remain uninitialized after failure
-        await Future.delayed(Duration.zero);
-        expect(service.isInitialized, isFalse);
-        expect(service.playlistId, isNull);
-      });
+          // Service should remain uninitialized after failure
+          await Future.delayed(Duration.zero);
+          expect(service.isInitialized, isFalse);
+          expect(service.playlistId, isNull);
+        },
+      );
 
       test('throws and remains uninitialized when loadSongIds fails', () async {
         expect(
@@ -117,15 +120,17 @@ void main() {
         expect(service.isFavorite(999), isFalse);
       });
 
-      test('returns false for non-favorited song after initialization',
-          () async {
-        await service.initialize(
-          findOrCreatePlaylist: () async => 1,
-          loadSongIds: (id) async => {10, 20},
-        );
+      test(
+        'returns false for non-favorited song after initialization',
+        () async {
+          await service.initialize(
+            findOrCreatePlaylist: () async => 1,
+            loadSongIds: (id) async => {10, 20},
+          );
 
-        expect(service.isFavorite(30), isFalse);
-      });
+          expect(service.isFavorite(30), isFalse);
+        },
+      );
     });
 
     group('toggle', () {

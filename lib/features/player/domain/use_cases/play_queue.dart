@@ -21,10 +21,7 @@ class PlayQueue {
   final List<Song> songs;
   final int currentIndex;
 
-  const PlayQueue({
-    required this.songs,
-    required this.currentIndex,
-  });
+  const PlayQueue({required this.songs, required this.currentIndex});
 
   /// 空队列常量
   static const empty = PlayQueue(songs: [], currentIndex: -1);
@@ -55,10 +52,7 @@ class PlayQueue {
       }
     }
 
-    return PlayQueue(
-      songs: updatedSongs,
-      currentIndex: currentIndex,
-    );
+    return PlayQueue(songs: updatedSongs, currentIndex: currentIndex);
   }
 
   /// 在指定位置插入歌曲，调整 currentIndex
@@ -73,10 +67,7 @@ class PlayQueue {
       newCurrentIndex++;
     }
 
-    return PlayQueue(
-      songs: updatedSongs,
-      currentIndex: newCurrentIndex,
-    );
+    return PlayQueue(songs: updatedSongs, currentIndex: newCurrentIndex);
   }
 
   /// 删除指定位置的歌曲，返回操作结果（包含新队列、是否应停止、新的当前歌曲）
@@ -142,10 +133,7 @@ class PlayQueue {
       }
     }
 
-    return PlayQueue(
-      songs: updatedSongs,
-      currentIndex: newCurrentIndex,
-    );
+    return PlayQueue(songs: updatedSongs, currentIndex: newCurrentIndex);
   }
 
   /// 判断队列中是否已有该歌曲 (by id + type)
@@ -166,9 +154,6 @@ class PlayQueue {
   /// 跳转到指定位置
   PlayQueue jumpTo(int index) {
     if (index < 0 || index >= songs.length) return this;
-    return PlayQueue(
-      songs: songs,
-      currentIndex: index,
-    );
+    return PlayQueue(songs: songs, currentIndex: index);
   }
 }

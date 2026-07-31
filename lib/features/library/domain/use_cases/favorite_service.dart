@@ -11,10 +11,8 @@ typedef LoadPlaylistSongIds = Future<Set<int>> Function(int playlistId);
 typedef AddSongToPlaylist = Future<void> Function(int playlistId, int songId);
 
 /// Callback to remove a song from a playlist.
-typedef RemoveSongFromPlaylist = Future<void> Function(
-  int playlistId,
-  int songId,
-);
+typedef RemoveSongFromPlaylist =
+    Future<void> Function(int playlistId, int songId);
 
 /// Pure-Dart domain service that manages favorite song/radio IDs.
 ///
@@ -103,9 +101,7 @@ class FavoriteService {
   /// Reload all favorite IDs from the backend.
   ///
   /// Throws [StateError] if not initialized.
-  Future<void> refresh({
-    required LoadPlaylistSongIds loadSongIds,
-  }) async {
+  Future<void> refresh({required LoadPlaylistSongIds loadSongIds}) async {
     if (_playlistId == null) {
       throw StateError(
         'FavoriteService is not initialized. Call initialize() first.',

@@ -33,7 +33,7 @@ class PlaylistSort {
   /// 默认使用大小写不敏感的 [String.compareTo]（ASCII/Unicode 序）。
   /// 传入自定义比较器可支持拼音排序等 locale-aware 排序。
   PlaylistSort({int Function(String a, String b)? compareStrings})
-      : _compareStrings = compareStrings ?? _defaultCompare;
+    : _compareStrings = compareStrings ?? _defaultCompare;
 
   /// 默认比较器：大小写不敏感的 Unicode code point 顺序。
   static int _defaultCompare(String a, String b) =>

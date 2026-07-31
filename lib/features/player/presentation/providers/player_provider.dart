@@ -489,7 +489,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
     if (updatedTimerStatus != null &&
         updatedTimerStatus.mode == SleepTimerMode.afterSongs) {
       debugPrint(
-          '[Player] Sleep timer: ${updatedTimerStatus.remainingSongs} songs remaining');
+        '[Player] Sleep timer: ${updatedTimerStatus.remainingSongs} songs remaining',
+      );
       state = state.copyWith(sleepTimer: updatedTimerStatus);
     }
 
@@ -785,10 +786,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
       length: state.playlist.length,
     );
     if (nextIdx == null) {
-      debugPrint('[Player] playNext: no next index (end of playlist or stopped)');
+      debugPrint(
+        '[Player] playNext: no next index (end of playlist or stopped)',
+      );
       return;
     }
-    debugPrint('[Player] playNext: nextIndex: $nextIdx (mode: ${state.playMode})');
+    debugPrint(
+      '[Player] playNext: nextIndex: $nextIdx (mode: ${state.playMode})',
+    );
 
     await _playAtIndex(nextIdx);
   }
@@ -857,7 +862,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
       await _audioHandler.seek(Duration.zero);
       return;
     }
-    debugPrint('[Player] playPrev: prevIndex: $prevIdx (mode: ${state.playMode})');
+    debugPrint(
+      '[Player] playPrev: prevIndex: $prevIdx (mode: ${state.playMode})',
+    );
 
     await _playAtIndex(prevIdx);
   }
@@ -1895,10 +1902,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
     int nextIndex;
     if (state.playMode == PlayMode.random) {
-      nextIndex = _modeResolver.nextIndex(
-        currentIndex: state.currentIndex,
-        length: state.playlist.length,
-      ) ?? 0;
+      nextIndex =
+          _modeResolver.nextIndex(
+            currentIndex: state.currentIndex,
+            length: state.playlist.length,
+          ) ??
+          0;
     } else {
       nextIndex = state.currentIndex + 1;
       if (nextIndex >= state.playlist.length) {
@@ -1939,7 +1948,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       final quality = prefs.getAudioQuality();
-      final targetFormat = AudioFormatHelper.getTranscodeFormat(nextSong.format);
+      final targetFormat = AudioFormatHelper.getTranscodeFormat(
+        nextSong.format,
+      );
 
       final songUrl = UrlHelper.buildSongUrl(
         nextSong.url!,

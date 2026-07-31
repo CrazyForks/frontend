@@ -25,7 +25,8 @@ Song _makeSong({
 List<Song> _makePlaylist(int count, {String type = 'remote'}) {
   return List.generate(
     count,
-    (i) => _makeSong(id: i + 1, type: type, url: '/api/v1/songs/${i + 1}/stream'),
+    (i) =>
+        _makeSong(id: i + 1, type: type, url: '/api/v1/songs/${i + 1}/stream'),
   );
 }
 
@@ -98,10 +99,7 @@ void main() {
       });
 
       test('local song returns skip', () {
-        final playlist = [
-          _makeSong(id: 1),
-          _makeSong(id: 2, type: 'local'),
-        ];
+        final playlist = [_makeSong(id: 1), _makeSong(id: 2, type: 'local')];
         final decision = strategy.evaluateAfterPlay(
           playlist: playlist,
           currentIndex: 0,
@@ -113,10 +111,7 @@ void main() {
       });
 
       test('song with no url returns skip', () {
-        final playlist = [
-          _makeSong(id: 1),
-          _makeSong(id: 2, url: null),
-        ];
+        final playlist = [_makeSong(id: 1), _makeSong(id: 2, url: null)];
         final decision = strategy.evaluateAfterPlay(
           playlist: playlist,
           currentIndex: 0,
@@ -128,10 +123,7 @@ void main() {
       });
 
       test('song with empty url returns skip', () {
-        final playlist = [
-          _makeSong(id: 1),
-          _makeSong(id: 2, url: ''),
-        ];
+        final playlist = [_makeSong(id: 1), _makeSong(id: 2, url: '')];
         final decision = strategy.evaluateAfterPlay(
           playlist: playlist,
           currentIndex: 0,

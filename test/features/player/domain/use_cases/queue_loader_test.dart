@@ -42,35 +42,38 @@ void main() {
     });
 
     group('loadRemaining', () {
-      test('normal batched load (250 songs, pageSize=100 -> 3 batches)', () async {
-        final allSongs = List.generate(250, (i) => _makeSong(i));
-        final batches = <List<Song>>[];
-        int fetchCount = 0;
+      test(
+        'normal batched load (250 songs, pageSize=100 -> 3 batches)',
+        () async {
+          final allSongs = List.generate(250, (i) => _makeSong(i));
+          final batches = <List<Song>>[];
+          int fetchCount = 0;
 
-        final result = await loader.loadRemaining(
-          generation: loader.generation,
-          totalCount: 250,
-          alreadyLoaded: 0,
-          pageSize: 100,
-          fetch: (offset, limit) async {
-            fetchCount++;
-            final end = (offset + limit).clamp(0, allSongs.length);
-            return allSongs.sublist(offset, end);
-          },
-          onBatch: (songs) => batches.add(songs),
-        );
+          final result = await loader.loadRemaining(
+            generation: loader.generation,
+            totalCount: 250,
+            alreadyLoaded: 0,
+            pageSize: 100,
+            fetch: (offset, limit) async {
+              fetchCount++;
+              final end = (offset + limit).clamp(0, allSongs.length);
+              return allSongs.sublist(offset, end);
+            },
+            onBatch: (songs) => batches.add(songs),
+          );
 
-        expect(result, isTrue);
-        expect(fetchCount, 3);
-        expect(batches.length, 3);
-        expect(batches[0].length, 100);
-        expect(batches[1].length, 100);
-        expect(batches[2].length, 50);
-        // Verify order
-        expect(batches[0].first.id, 0);
-        expect(batches[1].first.id, 100);
-        expect(batches[2].first.id, 200);
-      });
+          expect(result, isTrue);
+          expect(fetchCount, 3);
+          expect(batches.length, 3);
+          expect(batches[0].length, 100);
+          expect(batches[1].length, 100);
+          expect(batches[2].length, 50);
+          // Verify order
+          expect(batches[0].first.id, 0);
+          expect(batches[1].first.id, 100);
+          expect(batches[2].first.id, 200);
+        },
+      );
 
       test('generation cancellation stops loading mid-way', () async {
         final allSongs = List.generate(300, (i) => _makeSong(i));
@@ -99,7 +102,10 @@ void main() {
         // detects superseded and returns false.
         expect(result, isFalse);
         expect(fetchCount, 1);
-        expect(batches.length, 0); // onBatch not called because superseded after fetch
+        expect(
+          batches.length,
+          0,
+        ); // onBatch not called because superseded after fetch
       });
 
       test('generation cancellation before fetch stops immediately', () async {
