@@ -8,6 +8,32 @@ You may obtain a copy of the License at
     http://www.apache.org/licenses/LICENSE-2.0
 
 ================================================================================
+DISTRIBUTION LICENSE — PLEASE READ
+================================================================================
+
+The SOURCE CODE of this client is licensed under Apache-2.0 (see LICENSE).
+
+BINARY RELEASES, however, link against WebF, which is GPL-3.0-only with NO
+linking exception (see item 1 below). Apache-2.0 is one-way compatible with
+GPLv3, so the combination is permitted -- but the resulting combined work,
+i.e. every binary we distribute, is governed as a whole by the GNU General
+Public License, version 3.
+
+What this means for you, the recipient of a binary release:
+
+- You receive that binary under the terms of GPL-3.0, not Apache-2.0.
+- You are entitled to the complete corresponding source code of the combined
+  work:
+      https://github.com/songloft-org/songloft-player   (this client)
+      https://github.com/songloft-org/songloft          (server / parent repo)
+      https://github.com/openwebf/webf                  (WebF)
+  Each release records the exact commit it was built from.
+- A copy of the GPL-3.0 license text ships alongside each binary release.
+
+Building this client from source with the WebF dependency removed yields a
+binary containing no GPL-licensed code, to which Apache-2.0 alone applies.
+
+================================================================================
 THIRD-PARTY COMPONENTS
 ================================================================================
 
@@ -17,7 +43,30 @@ pub.dev packages distributed under MIT / BSD / Apache-2.0. See
 ones requiring explicit notice are listed below.
 
 --------------------------------------------------------------------------------
-1. libmpv  (used on Windows and Linux via just_audio_media_kit → media_kit)
+1. WebF  (alternative rendering engine for JS plugin pages, native platforms)
+--------------------------------------------------------------------------------
+License: GNU General Public License v3.0 only (GPL-3.0-only)
+Upstream: https://github.com/openwebf/webf
+
+WebF is a self-contained W3C-compatible web runtime (custom rendering engine
+plus QuickJS) that renders into the Flutter pipeline. It is used as an
+alternative to the system WebView for JS plugin pages on native platforms.
+It is NOT used on the Web target, which WebF does not support.
+
+Licensing notes:
+- WebF's LICENSE is the standard GPLv3 text plus an appended "OpenWebF
+  Enterprise Exception". That exception is an additional permission under
+  GPLv3 section 7 that applies ONLY to current enterprise or professional
+  subscribers who have signed the OpenWebF Software Agreement. This project
+  is not such a subscriber, so the exception does not apply here.
+- There is NO LGPL-style linking exception. Distributing a binary that links
+  WebF therefore places the entire combined work under GPL-3.0. See the
+  "DISTRIBUTION LICENSE" section above.
+- WebF ships prebuilt native libraries (libwebf.so / .dylib / .dll) which are
+  bundled into our binaries by the standard Flutter plugin mechanism.
+
+--------------------------------------------------------------------------------
+2. libmpv  (used on Windows and Linux via just_audio_media_kit → media_kit)
 --------------------------------------------------------------------------------
 License: GNU Lesser General Public License v2.1 or later (LGPL-2.1+)
 Upstream: https://github.com/mpv-player/mpv
@@ -38,7 +87,7 @@ LGPL section 4 compliance:
   https://github.com/media-kit/libmpv-android-audio-build
 
 --------------------------------------------------------------------------------
-2. FFmpeg  (bundled with libmpv on Windows)
+3. FFmpeg  (bundled with libmpv on Windows)
 --------------------------------------------------------------------------------
 License: GNU Lesser General Public License v2.1 or later (LGPL-2.1+)
 Upstream: https://ffmpeg.org
@@ -49,20 +98,20 @@ any GPL-only FFmpeg components. Source: same media-kit build repos
 listed above.
 
 --------------------------------------------------------------------------------
-3. just_audio / just_audio_media_kit
+4. just_audio / just_audio_media_kit
 --------------------------------------------------------------------------------
 License: MIT (just_audio), Apache-2.0 (just_audio_media_kit)
 Upstream: https://github.com/ryanheise/just_audio
           https://github.com/Pato05/just_audio_media_kit
 
 --------------------------------------------------------------------------------
-4. media_kit / media_kit_libs_windows_audio
+5. media_kit / media_kit_libs_windows_audio
 --------------------------------------------------------------------------------
 License: MIT (Dart wrapper), LGPL-2.1+ (bundled native binaries)
 Upstream: https://github.com/media-kit/media-kit
 
 --------------------------------------------------------------------------------
-5. Other pub.dev packages
+6. Other pub.dev packages
 --------------------------------------------------------------------------------
 The following packages are bundled and distributed under their own
 permissive licenses (MIT / BSD / Apache-2.0). See `pubspec.lock` and
@@ -82,7 +131,7 @@ each package's pub.dev page for full text.
   - volume_controller
 
 --------------------------------------------------------------------------------
-6. Noto Sans SC  (fonts/NotoSansSC-Regular.otf)
+7. Noto Sans SC  (fonts/NotoSansSC-Regular.otf)
 --------------------------------------------------------------------------------
 License: SIL Open Font License 1.1 (OFL-1.1)
 Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font

@@ -60,6 +60,13 @@ dependencies:
   flutter_markdown: ^0.7.6
   # WebView（用于应用内加载插件页面）
   flutter_inappwebview: ^6.1.5
+  # WebF：native 平台插件页的备选渲染引擎（songloft-org/songloft#341）。
+  # ⚠️ GPL-3.0-only，且 LICENSE 里的 OpenWebF Enterprise Exception 仅对付费
+  # 订阅者生效、无 LGPL 式链接例外 —— 引入后本客户端**分发的二进制整体**按
+  # GPL-3.0 授权（源码仍 Apache-2.0）。详见 NOTICE。
+  # 不支持 Flutter Web（lib/ 内 39 处无条件 import 'dart:ffi'），故 Web 端
+  # 永久保留 iframe 路径。
+  webf: ^0.24.27
   web: ^1.1.1
   json_annotation: ^4.9.0
   # 系统音量控制
