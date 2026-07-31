@@ -445,6 +445,22 @@ class AppPreferences {
     return _prefs.setBool(_webDebugConsoleKey, value);
   }
 
+  static const _pluginRenderEngineKey = 'plugin_render_engine';
+
+  /// 插件页渲染引擎（songloft-org/songloft#341）。
+  ///
+  /// `'webview'`（默认）= 系统 WebView，`'webf'` = WebF。
+  ///
+  /// 刻意存在**客户端本地**而不是后端 config：这是设备相关的选择（WebF 不支持
+  /// Web 端、Linux 只覆盖 x86-64 + glibc >= 2.38），跨设备同步是错的。
+  String getPluginRenderEngine() {
+    return _prefs.getString(_pluginRenderEngineKey) ?? 'webview';
+  }
+
+  Future<bool> setPluginRenderEngine(String engine) {
+    return _prefs.setString(_pluginRenderEngineKey, engine);
+  }
+
   static const _desktopLyricEnabledKey = 'desktop_lyric_enabled';
   static const _desktopLyricLockedKey = 'desktop_lyric_locked';
   static const _desktopLyricFontSizeKey = 'desktop_lyric_font_size';

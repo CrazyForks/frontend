@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/window_visibility.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 import 'plugin_render_controller.dart';
 import 'plugin_render_surface_webf.dart';
 import 'plugin_render_surface_webview.dart';
@@ -66,9 +67,10 @@ class _PluginRenderViewState extends ConsumerState<PluginRenderView>
   /// 必须换 key 重建才能重新走环境创建（songloft-org/songloft#271）。
   int _reloadSeq = 0;
 
-  /// 当前引擎。运行时开关在 songloft-org/songloft#341 的后续步骤接入，
-  /// 目前恒为 `webView`，行为与抽层前完全一致。
-  PluginRenderEngine get _engine => PluginRenderEngine.webView;
+  /// 当前引擎。默认系统 WebView；WebF 是 0.x beta，切换是用户显式行为。
+  ///
+  /// 在 [build] 里 watch，切换时整棵渲染面随 `_engine` 分支重建。
+  PluginRenderEngine _engine = PluginRenderEngine.webView;
 
   /// 是否需要为独立原生表面做「移出 widget 树以销毁」的处理（#293）。
   bool get _needsHwndUnmount => _engine.usesPlatformView;
@@ -165,6 +167,14 @@ class _PluginRenderViewState extends ConsumerState<PluginRenderView>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final engine = ref.watch(pluginRenderEngineProvider);
+    if (engine != _engine) {
+      // 换引擎等于换渲染面：复位加载态，否则会卡在上一引擎遗留的错误/完成态。
+      _engine = engine;
+      _isLoading = true;
+      _errorMessage = null;
+      _startLoadTimer();
+    }
     // 刻意不叫 mounted：那会遮蔽 State.mounted。
     final surfaceMounted = !_needsHwndUnmount || _hwndVisible;
 

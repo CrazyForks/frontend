@@ -3309,6 +3309,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPluginStoreSubtitle => '浏览和安装插件';
 
   @override
+  String get settingsPluginRenderEngineTitle => '插件页渲染引擎';
+
+  @override
+  String get settingsPluginRenderEngineSubtitle =>
+      'WebF 渲染进 Flutter 管线，启动更快、更省内存，但仍是实验特性：部分插件的表格、滑块、外链跳转可能异常。遇到问题可随时切回系统 WebView。';
+
+  @override
+  String get settingsPluginRenderEngineSystem => '系统 WebView';
+
+  @override
+  String get settingsPluginRenderEngineWebF => 'WebF（实验）';
+
+  @override
   String get settingsExportPlaylistTitle => '导出歌单';
 
   @override

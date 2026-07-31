@@ -22,6 +22,8 @@ import '../../data/settings_api.dart';
 import '../../data/frontend_version_api.dart';
 import '../../data/upgrade_api.dart';
 import '../../../playlist/presentation/providers/playlist_provider.dart';
+// 纯枚举、零依赖，Web 侧也安全（渲染面本身才是 native-only）。
+import '../../../home/presentation/render/plugin_render_controller.dart';
 
 // ============================================================================
 // API Providers
@@ -275,6 +277,52 @@ class AutoUpdateCheckNotifier extends Notifier<bool> {
 final autoUpdateCheckProvider = NotifierProvider<AutoUpdateCheckNotifier, bool>(
   AutoUpdateCheckNotifier.new,
 );
+
+// ============================================================================
+// Plugin Render Engine Provider（songloft-org/songloft#341）
+// ============================================================================
+
+class PluginRenderEngineNotifier extends Notifier<PluginRenderEngine> {
+  /// 同 [AutoUpdateCheckNotifier]：`_load()` 的续体若在用户点击之后才落地，
+  /// 会把刚设的值覆盖回旧的持久化值。
+  bool _userTouched = false;
+
+  @override
+  PluginRenderEngine build() {
+    _userTouched = false;
+    _load();
+    return PluginRenderEngine.webView;
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await ref.read(appPreferencesProvider.future);
+      if (_userTouched) return;
+      state = PluginRenderEngine.fromPrefValue(prefs.getPluginRenderEngine());
+    } catch (e) {
+      // 加载失败保持默认（系统 WebView），这是可回退的保守值
+    }
+  }
+
+  Future<void> setEngine(PluginRenderEngine engine) async {
+    _userTouched = true;
+    state = engine;
+    try {
+      final prefs = await ref.read(appPreferencesProvider.future);
+      await prefs.setPluginRenderEngine(engine.prefValue);
+    } catch (e) {
+      // 保存失败忽略
+    }
+  }
+}
+
+/// 插件页渲染引擎 Provider。
+///
+/// 仅 native 平台有意义 —— Web 端插件页永远走 iframe（WebF 不支持 Flutter Web）。
+final pluginRenderEngineProvider =
+    NotifierProvider<PluginRenderEngineNotifier, PluginRenderEngine>(
+      PluginRenderEngineNotifier.new,
+    );
 
 // ============================================================================
 // Scan Progress Provider

@@ -21,6 +21,14 @@ enum PluginRenderEngine {
   /// WebF，渲染进 Flutter 管线、零 platform view。
   webF;
 
+  /// 持久化用的字符串（见 `AppPreferences.getPluginRenderEngine`）。
+  String get prefValue => this == PluginRenderEngine.webF ? 'webf' : 'webview';
+
+  /// 未知值一律回落到 [webView]：这是随时可回退的保守默认，
+  /// 而 WebF 是 0.x beta，不该因为一个脏 pref 就把用户推上去。
+  static PluginRenderEngine fromPrefValue(String? value) =>
+      value == 'webf' ? PluginRenderEngine.webF : PluginRenderEngine.webView;
+
   /// 该引擎的渲染面是否是独立的原生表面（platform view）。
   ///
   /// 为 true 时宿主要额外伺候一堆平台细节：Windows 上 WebView2 是独立 HWND，

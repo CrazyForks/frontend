@@ -5996,6 +5996,30 @@ abstract class AppLocalizations {
   /// **'浏览和安装插件'**
   String get settingsPluginStoreSubtitle;
 
+  /// No description provided for @settingsPluginRenderEngineTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件页渲染引擎'**
+  String get settingsPluginRenderEngineTitle;
+
+  /// No description provided for @settingsPluginRenderEngineSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'WebF 渲染进 Flutter 管线，启动更快、更省内存，但仍是实验特性：部分插件的表格、滑块、外链跳转可能异常。遇到问题可随时切回系统 WebView。'**
+  String get settingsPluginRenderEngineSubtitle;
+
+  /// No description provided for @settingsPluginRenderEngineSystem.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统 WebView'**
+  String get settingsPluginRenderEngineSystem;
+
+  /// No description provided for @settingsPluginRenderEngineWebF.
+  ///
+  /// In zh, this message translates to:
+  /// **'WebF（实验）'**
+  String get settingsPluginRenderEngineWebF;
+
   /// No description provided for @settingsExportPlaylistTitle.
   ///
   /// In zh, this message translates to:

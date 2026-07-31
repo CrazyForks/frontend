@@ -3459,6 +3459,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPluginStoreSubtitle => 'Browse and install plugins';
 
   @override
+  String get settingsPluginRenderEngineTitle => 'Plugin page rendering engine';
+
+  @override
+  String get settingsPluginRenderEngineSubtitle =>
+      'WebF renders into the Flutter pipeline: faster startup, lower memory. Still experimental -- tables, sliders and external links may misbehave in some plugins. You can switch back to the system WebView at any time.';
+
+  @override
+  String get settingsPluginRenderEngineSystem => 'System WebView';
+
+  @override
+  String get settingsPluginRenderEngineWebF => 'WebF (experimental)';
+
+  @override
   String get settingsExportPlaylistTitle => 'Export playlists';
 
   @override
