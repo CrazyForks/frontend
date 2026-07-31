@@ -134,6 +134,10 @@ flutter:
   assets:
     - assets/icons/app_icon.png
     - windows/runner/resources/app_icon.ico
+    # 插件页图标字体（songloft-org/songloft#341）。刻意声明为 asset 而非
+    # fonts: 条目 —— 它只在 WebF 渲染引擎下由 PluginRenderFonts 用 FontLoader
+    # 按需注册，不进 App 自身的字体表，避免影响应用排版。
+    - fonts/material-symbols-outlined.ttf
   fonts:
     - family: NotoSansSC
       fonts:

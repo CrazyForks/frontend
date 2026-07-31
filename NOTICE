@@ -139,6 +139,18 @@ Name 'Noto Sans SC'.
 
 See fonts/OFL.txt for the full license text.
 
+--------------------------------------------------------------------------------
+8. Material Symbols  (fonts/material-symbols-outlined.ttf)
+--------------------------------------------------------------------------------
+License: Apache License 2.0
+Copyright 2016-2024 Google LLC
+
+Icon font used by JS plugin pages. Bundled as a plain asset (not a declared
+Flutter font family) and registered at runtime only when the WebF rendering
+engine is active, because WebF cannot load the woff2 the server serves.
+
+See fonts/MATERIAL_SYMBOLS_LICENSE.txt.
+
 ================================================================================
 TRADEMARK NOTICE
 ================================================================================

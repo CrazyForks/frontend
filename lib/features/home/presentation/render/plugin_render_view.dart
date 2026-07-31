@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/utils/window_visibility.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'plugin_render_controller.dart';
+import 'plugin_render_surface_webf.dart';
 import 'plugin_render_surface_webview.dart';
 
 /// 插件页渲染层的**引擎无关**外壳（songloft-org/songloft#341）。
@@ -196,8 +197,15 @@ class _PluginRenderViewState extends ConsumerState<PluginRenderView>
           onControllerReady: widget.onControllerReady,
         );
       case PluginRenderEngine.webF:
-        // WebF 渲染面在 songloft-org/songloft#341 的后续步骤接入。
-        throw UnimplementedError('WebF surface not wired up yet');
+        return PluginRenderSurfaceWebF(
+          key: ValueKey(_reloadSeq),
+          url: widget.url,
+          theme: widget.theme,
+          onLoadStart: _onLoadStart,
+          onLoadStop: _onLoadStop,
+          onError: _onError,
+          onControllerReady: widget.onControllerReady,
+        );
     }
   }
 
