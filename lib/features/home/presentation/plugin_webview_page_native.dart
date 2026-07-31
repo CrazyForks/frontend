@@ -39,7 +39,9 @@ class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage> {
     if (token.isNotEmpty) {
       query['access_token'] = token;
     }
-    return uri.replace(queryParameters: query).toString();
+    return ensurePluginPathTrailingSlash(
+      uri.replace(queryParameters: query).toString(),
+    );
   }
 
   /// 页面内还有历史就先回退，否则退出本路由。

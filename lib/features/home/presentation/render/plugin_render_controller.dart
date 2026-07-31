@@ -40,6 +40,23 @@ enum PluginRenderEngine {
   bool get usesPlatformView => this == PluginRenderEngine.webView;
 }
 
+/// 给插件页 URL 的**路径**补上尾斜杠。
+///
+/// 后端给每个插件页注入 `<base href="/api/v1/jsplugin/<entryPath>/">`，页面里的
+/// `static/js/app.bundle.js` 之类相对引用全靠它解析。**WebF 不采纳 `<base href>`**，
+/// 而是按文档 URL 所在目录解析 —— 无尾斜杠时 `/api/v1/jsplugin/subsonic` 的目录是
+/// `/api/v1/jsplugin/`，于是脚本被求到 `/api/v1/jsplugin/static/js/...`，那条路径
+/// 不匹配任何免鉴权静态路由，落到需要 JWT 的兜底路由拿 401，整页白屏（实测）。
+///
+/// 补上尾斜杠后目录恰好等于 base href 声明的值，两种解析方式结果一致。
+/// 后端本来就注册了带尾斜杠的路由，所以这对 InAppWebView 与浏览器都是无害的
+/// ——刻意不做引擎分支，避免两条链路的 URL 形态漂移。
+String ensurePluginPathTrailingSlash(String url) {
+  final uri = Uri.parse(url);
+  if (uri.path.endsWith('/')) return url;
+  return uri.replace(path: '${uri.path}/').toString();
+}
+
 /// 宿主页面对渲染面的操作句柄。
 ///
 /// 由具体引擎实现，经 `PluginRenderView` 的 `onControllerReady` 回调交给宿主。

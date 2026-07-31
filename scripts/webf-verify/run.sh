@@ -28,9 +28,12 @@ mkdir -p "$OUT"
 echo "[run] 主仓库根：$REPO_ROOT"
 echo "[run] 输出目录：$OUT"
 
-# --network 用默认 bridge 就够：静态服务与探针都在容器内 127.0.0.1，
-# 不需要访问宿主（与仓库里那套「无头 Chrome 验前端」不同，那个要 --network host）
+# 默认 bridge 就够：静态服务与探针都在容器内 127.0.0.1。
+# 但要渲染**真实插件页**（PROBE_URL 指向宿主上跑的 Go 后端）时必须置
+# HOST_NETWORK=1，否则容器里的 127.0.0.1 是它自己 —— 与仓库里那套
+# 「无头 Chrome 验前端」同样的理由。
 docker run --rm \
+  ${HOST_NETWORK:+--network host} \
   -v "$REPO_ROOT:/repo:ro" \
   -v "$OUT:/out" \
   ${PROBE_URL:+-e PROBE_URL="$PROBE_URL"} \

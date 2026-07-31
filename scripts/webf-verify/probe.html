@@ -54,5 +54,66 @@
     <span class="tag">4 FLEX GAP</span>
     <span class="gapbox"><i></i><i></i><i></i></span>
   </div>
+
+  <!--
+    5/6 分离「主题不生效」的两个可能原因（songloft-org/songloft#341）。
+    common.js 用 documentElement.dataset.theme 写属性，common.css 用
+    html[data-theme="dark"] 选择 —— 任一环断掉主题都不生效，而现象一样。
+      5 显示 getAttribute('data-theme') 的真实值：null = dataset setter 没写进属性
+      6 方块变绿 = 属性选择器匹配成功；仍是红 = 选择器没匹配
+  -->
+  <div class="row">
+    <span class="tag">5 DATASET ATTR</span>
+    <span id="attrval" style="font-size:20px">(script did not run)</span>
+  </div>
+
+  <div class="row">
+    <span class="tag">6 ATTR SELECTOR</span>
+    <span id="selbox"></span>
+  </div>
+
+  <!--
+    7 common.js 靠 window.location.search 读 ?theme= 与 ?embed=。若 WebF 不把
+    query 暴露到 location，主题与嵌入模式会**同时**静默失效，而现象只是「页面
+    看起来是亮色」，极易误判成 CSS 问题。用 run.sh 传带 query 的 PROBE_URL 观察。
+  -->
+  <div class="row">
+    <span class="tag">7 LOCATION QUERY</span>
+    <span id="loc" style="font-size:18px">(script did not run)</span>
+  </div>
+
+  <!--
+    8 common.css 的暗色主题不是靠直接属性，而是在 html[data-theme="dark"] 里
+    **重定义 CSS 变量**（约 40 个 --md-*），元素侧用 var() 引用。所以第 6 行通过
+    不代表主题能用 —— 必须单独验「更具体的选择器重定义变量后，var() 是否重解析」。
+    绿 = 变量覆盖生效；红 = 只认 :root 的初值，暗色主题整体失效。
+  -->
+  <div class="row">
+    <span class="tag">8 VAR OVERRIDE</span>
+    <span id="varbox"></span>
+  </div>
+
+  <style>
+    #selbox { width: 40px; height: 40px; display: block; background: #c62828; }
+    html[data-theme="dark"] #selbox { background: #2e7d32; }
+
+    :root { --probe-c: #c62828; }
+    html[data-theme="dark"] { --probe-c: #2e7d32; }
+    #varbox {
+      width: 40px; height: 40px; display: block;
+      background: var(--probe-c);
+    }
+  </style>
+  <script>
+    document.documentElement.dataset.theme = 'dark';
+    document.getElementById('attrval').textContent =
+      JSON.stringify(document.documentElement.getAttribute('data-theme'));
+
+    var sp = new URLSearchParams(window.location.search);
+    document.getElementById('loc').textContent =
+      'search=' + JSON.stringify(window.location.search) +
+      '  theme=' + JSON.stringify(sp.get('theme')) +
+      '  hasEmbed=' + sp.has('embed');
+  </script>
 </body>
 </html>

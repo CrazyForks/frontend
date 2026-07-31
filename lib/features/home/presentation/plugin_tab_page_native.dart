@@ -53,7 +53,9 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
     if (token.isNotEmpty) {
       query['access_token'] = token;
     }
-    return uri.replace(queryParameters: query).toString();
+    return ensurePluginPathTrailingSlash(
+      uri.replace(queryParameters: query).toString(),
+    );
   }
 
   @override
