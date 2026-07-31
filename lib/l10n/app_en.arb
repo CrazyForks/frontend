@@ -31,6 +31,35 @@
   "themeLight": "Light",
   "themeDark": "Dark",
   "themeSystem": "System",
+  "themePackTitle": "Theme Packs",
+  "themePackSubtitle": "Customize colors and visual styles with theme packs",
+  "themePackImport": "Import",
+  "themePackRestoreDefault": "Restore Default",
+  "themePackEmpty": "No theme packs installed",
+  "themePackLoadError": "Failed to load theme packs",
+  "themePackImportSuccess": "Theme pack imported successfully",
+  "themePackImportError": "Import failed",
+  "themePackDeleteConfirmTitle": "Delete Theme Pack",
+  "themePackDeleteConfirmContent": "Are you sure you want to delete \"{name}\"?",
+  "@themePackDeleteConfirmContent": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "themeCatalogTitle": "Online Themes",
+  "themeCatalogRefresh": "Refresh",
+  "themeCatalogEmpty": "No online themes available",
+  "themeCatalogLoadError": "Failed to load online themes",
+  "themeCatalogInstall": "Install",
+  "themeCatalogUpdate": "Update",
+  "themeCatalogInstalled": "Installed",
+  "themeCatalogInstallSuccess": "Theme \"{name}\" installed successfully",
+  "@themeCatalogInstallSuccess": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "themeCatalogInstallError": "Install failed",
   "commonConfirm": "Confirm",
   "commonCancel": "Cancel",
   "commonDelete": "Delete",

@@ -34,6 +34,35 @@
   "themeLight": "浅色",
   "themeDark": "深色",
   "themeSystem": "系统",
+  "themePackTitle": "主题包",
+  "themePackSubtitle": "使用主题包自定义配色和视觉样式",
+  "themePackImport": "导入主题包",
+  "themePackRestoreDefault": "恢复默认",
+  "themePackEmpty": "暂无已安装的主题包",
+  "themePackLoadError": "加载主题包列表失败",
+  "themePackImportSuccess": "主题包导入成功",
+  "themePackImportError": "导入失败",
+  "themePackDeleteConfirmTitle": "删除主题包",
+  "themePackDeleteConfirmContent": "确定要删除主题包「{name}」吗？",
+  "@themePackDeleteConfirmContent": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "themeCatalogTitle": "在线主题",
+  "themeCatalogRefresh": "刷新",
+  "themeCatalogEmpty": "暂无在线主题",
+  "themeCatalogLoadError": "加载在线主题失败",
+  "themeCatalogInstall": "安装",
+  "themeCatalogUpdate": "更新",
+  "themeCatalogInstalled": "已安装",
+  "themeCatalogInstallSuccess": "主题「{name}」安装成功",
+  "@themeCatalogInstallSuccess": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "themeCatalogInstallError": "安装失败",
   "commonConfirm": "确认",
   "commonCancel": "取消",
   "commonDelete": "删除",
@@ -1232,7 +1261,7 @@
   "playlistSongDeleted": "歌曲已删除",
   "playlistDeleteFailed": "删除失败",
   "playlistBatchDelete": "批量删除",
-  "playlistBatchDeleteSongsConfirm": "确定要从曲库中删除选中的 {count} 首歌曲吗？",
+  "playlistBatchDeleteSongsConfirm": "确定要从曲库中删除选中的 {count} 首歌��吗？",
   "@playlistBatchDeleteSongsConfirm": {
     "placeholders": {
       "count": {
@@ -2334,7 +2363,7 @@
   "settingsLogLevelError": "Error（仅错误）",
   "settingsLogLevelTitle": "日志等级",
   "settingsLogLevelDialogTitle": "选择日志等级",
-  "settingsLogLevelSwitched": "日志等级已切换为 {level}",
+  "settingsLogLevelSwitched": "日志等级已���换为 {level}",
   "@settingsLogLevelSwitched": {
     "placeholders": {
       "level": {

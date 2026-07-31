@@ -98,6 +98,67 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeSystem => '系统';
 
   @override
+  String get themePackTitle => '主题包';
+
+  @override
+  String get themePackSubtitle => '使用主题包自定义配色和视觉样式';
+
+  @override
+  String get themePackImport => '导入主题包';
+
+  @override
+  String get themePackRestoreDefault => '恢复默认';
+
+  @override
+  String get themePackEmpty => '暂无已安装的主题包';
+
+  @override
+  String get themePackLoadError => '加载主题包列表失败';
+
+  @override
+  String get themePackImportSuccess => '主题包导入成功';
+
+  @override
+  String get themePackImportError => '导入失败';
+
+  @override
+  String get themePackDeleteConfirmTitle => '删除主题包';
+
+  @override
+  String themePackDeleteConfirmContent(String name) {
+    return '确定要删除主题包「$name」吗？';
+  }
+
+  @override
+  String get themeCatalogTitle => '在线主题';
+
+  @override
+  String get themeCatalogRefresh => '刷新';
+
+  @override
+  String get themeCatalogEmpty => '暂无在线主题';
+
+  @override
+  String get themeCatalogLoadError => '加载在线主题失败';
+
+  @override
+  String get themeCatalogInstall => '安装';
+
+  @override
+  String get themeCatalogUpdate => '更新';
+
+  @override
+  String get themeCatalogInstalled => '已安装';
+
+  @override
+  String themeCatalogInstallSuccess(String name) {
+    return '主题「$name」安装成功';
+  }
+
+  @override
+  String get themeCatalogInstallError => '安装失败';
+
+  @override
   String get commonConfirm => '确认';
 
   @override
@@ -1923,7 +1984,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String playlistBatchDeleteSongsConfirm(int count) {
-    return '确定要从曲库中删除选中的 $count 首歌曲吗？';
+    return '确定要从曲库中删除选中的 $count 首歌��吗？';
   }
 
   @override
@@ -3555,7 +3616,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String settingsLogLevelSwitched(String level) {
-    return '日志等级已切换为 $level';
+    return '日志等级已���换为 $level';
   }
 
   @override

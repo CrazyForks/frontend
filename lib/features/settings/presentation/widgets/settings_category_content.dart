@@ -41,6 +41,7 @@ import 'scan_manager.dart';
 import 'section_card.dart';
 import 'settings_master_detail.dart';
 import 'theme_selector.dart';
+import 'theme_pack_manager.dart';
 import 'language_selector.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'frontend_upgrade_dialog.dart';
@@ -288,6 +289,16 @@ class _SettingsCategoryContentState
               AppSpacing.md,
             ),
             child: ThemeSelector(),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.color_lens_outlined),
+            title: Text(l10n.themePackTitle),
+            subtitle: Text(l10n.themePackSubtitle),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(bottom: AppSpacing.md),
+            child: ThemePackManager(),
           ),
         ],
       ),

@@ -101,6 +101,68 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeSystem => 'System';
 
   @override
+  String get themePackTitle => 'Theme Packs';
+
+  @override
+  String get themePackSubtitle =>
+      'Customize colors and visual styles with theme packs';
+
+  @override
+  String get themePackImport => 'Import';
+
+  @override
+  String get themePackRestoreDefault => 'Restore Default';
+
+  @override
+  String get themePackEmpty => 'No theme packs installed';
+
+  @override
+  String get themePackLoadError => 'Failed to load theme packs';
+
+  @override
+  String get themePackImportSuccess => 'Theme pack imported successfully';
+
+  @override
+  String get themePackImportError => 'Import failed';
+
+  @override
+  String get themePackDeleteConfirmTitle => 'Delete Theme Pack';
+
+  @override
+  String themePackDeleteConfirmContent(String name) {
+    return 'Are you sure you want to delete \"$name\"?';
+  }
+
+  @override
+  String get themeCatalogTitle => 'Online Themes';
+
+  @override
+  String get themeCatalogRefresh => 'Refresh';
+
+  @override
+  String get themeCatalogEmpty => 'No online themes available';
+
+  @override
+  String get themeCatalogLoadError => 'Failed to load online themes';
+
+  @override
+  String get themeCatalogInstall => 'Install';
+
+  @override
+  String get themeCatalogUpdate => 'Update';
+
+  @override
+  String get themeCatalogInstalled => 'Installed';
+
+  @override
+  String themeCatalogInstallSuccess(String name) {
+    return 'Theme \"$name\" installed successfully';
+  }
+
+  @override
+  String get themeCatalogInstallError => 'Install failed';
+
+  @override
   String get commonConfirm => 'Confirm';
 
   @override

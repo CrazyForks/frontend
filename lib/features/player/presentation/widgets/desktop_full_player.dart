@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/backend/run_mode_provider.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/responsive.dart';
 import '../../../../core/utils/color_extraction.dart';
 import '../../../../core/utils/url_helper.dart';
@@ -170,6 +171,25 @@ class _DesktopFullPlayerState extends ConsumerState<DesktopFullPlayer>
                             .withValues(alpha: 0.22),
                         Colors.transparent,
                       ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // 主题包自定义渐变层
+          if (Theme.of(context).extension<SongloftThemeExtension>()?.playerGradientColors != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: Theme.of(context)
+                          .extension<SongloftThemeExtension>()!
+                          .playerGradientColors!
+                          .map((c) => c.withValues(alpha: 0.4))
+                          .toList(),
                     ),
                   ),
                 ),

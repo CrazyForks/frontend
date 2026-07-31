@@ -42,6 +42,7 @@ import 'features/desktop_lyric/desktop_lyric_ipc.dart';
 import 'features/desktop_lyric/desktop_lyric_main.dart';
 import 'features/player/presentation/widgets/player_shortcut_scope.dart';
 import 'features/settings/presentation/providers/settings_provider.dart';
+import 'features/settings/presentation/providers/theme_pack_provider.dart';
 import 'features/startup/presentation/startup_gate.dart';
 import 'features/startup/presentation/web_update_gate.dart';
 import 'l10n/app_localizations.dart';
@@ -469,12 +470,14 @@ class SongloftApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localeProvider);
+    // 主题包：取已加载的值，加载中或出错时使用默认主题
+    final activeThemePack = ref.watch(activeThemePackProvider).value;
     return MaterialApp.router(
       title: 'Songloft',
       debugShowCheckedModeBanner: false,
       scrollBehavior: _AppScrollBehavior(),
-      theme: AppTheme.lightTheme(),
-      darkTheme: AppTheme.darkTheme(),
+      theme: AppTheme.lightTheme(themePack: activeThemePack),
+      darkTheme: AppTheme.darkTheme(themePack: activeThemePack),
       themeMode: themeMode,
       locale: locale, // null → 跟随系统
       supportedLocales: AppLocalizations.supportedLocales,
@@ -500,8 +503,8 @@ class SongloftApp extends ConsumerWidget {
         final themed = Theme(
           data:
               isDark
-                  ? AppTheme.darkTheme(screenType: screenType)
-                  : AppTheme.lightTheme(screenType: screenType),
+                  ? AppTheme.darkTheme(screenType: screenType, themePack: activeThemePack)
+                  : AppTheme.lightTheme(screenType: screenType, themePack: activeThemePack),
           child: child!,
         );
         // Web 端启动时检测缓存是否过期（原生端 build 直返 child，零开销）。

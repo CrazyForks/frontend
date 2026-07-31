@@ -260,6 +260,120 @@ abstract class AppLocalizations {
   /// **'系统'**
   String get themeSystem;
 
+  /// No description provided for @themePackTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'主题包'**
+  String get themePackTitle;
+
+  /// No description provided for @themePackSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用主题包自定义配色和视觉样式'**
+  String get themePackSubtitle;
+
+  /// No description provided for @themePackImport.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入主题包'**
+  String get themePackImport;
+
+  /// No description provided for @themePackRestoreDefault.
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复默认'**
+  String get themePackRestoreDefault;
+
+  /// No description provided for @themePackEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无已安装的主题包'**
+  String get themePackEmpty;
+
+  /// No description provided for @themePackLoadError.
+  ///
+  /// In zh, this message translates to:
+  /// **'加载主题包列表失败'**
+  String get themePackLoadError;
+
+  /// No description provided for @themePackImportSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'主题包导入成功'**
+  String get themePackImportSuccess;
+
+  /// No description provided for @themePackImportError.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入失败'**
+  String get themePackImportError;
+
+  /// No description provided for @themePackDeleteConfirmTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除主题包'**
+  String get themePackDeleteConfirmTitle;
+
+  /// No description provided for @themePackDeleteConfirmContent.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定要删除主题包「{name}」吗？'**
+  String themePackDeleteConfirmContent(String name);
+
+  /// No description provided for @themeCatalogTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'在线主题'**
+  String get themeCatalogTitle;
+
+  /// No description provided for @themeCatalogRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新'**
+  String get themeCatalogRefresh;
+
+  /// No description provided for @themeCatalogEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无在线主题'**
+  String get themeCatalogEmpty;
+
+  /// No description provided for @themeCatalogLoadError.
+  ///
+  /// In zh, this message translates to:
+  /// **'加载在线主题失败'**
+  String get themeCatalogLoadError;
+
+  /// No description provided for @themeCatalogInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装'**
+  String get themeCatalogInstall;
+
+  /// No description provided for @themeCatalogUpdate.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新'**
+  String get themeCatalogUpdate;
+
+  /// No description provided for @themeCatalogInstalled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已安装'**
+  String get themeCatalogInstalled;
+
+  /// No description provided for @themeCatalogInstallSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'主题「{name}」安装成功'**
+  String themeCatalogInstallSuccess(String name);
+
+  /// No description provided for @themeCatalogInstallError.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装失败'**
+  String get themeCatalogInstallError;
+
   /// No description provided for @commonConfirm.
   ///
   /// In zh, this message translates to:
@@ -3563,7 +3677,7 @@ abstract class AppLocalizations {
   /// No description provided for @playlistBatchDeleteSongsConfirm.
   ///
   /// In zh, this message translates to:
-  /// **'确定要从曲库中删除选中的 {count} 首歌曲吗？'**
+  /// **'确定要从曲库中删除选中的 {count} 首歌��吗？'**
   String playlistBatchDeleteSongsConfirm(int count);
 
   /// No description provided for @playlistDeletedSongsCount.
@@ -6430,7 +6544,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLogLevelSwitched.
   ///
   /// In zh, this message translates to:
-  /// **'日志等级已切换为 {level}'**
+  /// **'日志等级已���换为 {level}'**
   String settingsLogLevelSwitched(String level);
 
   /// No description provided for @settingsExportLogsTitle.
