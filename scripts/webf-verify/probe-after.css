@@ -1,0 +1,18 @@
+/* 模拟插件自己的 style.css：在 common.css **之后**加载，并在 :root 里用亮色
+   重定义 common.css 已在 html[data-theme="dark"] 里定义过的同名变量。
+   这正是 subsonic 等插件的真实情形（songloft-org/songloft#341）。
+
+   按 CSS 规范，html[data-theme="dark"] 优先级 (0,1,1) 高于 :root (0,1,0)，
+   **跨样式表同样按优先级裁决**，所以 --md-surface 应保持 common.css 的暗色值。
+   若探针第 10 行显示亮色，说明 WebF 只按样式表/源码顺序裁决，那就是主题失效的根因。 */
+:root {
+  --md-surface: #FFFBFE;
+}
+
+#crossbox {
+  width: 120px;
+  height: 40px;
+  display: block;
+  background: var(--md-surface);
+  border: 2px solid #888;
+}

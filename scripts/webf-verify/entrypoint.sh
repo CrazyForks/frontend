@@ -27,6 +27,7 @@ mkdir -p "$OUT"
 rm -rf "$DOCROOT" && mkdir -p "$DOCROOT"
 cp -r "$ASSETS/." "$DOCROOT/"
 cp /opt/probe.html "$DOCROOT/probe.html"
+cp /opt/probe-after.css "$DOCROOT/probe-after.css"
 
 # ── 2. 从真实 woff2 的 cmap 查图标码点（不猜）────────────────────
 resolve_codepoints() {
@@ -181,6 +182,7 @@ cd /opt/webf_probe
 if ! flutter build linux --release \
       --dart-define=PROBE_URL="$PROBE_URL" \
       --dart-define=FONT_PRELOAD_DIR="$FONT_PRELOAD_DIR" \
+      --dart-define=DIAGNOSE="${DIAGNOSE:-}" \
       >"$OUT/build.log" 2>&1; then
   echo '构建失败，日志末尾：' >&2
   tail -60 "$OUT/build.log" >&2

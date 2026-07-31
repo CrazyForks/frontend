@@ -21,6 +21,8 @@
   <meta charset="utf-8">
   <title>WebF probe</title>
   <link rel="stylesheet" href="./common.css">
+  <!-- 顺序刻意在 common.css 之后，模拟插件自己的 style.css，见 probe-after.css -->
+  <link rel="stylesheet" href="./probe-after.css">
   <style>
     body { margin: 0; padding: 16px; background: #fff; color: #000;
            font-family: Roboto, sans-serif; }
@@ -93,6 +95,33 @@
     <span id="varbox"></span>
   </div>
 
+  <!--
+    9 第 8 行区分不出「按优先级」与「按源码顺序取最后」—— 它把 :root 写在
+    html[data-theme] 之前，两种实现都会变绿。这里把顺序反过来：
+      html[data-theme="dark"] 优先级 (0,1,1) 高于 :root (0,1,0)，
+      所以按 CSS 规范**无论源码顺序**都应取绿。
+    绿 = 按优先级裁决（正确）；红 = 按源码顺序取最后（bug）。
+    这正是真实插件页的处境：插件自己的 style.css 在 common.css 之后加载，
+    并在 :root 里用亮色重定义同名 --md-* 变量。
+  -->
+  <div class="row">
+    <span class="tag">9 VAR SPECIFICITY</span>
+    <span id="varbox2"></span>
+  </div>
+
+  <!--
+    10 跨样式表的变量优先级 —— 最接近真实插件页的处境。
+    common.css 在 html[data-theme="dark"] 里给 --md-surface 定了暗色 #1C1B1F，
+    随后加载的 probe-after.css 在 :root 里用亮色 #FFFBFE 覆盖同名变量。
+    按规范优先级仍应取暗色。
+      深色方块 = 跨表也按优先级裁决（正确）
+      浅色方块 = 只按样式表顺序裁决 → 这就是插件页暗色主题失效的根因
+  -->
+  <div class="row">
+    <span class="tag">10 CROSS-SHEET VAR</span>
+    <span id="crossbox"></span>
+  </div>
+
   <style>
     #selbox { width: 40px; height: 40px; display: block; background: #c62828; }
     html[data-theme="dark"] #selbox { background: #2e7d32; }
@@ -102,6 +131,14 @@
     #varbox {
       width: 40px; height: 40px; display: block;
       background: var(--probe-c);
+    }
+
+    /* 顺序刻意与上面相反：低优先级的 :root 写在后面 */
+    html[data-theme="dark"] { --probe-d: #2e7d32; }
+    :root { --probe-d: #c62828; }
+    #varbox2 {
+      width: 40px; height: 40px; display: block;
+      background: var(--probe-d);
     }
   </style>
   <script>

@@ -67,6 +67,33 @@ const String _probeUrl = String.fromEnvironment(
   defaultValue: 'http://127.0.0.1:58991/probe.html',
 );
 
+/// `--dart-define=DIAGNOSE=1` 时，页面加载完成后注入的诊断脚本。
+///
+/// 存在的理由：探针页可以自己加检查行，但**真实插件页改不了**。要回答「这个
+/// 页面在 WebF 里到底算出了什么样式」只能在页面自身上下文里读，再经 console
+/// 回传到 flutter.log。Phase 2 逐插件适配会反复用到。
+const String _diagnoseJs = r'''
+(function () {
+  function log() { console.log('[diag] ' + Array.prototype.join.call(arguments, ' ')); }
+  var de = document.documentElement;
+  log('data-theme =', JSON.stringify(de.getAttribute('data-theme')));
+  log('html.className =', JSON.stringify(de.className));
+  log('location.search =', JSON.stringify(window.location.search));
+  var cs = getComputedStyle(de);
+  ['--md-surface', '--md-background', '--md-on-surface'].forEach(function (v) {
+    log('var', v, '=', JSON.stringify(cs.getPropertyValue(v)));
+  });
+  log('body bg =', JSON.stringify(getComputedStyle(document.body).backgroundColor));
+  log('styleSheets =', document.styleSheets ? document.styleSheets.length : 'n/a');
+  log('SongloftPlugin =', typeof window.SongloftPlugin);
+  if (window.SongloftPlugin) {
+    log('host.isAvailable =', String(window.SongloftPlugin.host.isAvailable()));
+  }
+})();
+''';
+
+const bool _diagnose = bool.fromEnvironment('DIAGNOSE');
+
 class ProbeApp extends StatelessWidget {
   const ProbeApp({super.key});
 
@@ -80,16 +107,26 @@ class ProbeApp extends StatelessWidget {
         body: WebF.fromControllerName(
           controllerName: 'probe',
           bundle: WebFBundle.fromUrl(_probeUrl),
-          createController:
-              () => WebFController(
-                // 加载失败要在截图里看得见，不能只落日志
-                onLoadError: (error, stack) {
-                  debugPrint('[probe] onLoadError: $error\n$stack');
-                },
-                onJSError: (msg) {
-                  debugPrint('[probe] onJSError: $msg');
-                },
-              ),
+          createController: () {
+            final controller = WebFController(
+              // 加载失败要在截图里看得见，不能只落日志
+              onLoadError: (error, stack) {
+                debugPrint('[probe] onLoadError: $error\n$stack');
+              },
+              onJSError: (msg) {
+                debugPrint('[probe] onJSError: $msg');
+              },
+              onLoad: (c) {
+                if (_diagnose) c.view.evaluateJavaScripts(_diagnoseJs);
+              },
+            );
+            // onJSLog 是字段而非构造参数，必须构造后赋值。
+            // 页面 console 靠它回传，诊断脚本的输出才能落到 flutter.log。
+            controller.onJSLog = (level, message) {
+              debugPrint('[page] $message');
+            };
+            return controller;
+          },
           loadingWidget: const Center(child: CircularProgressIndicator()),
           errorBuilder:
               (context, error) => Center(

@@ -24,6 +24,13 @@ if [ "${1:-}" = '--build' ] || ! docker image inspect "$IMAGE" >/dev/null 2>&1; 
   docker build -t "$IMAGE" "$HERE"
 fi
 
+# DIAGNOSE 最终落到 Dart 的 bool.fromEnvironment，它**只认字面 "true"**，
+# 传 1 会被静默当成 false（诊断脚本不注入、日志里什么都没有）。这里归一化。
+case "${DIAGNOSE:-}" in
+  1|yes|on|true) DIAGNOSE=true ;;
+  *) DIAGNOSE='' ;;
+esac
+
 mkdir -p "$OUT"
 echo "[run] 主仓库根：$REPO_ROOT"
 echo "[run] 输出目录：$OUT"
@@ -39,6 +46,7 @@ docker run --rm \
   ${PROBE_URL:+-e PROBE_URL="$PROBE_URL"} \
   ${SETTLE:+-e SETTLE="$SETTLE"} \
   ${FONT_FIX:+-e FONT_FIX="$FONT_FIX"} \
+  ${DIAGNOSE:+-e DIAGNOSE="$DIAGNOSE"} \
   "$IMAGE"
 
 echo

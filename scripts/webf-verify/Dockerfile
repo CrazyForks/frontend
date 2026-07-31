@@ -50,6 +50,7 @@ RUN cd ${PROBE_HOME} && flutter pub get
 
 COPY probe_main.dart ${PROBE_HOME}/lib/main.dart
 COPY probe.html /opt/probe.html
+COPY probe-after.css /opt/probe-after.css
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
