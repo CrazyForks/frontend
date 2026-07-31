@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!--
+  WebF 图标连字生死闸探针（songloft-org/songloft#341）
+
+  这个页面刻意加载**真实的** common.css 与真实字体文件（由 entrypoint.sh 组合的
+  docroot 提供），不复刻简化版 —— 否则测不到真实条件。
+
+  怎么读截图（每一行都是自解释的判据）：
+    1. CONTROL      纯文本，证明页面真的加载并渲染了。这行都没有 → 别看后面几行
+    2. LIGATURE     插件里 ~350 处的真实写法。出现图标字形 = 闸通过；
+                    出现英文单词 "download settings play_arrow" = 闸失败
+                    （Material Symbols 刻意保留了拉丁字母轮廓做降级，所以
+                     连字失效时会显示可读单词而不是豆腐块）
+    3. CODEPOINT    闸失败时的补救路径能否走通。码点由 entrypoint.sh 用
+                    fontTools 从真实 woff2 的 cmap 里查出来后注入，不靠猜
+    4. FLEX GAP     覆盖面最广的单一 CSS 特性（common.css 7 处 + 插件 348 处）。
+                    三个方块之间有间距 = 支持
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>WebF probe</title>
+  <link rel="stylesheet" href="./common.css">
+  <style>
+    body { margin: 0; padding: 16px; background: #fff; color: #000;
+           font-family: Roboto, sans-serif; }
+    .row { display: flex; align-items: center; margin-bottom: 20px; }
+    .tag { width: 190px; font-size: 13px; font-weight: 700; color: #666; }
+    .gapbox { display: flex; gap: 24px; }
+    .gapbox i { width: 40px; height: 40px; background: #3f51b5; display: block; }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <span class="tag">1 CONTROL</span>
+    <span style="font-size:20px">plain text renders</span>
+  </div>
+
+  <div class="row">
+    <span class="tag">2 LIGATURE</span>
+    <span class="material-symbols-outlined" style="font-size:40px">download</span>
+    <span class="material-symbols-outlined" style="font-size:40px">settings</span>
+    <span class="material-symbols-outlined" style="font-size:40px">play_arrow</span>
+  </div>
+
+  <div class="row">
+    <span class="tag">3 CODEPOINT</span>
+    <span class="material-symbols-outlined" style="font-size:40px">__CODEPOINT_DOWNLOAD__</span>
+    <span class="material-symbols-outlined" style="font-size:40px">__CODEPOINT_SETTINGS__</span>
+    <span class="material-symbols-outlined" style="font-size:40px">__CODEPOINT_PLAY_ARROW__</span>
+  </div>
+
+  <div class="row">
+    <span class="tag">4 FLEX GAP</span>
+    <span class="gapbox"><i></i><i></i><i></i></span>
+  </div>
+</body>
+</html>
