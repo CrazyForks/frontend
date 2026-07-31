@@ -263,6 +263,19 @@ class RegistryPluginEntry {
   /// 该插件所属订阅源 URL（仅「全部」聚合模式返回），安装时回传给后端解析 token
   final String? sourceUrl;
 
+  /// 该插件所属订阅源名称（仅「全部」聚合模式返回），用于区分 entryPath 相同的条目
+  final String? sourceName;
+
+  /// entryPath 之外的身份维度（后端按规范化 author、或 GitHub 仓库兜底算出）。
+  /// entryPath 可能被不同作者的插件撞名，故行标识与状态更新都要带上它。
+  final String? identity;
+
+  /// 本地已装了同 entryPath 但**不同作者**的插件：安装本条会替换掉它
+  final bool conflict;
+
+  /// 占用该 entryPath 的本地插件描述，可直接展示给用户
+  final String? conflictWith;
+
   RegistryPluginEntry({
     required this.name,
     required this.entryPath,
@@ -276,12 +289,29 @@ class RegistryPluginEntry {
     this.installedVersion,
     this.hasUpdate = false,
     this.sourceUrl,
+    this.sourceName,
+    this.identity,
+    this.conflict = false,
+    this.conflictWith,
   });
+
+  /// 商店列表中的稳定行标识。entryPath 单独不够用——同名不同作者的两个插件
+  /// 会共用一个 entryPath（songloft-org/songloft#339）。
+  String get rowKey => '$entryPath|${identity ?? ''}';
+
+  /// 判断本条目是否就是 (entryPath, identity) 所指的那个插件。
+  /// 安装成功后就地更新状态时用它，避免一次点亮所有同 entryPath 的条目。
+  bool matches(String otherEntryPath, String? otherIdentity) {
+    return entryPath == otherEntryPath &&
+        (identity ?? '') == (otherIdentity ?? '');
+  }
 
   RegistryPluginEntry copyWith({
     bool? installed,
     String? installedVersion,
     bool? hasUpdate,
+    bool? conflict,
+    String? conflictWith,
   }) {
     return RegistryPluginEntry(
       name: name,
@@ -296,6 +326,10 @@ class RegistryPluginEntry {
       installedVersion: installedVersion ?? this.installedVersion,
       hasUpdate: hasUpdate ?? this.hasUpdate,
       sourceUrl: sourceUrl,
+      sourceName: sourceName,
+      identity: identity,
+      conflict: conflict ?? this.conflict,
+      conflictWith: conflictWith ?? this.conflictWith,
     );
   }
 
@@ -313,6 +347,10 @@ class RegistryPluginEntry {
       installedVersion: json['installed_version'] as String?,
       hasUpdate: json['has_update'] as bool? ?? false,
       sourceUrl: json['source_url'] as String?,
+      sourceName: json['source_name'] as String?,
+      identity: json['identity'] as String?,
+      conflict: json['conflict'] as bool? ?? false,
+      conflictWith: json['conflict_with'] as String?,
     );
   }
 }
@@ -594,14 +632,21 @@ class JSPluginApi {
 
   /// 从注册表安装插件
   /// POST /api/v1/jsplugins/registry/install
+  ///
+  /// [overwrite] 为 true 时允许替换掉本地同 entryPath 但不同作者的插件。
+  /// 默认 false：这种情况后端返回 409，需用户确认后再带 true 重试。
   Future<JSPluginUploadResponse> installFromRegistry({
     required String downloadUrl,
     String? githubProxy,
     String? token,
     String? sourceUrl,
+    bool overwrite = false,
   }) async {
     try {
       final body = <String, dynamic>{'download_url': downloadUrl};
+      if (overwrite) {
+        body['overwrite'] = true;
+      }
       if (githubProxy != null && githubProxy.isNotEmpty) {
         body['github_proxy'] = githubProxy;
       }

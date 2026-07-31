@@ -687,6 +687,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get jspluginInstall => '安装';
 
   @override
+  String get jspluginOverwriteInstall => '覆盖安装';
+
+  @override
+  String jspluginConflictBanner(String plugin) {
+    return '与已安装的 $plugin 冲突';
+  }
+
+  @override
+  String get jspluginConflictDialogTitle => '替换已安装的插件？';
+
+  @override
+  String jspluginConflictDialogBody(String entryPath, String plugin) {
+    return '插件标识「$entryPath」已被 $plugin 占用。安装本插件会替换掉它，且新插件会继承原插件保存的数据。此操作无法撤销。';
+  }
+
+  @override
+  String get jspluginConflictDialogConfirm => '替换';
+
+  @override
   String jspluginSaveFailed(String error) {
     return '保存失败: $error';
   }

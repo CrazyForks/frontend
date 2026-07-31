@@ -124,15 +124,31 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
     }
   }
 
-  void _markPluginInstalled(String entryPath, String version) {
+  /// 安装成功后就地更新状态。必须按 (entryPath, identity) 匹配：只比 entryPath
+  /// 会把同名不同作者的其他条目一起点亮成「已安装」（songloft-org/songloft#339）。
+  void _markPluginInstalled(RegistryPluginEntry installed) {
     if (_pluginResponse == null) return;
     final updatedPlugins =
         _pluginResponse!.plugins.map((p) {
-          if (p.entryPath == entryPath) {
+          if (p.matches(installed.entryPath, installed.identity)) {
             return p.copyWith(
               installed: true,
-              installedVersion: version,
+              installedVersion: installed.version,
               hasUpdate: false,
+              conflict: false,
+              conflictWith: '',
+            );
+          }
+          // 同 entryPath 的其他条目：本地那一个已经被换成 installed 了，
+          // 它们从「已安装」翻转为「冲突」。
+          if (p.entryPath == installed.entryPath) {
+            return p.copyWith(
+              installed: false,
+              conflict: true,
+              conflictWith:
+                  '${installed.name}'
+                  '${installed.author != null && installed.author!.isNotEmpty ? '（作者：${installed.author}）' : ''}'
+                  ' v${installed.version}',
             );
           }
           return p;
@@ -434,14 +450,14 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
             separatorBuilder: (_, _) => const Divider(height: 1, indent: 16),
             itemBuilder:
                 (context, index) => _RegistryPluginItem(
+                  // rowKey 而非 index：_RegistryPluginItem 持有 _installing 本地状态，
+                  // 翻页/搜索后按 index 复用 Element 会把 loading 挂到别的条目上。
+                  key: ValueKey(plugins[index].rowKey),
                   entry: plugins[index],
                   // 「全部」模式无法确定插件来源，token 留空（私有源需切到具体源安装）
                   token: _allSources ? '' : (_selectedRegistry?.token ?? ''),
                   onInstalled: () {
-                    _markPluginInstalled(
-                      plugins[index].entryPath,
-                      plugins[index].version,
-                    );
+                    _markPluginInstalled(plugins[index]);
                     ref.invalidate(jsPluginsProvider);
                   },
                 ),
@@ -526,6 +542,7 @@ class _RegistryPluginItem extends ConsumerStatefulWidget {
   final VoidCallback onInstalled;
 
   const _RegistryPluginItem({
+    super.key,
     required this.entry,
     this.token = '',
     required this.onInstalled,
@@ -539,7 +556,37 @@ class _RegistryPluginItem extends ConsumerStatefulWidget {
 class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
   bool _installing = false;
 
-  Future<void> _install() async {
+  /// 冲突条目的安装入口：先让用户确认会替换掉本地那个同名插件。
+  Future<void> _confirmThenInstall() async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(l10n.jspluginConflictDialogTitle),
+            content: Text(
+              l10n.jspluginConflictDialogBody(
+                widget.entry.entryPath,
+                widget.entry.conflictWith ?? '',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(l10n.commonCancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(l10n.jspluginConflictDialogConfirm),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true) return;
+    await _install(overwrite: true);
+  }
+
+  Future<void> _install({bool overwrite = false}) async {
     final proxy = await ref.read(githubProxyProvider.future);
     if (!mounted) return;
     setState(() => _installing = true);
@@ -550,6 +597,7 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
         githubProxy: proxy.isEmpty ? null : proxy,
         token: widget.token.isEmpty ? null : widget.token,
         sourceUrl: widget.entry.sourceUrl,
+        overwrite: overwrite,
       );
       if (!mounted) return;
       if (result.success > 0) {
@@ -585,15 +633,29 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
     final entry = widget.entry;
     final theme = Theme.of(context);
 
+    final l10n = AppLocalizations.of(context);
+    final hasDescription =
+        entry.description != null && entry.description!.isNotEmpty;
+
     return ListTile(
       leading: _buildIcon(entry, theme),
       title: Text(entry.name),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (entry.author != null && entry.author!.isNotEmpty)
-            Text(entry.author!, style: theme.textTheme.bodySmall),
-          if (entry.description != null && entry.description!.isNotEmpty)
+          // 作者与来源是用户区分「同名不同插件」的唯一依据，故并排展示
+          if ((entry.author != null && entry.author!.isNotEmpty) ||
+              (entry.sourceName != null && entry.sourceName!.isNotEmpty))
+            Text(
+              [
+                if (entry.author != null && entry.author!.isNotEmpty)
+                  entry.author!,
+                if (entry.sourceName != null && entry.sourceName!.isNotEmpty)
+                  entry.sourceName!,
+              ].join(' · '),
+              style: theme.textTheme.bodySmall,
+            ),
+          if (hasDescription)
             Text(
               entry.description!,
               maxLines: 2,
@@ -602,10 +664,34 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
                 color: theme.colorScheme.outline,
               ),
             ),
+          if (entry.conflict)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 14,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      l10n.jspluginConflictBanner(entry.conflictWith ?? ''),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
       trailing: _buildAction(entry, theme),
-      isThreeLine: entry.description != null && entry.description!.isNotEmpty,
+      isThreeLine: hasDescription || entry.conflict,
     );
   }
 
@@ -640,8 +726,9 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
   }
 
   Widget _buildFallbackIcon(RegistryPluginEntry entry, ThemeData theme) {
+    // 用 rowKey 而非 entryPath：同名不同作者的两个条目否则连颜色和首字母都一样
     final color =
-        Colors.primaries[entry.entryPath.hashCode % Colors.primaries.length];
+        Colors.primaries[entry.rowKey.hashCode % Colors.primaries.length];
     final initial =
         entry.name.isNotEmpty ? entry.name.characters.first.toUpperCase() : '?';
     return CircleAvatar(
@@ -676,6 +763,17 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
       return FilledButton.tonal(
         onPressed: _install,
         child: Text(l10n.jspluginUpdateTo(entry.version)),
+      );
+    }
+    // entry_path 被另一个作者的插件占用：安装会替换它，先让用户确认
+    if (entry.conflict) {
+      return FilledButton.tonal(
+        onPressed: _confirmThenInstall,
+        style: FilledButton.styleFrom(
+          backgroundColor: theme.colorScheme.errorContainer,
+          foregroundColor: theme.colorScheme.onErrorContainer,
+        ),
+        child: Text(l10n.jspluginOverwriteInstall),
       );
     }
     return FilledButton(onPressed: _install, child: Text(l10n.jspluginInstall));

@@ -371,6 +371,28 @@
     }
   },
   "jspluginInstall": "Install",
+  "jspluginOverwriteInstall": "Replace",
+  "jspluginConflictBanner": "Conflicts with installed {plugin}",
+  "@jspluginConflictBanner": {
+    "placeholders": {
+      "plugin": {
+        "type": "String"
+      }
+    }
+  },
+  "jspluginConflictDialogTitle": "Replace the installed plugin?",
+  "jspluginConflictDialogBody": "The identifier \"{entryPath}\" is already used by {plugin}. Installing this plugin replaces it, and the replacement inherits the original plugin's stored data. This cannot be undone.",
+  "@jspluginConflictDialogBody": {
+    "placeholders": {
+      "entryPath": {
+        "type": "String"
+      },
+      "plugin": {
+        "type": "String"
+      }
+    }
+  },
+  "jspluginConflictDialogConfirm": "Replace",
   "jspluginSaveFailed": "Save failed: {error}",
   "@jspluginSaveFailed": {
     "placeholders": {

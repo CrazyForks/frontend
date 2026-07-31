@@ -1298,6 +1298,36 @@ abstract class AppLocalizations {
   /// **'安装'**
   String get jspluginInstall;
 
+  /// No description provided for @jspluginOverwriteInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'覆盖安装'**
+  String get jspluginOverwriteInstall;
+
+  /// No description provided for @jspluginConflictBanner.
+  ///
+  /// In zh, this message translates to:
+  /// **'与已安装的 {plugin} 冲突'**
+  String jspluginConflictBanner(String plugin);
+
+  /// No description provided for @jspluginConflictDialogTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'替换已安装的插件？'**
+  String get jspluginConflictDialogTitle;
+
+  /// No description provided for @jspluginConflictDialogBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件标识「{entryPath}」已被 {plugin} 占用。安装本插件会替换掉它，且新插件会继承原插件保存的数据。此操作无法撤销。'**
+  String jspluginConflictDialogBody(String entryPath, String plugin);
+
+  /// No description provided for @jspluginConflictDialogConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'替换'**
+  String get jspluginConflictDialogConfirm;
+
   /// No description provided for @jspluginSaveFailed.
   ///
   /// In zh, this message translates to:

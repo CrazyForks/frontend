@@ -705,6 +705,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get jspluginInstall => 'Install';
 
   @override
+  String get jspluginOverwriteInstall => 'Replace';
+
+  @override
+  String jspluginConflictBanner(String plugin) {
+    return 'Conflicts with installed $plugin';
+  }
+
+  @override
+  String get jspluginConflictDialogTitle => 'Replace the installed plugin?';
+
+  @override
+  String jspluginConflictDialogBody(String entryPath, String plugin) {
+    return 'The identifier \"$entryPath\" is already used by $plugin. Installing this plugin replaces it, and the replacement inherits the original plugin\'s stored data. This cannot be undone.';
+  }
+
+  @override
+  String get jspluginConflictDialogConfirm => 'Replace';
+
+  @override
   String jspluginSaveFailed(String error) {
     return 'Save failed: $error';
   }

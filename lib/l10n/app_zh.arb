@@ -476,6 +476,28 @@
     }
   },
   "jspluginInstall": "安装",
+  "jspluginOverwriteInstall": "覆盖安装",
+  "jspluginConflictBanner": "与已安装的 {plugin} 冲突",
+  "@jspluginConflictBanner": {
+    "placeholders": {
+      "plugin": {
+        "type": "String"
+      }
+    }
+  },
+  "jspluginConflictDialogTitle": "替换已安装的插件？",
+  "jspluginConflictDialogBody": "插件标识「{entryPath}」已被 {plugin} 占用。安装本插件会替换掉它，且新插件会继承原插件保存的数据。此操作无法撤销。",
+  "@jspluginConflictDialogBody": {
+    "placeholders": {
+      "entryPath": {
+        "type": "String"
+      },
+      "plugin": {
+        "type": "String"
+      }
+    }
+  },
+  "jspluginConflictDialogConfirm": "替换",
   "jspluginSaveFailed": "保存失败: {error}",
   "@jspluginSaveFailed": {
     "placeholders": {
