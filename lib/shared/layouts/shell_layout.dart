@@ -11,6 +11,7 @@ import '../../core/updater/patch_update_dialog.dart';
 import '../../features/auth/domain/auth_state.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/home/presentation/plugin_tab_page.dart';
+import '../../features/jsplugin/data/jsplugin_api.dart';
 import '../../features/jsplugin/presentation/providers/jsplugin_provider.dart';
 import '../../features/library/presentation/providers/favorite_provider.dart';
 import '../../features/player/domain/player_state.dart';
@@ -206,7 +207,23 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
   Widget build(BuildContext context) {
     final tabConfigAsync = ref.watch(tabConfigProvider);
     final tabConfig = tabConfigAsync.value ?? TabConfig.defaultConfig();
-    final plugins = ref.watch(jsPluginsProvider).value ?? [];
+    // 只在导航相关字段（活跃插件的 entryPath/名称/图标）实际变化时才触发重建。
+    // 插件版本更新、状态刷新等会 invalidate jsPluginsProvider，但不应导致
+    // ShellLayout 重建——否则 CanvasKit 平台视图嵌入器可能因合成层序变化
+    // 把 iframe DOM 摘挂一次，触发浏览器重载插件页面（#278, #344）。
+    ref.watch(jsPluginsProvider.select((v) {
+      final list = v.value ?? const <JSPlugin>[];
+      return list
+          .where(
+            (p) =>
+                p.isActive &&
+                p.entryPath != null &&
+                p.entryPath!.isNotEmpty,
+          )
+          .map((p) => '${p.entryPath}\t${p.displayName}\t${p.iconUrl ?? ""}')
+          .join('\n');
+    }));
+    final plugins = ref.read(jsPluginsProvider).value ?? <JSPlugin>[];
     final activeDest = ActiveDestinations.compute(
       tabConfig,
       plugins,
