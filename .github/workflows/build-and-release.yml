@@ -358,7 +358,15 @@ jobs:
           FLUTTER_BINDING: ${{ env.FLUTTER_VERSION }}
         run: |
           set -e
-          TAG=$([[ "$GITHUB_REF" == refs/tags/v* ]] && echo "${GITHUB_REF#refs/tags/}" || echo "dev")
+          # 与 release_info 步骤保持一致：WebF 实验分支发到独立的 dev-webf release，
+          # 这里若仍写 dev，manifest 里的 patchUrl 会指向不存在的路径。
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ "${GITHUB_REF#refs/heads/}" == feat/webf-plugin-render ]]; then
+            TAG="dev-webf"
+          else
+            TAG="dev"
+          fi
           # --split-per-abi 时 gradle 会把各 ABI APK 的 versionCode 改写为
           # 「ABI偏移×1000+pubspec基础值」(如 arm64-v8a=2001),flutter_patcher 按
           # versionCode 严格绑定,manifest/补丁必须写 APK 的**真实值**(用 aapt 读),
@@ -484,7 +492,15 @@ jobs:
           else
             # 分支触发（push to main / workflow_dispatch）统一用 dev tag 滚动 prerelease
             BRANCH="${GITHUB_REF#refs/heads/}"
-            echo "tag=dev" >> "$GITHUB_OUTPUT"
+            # WebF 实验分支（songloft-org/songloft#341）刻意发到独立 tag：
+            # 共享的 dev 预发布是 dev 渠道客户端热更新检查的目标，若把实验构建
+            # 推到那里，所有 dev 用户都会被自动升到这个 beta 渲染引擎上。
+            # 本分支合并回 main 前必须删掉这段。
+            if [[ "$BRANCH" == feat/webf-plugin-render ]]; then
+              echo "tag=dev-webf" >> "$GITHUB_OUTPUT"
+            else
+              echo "tag=dev" >> "$GITHUB_OUTPUT"
+            fi
             echo "name=Dev Build ($BRANCH)" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "make_latest=false" >> "$GITHUB_OUTPUT"
