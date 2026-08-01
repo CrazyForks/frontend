@@ -28,7 +28,10 @@
   <style>
     body { margin: 0; padding: 16px; background: #fff; color: #000;
            font-family: Roboto, sans-serif; }
-    .row { display: flex; align-items: center; margin-bottom: 20px; }
+    /* 12px 而不是更宽松的间距：WebF 的窗口在容器里实测只有 1280x717（Xvfb 屏幕是
+       1280x900，下方黑色区域是 Flutter 压根没画的部分），12 组检查必须全部挤进
+       717px 才不会被截掉 —— 被截掉的行看起来就像「脚本没跑」。 */
+    .row { display: flex; align-items: center; margin-bottom: 12px; }
     .tag { width: 190px; font-size: 13px; font-weight: 700; color: #666; }
     .gapbox { display: flex; gap: 24px; }
     .gapbox i { width: 40px; height: 40px; background: #3f51b5; display: block; }
@@ -138,7 +141,41 @@
     <img id="emptyruntime" alt="runtime" style="width:40px;height:40px;background:#ddd;margin-left:12px">
   </div>
 
+  <!--
+    12 <details>/<summary> 垫片。WebF 的两份标签注册表里都没有 details/summary，
+    它们降级为 _UnknownHTMLElement（display:block）：子内容照常摊开显示、点击毫无
+    反应、没有三角标记。common.js 的 WebF-only 垫片（applyOnReady 时机）负责补上
+    折叠交互，这一组就是它的回归用例。
+
+    判据 —— 折叠/展开是否可交互（第三个由脚本代点，不需要人动手）：
+      A 默认       只看到「▸ A closed」一行，A-BODY **不可见**  ← 折叠生效
+      B open 属性  看到「▾ B open」+ B-BODY                     ← 尊重初始 open
+      C 脚本点击   看到「▾ C clicked」+ C-BODY                   ← 点击真能展开
+      三角标记     ▸/▾ 字形（连字失效时会退成 arrow_right 等单词，不影响折叠判定）
+    12b 是同一件事的文字化断言，避免只靠肉眼看方块：
+      期望 A.open=false/wrap=none  B.open=true/wrap=block  C.open=true/wrap=block
+      wrap=native → 垫片没跑（DOM 里没有 .sl-details-content 容器）
+      三个 open 全 false + BODY 全可见 → 垫片抛异常了，去 flutter.log 搜 shim failed
+  -->
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">12 DETAILS</span>
+    <div class="dtrow">
+      <details id="dtA" class="probe-details"><summary>A closed</summary><div class="probe-dbody">A-BODY</div></details>
+      <details id="dtB" class="probe-details" open><summary>B open</summary><div class="probe-dbody">B-BODY</div></details>
+      <details id="dtC" class="probe-details"><summary>C clicked</summary><div class="probe-dbody">C-BODY</div></details>
+    </div>
+  </div>
+
+  <div class="row">
+    <span class="tag">12b DETAILS STATE</span>
+    <span id="dtstate" style="font-size:16px">(script did not run)</span>
+  </div>
+
   <style>
+    .dtrow { display: flex; gap: 20px; font-size: 14px; }
+    .probe-details { border: 1px solid #999; padding: 4px 8px; min-width: 130px; }
+    .probe-dbody { color: #b71c1c; font-weight: 700; }
+
     #selbox { width: 40px; height: 40px; display: block; background: #c62828; }
     html[data-theme="dark"] #selbox { background: #2e7d32; }
 
@@ -173,6 +210,38 @@
       'search=' + JSON.stringify(window.location.search) +
       '  theme=' + JSON.stringify(sp.get('theme')) +
       '  hasEmbed=' + sp.has('embed');
+
+    // details 垫片在 DOMContentLoaded 里改 DOM，而这段内联脚本跑在 DOMContentLoaded
+    // **之前**，所以读状态必须同样挂到该事件上。common.js 在 <head> 里先注册，
+    // 同一事件按注册顺序回调 → 这里一定后跑，读到的是垫片之后的 DOM。
+    document.addEventListener('DOMContentLoaded', function () {
+      var c = document.getElementById('dtC');
+      // 代替人手点击：垫片把 click 挂在 summary 上。
+      // 刻意只用 HTMLElement.click()（最接近真实交互的一条路），**不再补
+      // dispatchEvent 兜底** —— 实测 WebF 的 click() 是**异步**投递的：先 click()
+      // 再看 open 仍是旧值，于是兜底又派一次事件，两次 toggle 抵消，截图里 C 是
+      // 折叠的、而同步读到的 readout 却说 open=true，自相矛盾。
+      var s = c.getElementsByTagName('summary')[0];
+      if (s) { try { s.click(); } catch (e) { console.log('[probe] summary.click() threw: ' + e); } }
+
+      // 同理，状态必须**延迟**读，否则读到的是 click 投递前的旧值。
+      setTimeout(function () {
+        // 读 wrapper 的 **inline style** 而不是 getComputedStyle：垫片就是用内联
+        // display 折叠的，这样不依赖 WebF 的 computed style 实现。
+        // 浏览器原生 details 下压根没有这个 wrapper → 打印 native。
+        function wrap(id) {
+          var w = document.getElementById(id).getElementsByClassName('sl-details-content')[0];
+          return w ? (w.style.display || '(empty)') : 'native';
+        }
+        var text =
+          'A.open=' + document.getElementById('dtA').open + '/wrap=' + wrap('dtA') +
+          '  B.open=' + document.getElementById('dtB').open + '/wrap=' + wrap('dtB') +
+          '  C.open=' + c.open + '/wrap=' + wrap('dtC');
+        document.getElementById('dtstate').textContent = text;
+        // 同时回传到 flutter.log（截图糊掉时还有文字证据）
+        console.log('[probe] details ' + text);
+      }, 800);
+    });
   </script>
 </body>
 </html>
