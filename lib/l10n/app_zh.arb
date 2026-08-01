@@ -2732,5 +2732,9 @@
   "playHistoryDeleteEntry": "删除此记录",
   "playHistoryOperationFailed": "操作失败，请重试",
   "playHistorySongMissing": "该歌曲已不在此列表中，已把其余歌曲加入队列",
-  "scrollToTop": "回到顶部"
+  "scrollToTop": "回到顶部",
+  "playlistLocatePlaying": "定位到正在播放",
+  "playlistLocateNotFound": "当前播放歌曲不在此歌单中",
+  "playlistSortShuffle": "随机排序",
+  "playlistShuffled": "已随机打乱歌曲顺序"
 }

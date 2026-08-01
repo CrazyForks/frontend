@@ -7536,6 +7536,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'回到顶部'**
   String get scrollToTop;
+
+  /// No description provided for @playlistLocatePlaying.
+  ///
+  /// In zh, this message translates to:
+  /// **'定位到正在播放'**
+  String get playlistLocatePlaying;
+
+  /// No description provided for @playlistLocateNotFound.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前播放歌曲不在此歌单中'**
+  String get playlistLocateNotFound;
+
+  /// No description provided for @playlistSortShuffle.
+  ///
+  /// In zh, this message translates to:
+  /// **'随机排序'**
+  String get playlistSortShuffle;
+
+  /// No description provided for @playlistShuffled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已随机打乱歌曲顺序'**
+  String get playlistShuffled;
 }
 
 class _AppLocalizationsDelegate

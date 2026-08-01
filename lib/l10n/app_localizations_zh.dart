@@ -4178,4 +4178,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scrollToTop => '回到顶部';
+
+  @override
+  String get playlistLocatePlaying => '定位到正在播放';
+
+  @override
+  String get playlistLocateNotFound => '当前播放歌曲不在此歌单中';
+
+  @override
+  String get playlistSortShuffle => '随机排序';
+
+  @override
+  String get playlistShuffled => '已随机打乱歌曲顺序';
 }

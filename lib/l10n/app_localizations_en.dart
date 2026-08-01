@@ -4356,4 +4356,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scrollToTop => 'Scroll to top';
+
+  @override
+  String get playlistLocatePlaying => 'Locate playing song';
+
+  @override
+  String get playlistLocateNotFound => 'Current song is not in this playlist';
+
+  @override
+  String get playlistSortShuffle => 'Shuffle';
+
+  @override
+  String get playlistShuffled => 'Songs shuffled';
 }

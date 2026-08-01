@@ -2627,5 +2627,9 @@
   "playHistoryDeleteEntry": "Remove this entry",
   "playHistoryOperationFailed": "Operation failed, please try again",
   "playHistorySongMissing": "This song is no longer in the list; the rest have been added to the queue",
-  "scrollToTop": "Scroll to top"
+  "scrollToTop": "Scroll to top",
+  "playlistLocatePlaying": "Locate playing song",
+  "playlistLocateNotFound": "Current song is not in this playlist",
+  "playlistSortShuffle": "Shuffle",
+  "playlistShuffled": "Songs shuffled"
 }

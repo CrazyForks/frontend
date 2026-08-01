@@ -258,6 +258,80 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     }
   }
 
+  /// 随机打乱歌单内歌曲顺序
+  Future<void> _autoSortShuffle(List<Song> songs) async {
+    await ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadAll();
+    if (!mounted) return;
+    final fullSongs =
+        ref.read(playlistSongsProvider(_playlistIdInt)).value?.items ?? songs;
+
+    final songIds = PlaylistSort().shuffleSongs(fullSongs);
+
+    if (songIds == null) {
+      if (mounted) {
+        ResponsiveSnackBar.show(
+          context,
+          message: AppLocalizations.of(context).playlistAlreadySortedSongs,
+        );
+      }
+      return;
+    }
+
+    final notifier = ref.read(playlistNotifierProvider.notifier);
+    final success = await notifier.reorderPlaylistSongs(
+      _playlistIdInt,
+      songIds,
+    );
+
+    if (mounted) {
+      final l10n = AppLocalizations.of(context);
+      if (success) {
+        ref.read(playlistSongsProvider(_playlistIdInt).notifier).resetFilter();
+        ResponsiveSnackBar.showSuccess(context, message: l10n.playlistShuffled);
+      } else {
+        ResponsiveSnackBar.showError(context, message: l10n.playlistSortFailed);
+      }
+    }
+  }
+
+  /// 定位到当前正在播放的歌曲
+  Future<void> _scrollToCurrentSong(List<Song> songs) async {
+    final playerState = ref.read(playerStateProvider);
+    final currentSong = playerState.currentSong;
+    if (currentSong == null) return;
+
+    var index = songs.indexWhere((s) => s.id == currentSong.id);
+
+    if (index < 0) {
+      await ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadAll();
+      if (!mounted) return;
+      final fullSongs =
+          ref.read(playlistSongsProvider(_playlistIdInt)).value?.items ?? songs;
+      index = fullSongs.indexWhere((s) => s.id == currentSong.id);
+      if (index < 0) {
+        if (mounted) {
+          ResponsiveSnackBar.show(
+            context,
+            message: AppLocalizations.of(context).playlistLocateNotFound,
+          );
+        }
+        return;
+      }
+    }
+
+    if (!_scrollController.hasClients) return;
+    final headerExtent = context.useWideLayout ? 0.0 : 300.0;
+    final target =
+        headerExtent +
+        index * 72.0 -
+        _scrollController.position.viewportDimension / 3;
+    _scrollController.animateTo(
+      target.clamp(0.0, _scrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
   /// 取消排序模式（不保存）
   void _cancelSortMode() {
     setState(() {
@@ -1027,6 +1101,14 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
 
     // 正常模式
     return [
+      if (ref.watch(playerStateProvider.select((s) => s.sourcePlaylistId)) ==
+              _playlistIdInt &&
+          ref.watch(playerStateProvider.select((s) => s.currentSong)) != null)
+        IconButton(
+          icon: const Icon(Icons.my_location),
+          tooltip: l10n.playlistLocatePlaying,
+          onPressed: () => _scrollToCurrentSong(songs),
+        ),
       IconButton(
         icon: Icon(_isSearchMode ? Icons.search_off : Icons.search),
         tooltip: l10n.playlistSearch,
@@ -1075,6 +1157,9 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
                 break;
               case 'perm_number':
                 _autoSortByNumberPrefix(songs);
+                break;
+              case 'perm_shuffle':
+                _autoSortShuffle(songs);
                 break;
               case 'manual':
                 _enterSortMode(songs);
@@ -1148,6 +1233,15 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
+                  PopupMenuItem(
+                    value: 'perm_shuffle',
+                    child: ListTile(
+                      leading: const Icon(Icons.shuffle),
+                      title: Text(l10n.playlistSortShuffle),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
                   if (currentSort == 'position')
                     PopupMenuItem(
                       value: 'manual',
@@ -1196,7 +1290,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              // 播放历史：无条件显示（有无记录要请求才知道，空态由面板承担）
+              // 播放历史：无条件显示��有无记录要请求才知道，空态由面板承担）
               PopupMenuItem(
                 value: 'play_history',
                 child: ListTile(

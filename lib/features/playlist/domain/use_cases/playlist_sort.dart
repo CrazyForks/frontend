@@ -126,6 +126,17 @@ class PlaylistSort {
     return sortedIds;
   }
 
+  /// 随机打乱歌曲顺序，返回打乱后的 song ID 列表。
+  /// 仅当列表只有一首歌时返回 null（打乱无意义）。
+  List<int>? shuffleSongs(List<Song> songs) {
+    if (songs.length <= 1) return null;
+    final shuffled = List<Song>.from(songs)..shuffle();
+    final shuffledIds = shuffled.map((s) => s.id).toList();
+    final originalIds = songs.map((s) => s.id).toList();
+    if (_listEquals(shuffledIds, originalIds)) return null;
+    return shuffledIds;
+  }
+
   /// 简单的整数列表比较（避免依赖 flutter/foundation 的 listEquals）。
   bool _listEquals(List<int> a, List<int> b) {
     if (a.length != b.length) return false;
