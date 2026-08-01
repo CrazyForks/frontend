@@ -95,7 +95,7 @@ class ThemeCatalogNotifier extends AsyncNotifier<List<ThemeCatalogEntry>> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final api = ref.read(themePackApiProvider);
-      final proxy = ref.read(githubProxyProvider).value ?? '';
+      final proxy = await ref.read(githubProxyProvider.future);
       final resp = await api.refreshCatalog(
         githubProxy: proxy.isNotEmpty ? proxy : null,
         force: force,
@@ -106,7 +106,7 @@ class ThemeCatalogNotifier extends AsyncNotifier<List<ThemeCatalogEntry>> {
 
   Future<void> installTheme(ThemeCatalogEntry entry) async {
     final api = ref.read(themePackApiProvider);
-    final proxy = ref.read(githubProxyProvider).value ?? '';
+    final proxy = await ref.read(githubProxyProvider.future);
     await api.installFromCatalog(
       url: entry.url,
       githubProxy: proxy.isNotEmpty ? proxy : null,
