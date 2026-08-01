@@ -23,6 +23,8 @@
   <link rel="stylesheet" href="./common.css">
   <!-- 顺序刻意在 common.css 之后，模拟插件自己的 style.css，见 probe-after.css -->
   <link rel="stylesheet" href="./probe-after.css">
+  <!-- 加载真实的 common.js：第 11 行的空 src 兜底就在它里面，不加载就测不到 -->
+  <script src="./common.js"></script>
   <style>
     body { margin: 0; padding: 16px; background: #fff; color: #000;
            font-family: Roboto, sans-serif; }
@@ -122,6 +124,20 @@
     <span id="crossbox"></span>
   </div>
 
+  <!--
+    11 空 img src。按规范 src="" 是无效值、浏览器不发请求；WebF 会把它解析成
+    当前文档 URL，把这个 HTML 抓回来当图片解码，报 Failed to decode image
+    (mime=text/html)。common.js 里有 WebF-only 的兜底（属性扫描 + 访问器拦截），
+    这两个元素就是它的回归用例：日志里不该再出现 decode image 报错。
+      左：HTML 里写死的 src=""（解析器设的是属性）
+      右：运行时 img.src = ''（走属性访问器）
+  -->
+  <div class="row">
+    <span class="tag">11 EMPTY IMG SRC</span>
+    <img id="emptystatic" src="" alt="static" style="width:40px;height:40px;background:#ddd">
+    <img id="emptyruntime" alt="runtime" style="width:40px;height:40px;background:#ddd;margin-left:12px">
+  </div>
+
   <style>
     #selbox { width: 40px; height: 40px; display: block; background: #c62828; }
     html[data-theme="dark"] #selbox { background: #2e7d32; }
@@ -142,9 +158,15 @@
     }
   </style>
   <script>
-    document.documentElement.dataset.theme = 'dark';
+    // 用 setAttribute 而不是 dataset：实测 WebF 里 documentElement.dataset 时机
+    // 不可靠（会是 null 并抛 TypeError），common.js 也因此改掉了。探针要跟产品
+    // 代码用同一种写法，否则测的是探针自己的 bug。
+    document.documentElement.setAttribute('data-theme', 'dark');
     document.getElementById('attrval').textContent =
       JSON.stringify(document.documentElement.getAttribute('data-theme'));
+
+    // 运行时把 src 置空 —— 未打补丁时这一行会触发一次 decode image 报错
+    document.getElementById('emptyruntime').src = '';
 
     var sp = new URLSearchParams(window.location.search);
     document.getElementById('loc').textContent =

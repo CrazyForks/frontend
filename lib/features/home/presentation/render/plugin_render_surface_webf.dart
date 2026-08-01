@@ -208,6 +208,18 @@ class _PluginRenderSurfaceWebFState
     _ensureManagerConfigured();
     widget.onLoadStart();
     final controller = WebFController(
+      // 关掉 WebF 自己的 HTTP 缓存（songloft-org/songloft#341）。
+      //
+      // 实测日志里反复出现 `WebF.HttpCache Cache validation failed / Missing
+      // cache files`，并伴随 `Bytecode are not valid to execute.` —— 因果链是：
+      // 缓存吐出残缺的脚本内容 → dumpQuickjsByteCode 编译出无效字节码 →
+      // script.dart 的 isBytecode 分支**没有回退**（同为字节码执行的
+      // to_native.dart 那条有「失败即删缓存、退回原始 JS」的自愈），于是脚本
+      // 静默不执行、整个插件页功能缺失。
+      //
+      // 代价极小：插件静态资源本来就是内容哈希文件名（app.bundle.<hash>.js），
+      // 缓存命中率的收益有限，而缓存损坏的代价是整页不可用。
+      networkOptions: const WebFNetworkOptions(enableHttpCache: false),
       onLoad: (_) {
         _pageReady = true;
         widget.onLoadStop();
@@ -216,7 +228,22 @@ class _PluginRenderSurfaceWebFState
         _pageReady = false;
         widget.onError(error.message);
       },
+      // 页面内的 JS 异常必须落日志。
+      //
+      // 实测教训（songloft-org/songloft#341）：WebF 的
+      // `Bytecode are not valid to execute.` 是**次级症状** —— 前面有未捕获的
+      // JS 异常污染了 QuickJS 上下文，之后的脚本编译才整体失败。而那条报错既不
+      // 带 URL 也不带原始异常，只看它无法归因。没有这里的转发，用户日志里就只
+      // 剩下那句无用的字节码报错，真正的第一现场丢失。
+      onJSError: (message) {
+        debugPrint('[plugin][js-error] $message');
+      },
     );
+    // onJSLog 是字段而非构造参数，只能构造后赋值。
+    // 插件页的 console 输出同样要能进日志，否则排查只能靠猜。
+    controller.onJSLog = (level, message) {
+      debugPrint('[plugin][console] $message');
+    };
     controller.javascriptChannel.onMethodCall = _onMethodCall;
     _controller = controller;
     return controller;

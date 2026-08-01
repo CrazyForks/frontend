@@ -109,6 +109,11 @@ class ProbeApp extends StatelessWidget {
           bundle: WebFBundle.fromUrl(_probeUrl),
           createController: () {
             final controller = WebFController(
+              // 与产品代码保持一致：关掉 WebF 的 HTTP 缓存。
+              // 缓存吐出残缺脚本 → 编译出无效字节码 → script.dart 的 isBytecode
+              // 分支没有回退 → 脚本静默不执行。探针必须复现同一配置，否则测出的
+              // 现象与真机不一致（songloft-org/songloft#341）。
+              networkOptions: const WebFNetworkOptions(enableHttpCache: false),
               // 加载失败要在截图里看得见，不能只落日志
               onLoadError: (error, stack) {
                 debugPrint('[probe] onLoadError: $error\n$stack');
