@@ -4,6 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webf/webf.dart';
 
+// 产品代码，**不是探针自己的副本**。
+//
+// `lib/elements/` 在镜像里不存在，由 entrypoint.sh 每次运行时从
+// `/repo/songloft-player/lib/features/home/presentation/render/elements/`
+// 原样拷进来（拷贝前会校验源目录存在，缺了直接 exit 1）。这样探针编译的就是
+// 产品实现本身 —— 探针与产品是两个 package，Dart 不能跨 package 相对 import，
+// 「拷贝 + 校验」是唯一能保证「测的是产品那一份」的做法。
+// 代价：产品的 `elements/` 目录必须只依赖 flutter 与 webf（那边的头注释里
+// 写了这条约束），否则探针编不过。
+import 'elements/songloft_custom_elements.dart';
+
 /// WebF 渲染能力探针（songloft-org/songloft#341）。
 ///
 /// 只做一件事：把 `--dart-define=PROBE_URL=...` 指定的页面用 WebF 渲染出来，
@@ -59,6 +70,9 @@ Future<void> main() async {
       maxAttachedInstances: 2,
     ),
   );
+  // 自定义元素同理（且这里调的就是产品的注册入口，见文件头 import 处的说明）。
+  // 顺序与产品侧 `_ensureWebFProcessSetup()` 一致。
+  SongloftCustomElements.ensureRegistered();
   runApp(const ProbeApp());
 }
 

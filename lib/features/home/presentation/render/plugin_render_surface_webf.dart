@@ -8,6 +8,7 @@ import 'package:webf/webf.dart';
 import '../../../player/domain/player_state.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../plugin_host_dispatch.dart';
+import 'elements/songloft_custom_elements.dart';
 import 'plugin_render_controller.dart';
 import 'plugin_render_fonts.dart';
 
@@ -48,23 +49,34 @@ class PluginRenderSurfaceWebF extends ConsumerStatefulWidget {
 class _PluginRenderSurfaceWebFState
     extends ConsumerState<PluginRenderSurfaceWebF>
     implements PluginRenderController {
-  /// 限额只需设一次，且必须在创建任何 controller 之前。
-  ///
-  /// 刻意不用默认的 `maxAliveInstances: 5`：插件 Tab 数可能超过 5，而超出
-  /// `maxAliveInstances` 会 **dispose** controller，之后重新挂载虽然会自动重建
-  /// （用缓存的初始化参数重放），但页面内 JS 状态归零、还会闪一下 loading。
-  /// 超出 `maxAttachedInstances` 只是 detach、状态保留，代价小得多。
-  static bool _managerConfigured = false;
+  /// WebF 的两项**进程级**一次性设置。两者都必须在创建任何 controller 之前
+  /// 完成，所以放在同一个入口里一次做完。
+  static bool _processSetupDone = false;
 
-  static void _ensureManagerConfigured() {
-    if (_managerConfigured) return;
-    _managerConfigured = true;
+  static void _ensureWebFProcessSetup() {
+    if (_processSetupDone) return;
+    _processSetupDone = true;
+
+    // ① 实例限额。
+    //
+    // 刻意不用默认的 `maxAliveInstances: 5`：插件 Tab 数可能超过 5，而超出
+    // `maxAliveInstances` 会 **dispose** controller，之后重新挂载虽然会自动重建
+    // （用缓存的初始化参数重放），但页面内 JS 状态归零、还会闪一下 loading。
+    // 超出 `maxAttachedInstances` 只是 detach、状态保留，代价小得多。
     WebFControllerManager.instance.initialize(
       const WebFControllerManagerConfig(
         maxAliveInstances: 8,
         maxAttachedInstances: 3,
       ),
     );
+
+    // ② 自定义元素（`<songloft-progress-ring>` 等）。
+    //
+    // 与限额同一类约束：写的是进程级全局注册表、重复注册会抛、且必须早于
+    // controller —— controller 初始化期就会预取 widget 元素的形状与属性默认值，
+    // 注册晚了那一页只能拿到 `_UnknownHTMLElement`。详见
+    // `elements/songloft_custom_elements.dart` 的头注释。
+    SongloftCustomElements.ensureRegistered();
   }
 
   WebFController? _controller;
@@ -205,7 +217,7 @@ class _PluginRenderSurfaceWebFState
 
   // ── 渲染 ────────────────────────────────────────────────────────────
   WebFController _createController() {
-    _ensureManagerConfigured();
+    _ensureWebFProcessSetup();
     widget.onLoadStart();
     final controller = WebFController(
       // 关掉 WebF 自己的 HTTP 缓存（songloft-org/songloft#341）。

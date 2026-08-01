@@ -48,15 +48,28 @@ RUN flutter create --platforms=linux --project-name webf_probe ${PROBE_HOME}
 COPY probe_pubspec.yaml ${PROBE_HOME}/pubspec.yaml
 RUN cd ${PROBE_HOME} && flutter pub get
 
+# flutter create 生成的示例 main.dart 用了 dot-shorthands（`colorScheme: .fromSeed`），
+# 那要求比 probe_pubspec.yaml 的 `sdk: ^3.7.0` 更高的语言版本，下面这步预编译会直接
+# 报 "requires the experimental 'dot-shorthands' language feature"。这里换成空 main，
+# 它只为触发 CMake/原生库那层重活，永远不会被运行。
+RUN printf 'void main() {}\n' > ${PROBE_HOME}/lib/main.dart
+
+# 预编译一次，把 CMake 配置与 WebF 的共享库拷贝固化进镜像，
+# 让每次 run 只跑增量构建。
+#
+# 刻意跑在 COPY probe_main.dart **之前**（此时 main.dart 是上面那个空壳）：
+# 真正的 probe_main.dart 会 import `lib/elements/`，而那个目录由
+# entrypoint.sh 每次运行时从挂载的 /repo 拷进来（为的是编译产品实现本身，而不是
+# 探针里另抄的一份），镜像构建期压根不存在 —— 放在它之后 docker build 必然失败。
+# 这一层与 main.dart 内容无关：WebF 的原生库是 pubspec 里的插件在 CMake 阶段拷的。
+# 顺带的好处：重量级的这层不再被后面几个易变的 COPY 打掉缓存。
+RUN cd ${PROBE_HOME} && flutter build linux --release
+
 COPY probe_main.dart ${PROBE_HOME}/lib/main.dart
 COPY probe.html /opt/probe.html
 COPY probe-after.css /opt/probe-after.css
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
-
-# 预编译一次，把 CMake 配置与 WebF 的共享库拷贝固化进镜像，
-# 让每次 run 只跑增量构建
-RUN cd ${PROBE_HOME} && flutter build linux --release
 
 WORKDIR ${PROBE_HOME}
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

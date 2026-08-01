@@ -15,6 +15,12 @@
                     fontTools 从真实 woff2 的 cmap 里查出来后注入，不靠猜
     4. FLEX GAP     覆盖面最广的单一 CSS 特性（common.css 7 处 + 插件 348 处）。
                     三个方块之间有间距 = 支持
+    13. RING        自定义元素 <songloft-progress-ring>，判据见右列该行上方注释
+
+  版面：WebF 窗口实测只有 1280x717（Xvfb 屏是 1280x900，下方黑色区域是 Flutter
+  压根没画的部分），单列纵向已经被 12 组占满，所以从第 13 组起改成**两列**：
+  左列 1~12b（原样不动），右列 13 起。加新检查行前先确认它落在 717px 以内 ——
+  被截掉的行看起来和「脚本没跑」一模一样。
 -->
 <html lang="zh-CN">
 <head>
@@ -35,9 +41,17 @@
     .tag { width: 190px; font-size: 13px; font-weight: 700; color: #666; }
     .gapbox { display: flex; gap: 24px; }
     .gapbox i { width: 40px; height: 40px; background: #3f51b5; display: block; }
+    /* 两列版面，见文件头「版面」说明。宽度写死而不用 flex:1：
+       flex-grow 若在 WebF 下表现异常，右列会被挤到 0 宽而整组静默消失。 */
+    .cols { display: flex; gap: 24px; align-items: flex-start; }
+    .colL { width: 762px; }
+    .colR { width: 462px; }
+    .colR .tag { width: 118px; }
   </style>
 </head>
 <body>
+<div class="cols">
+<div class="col colL">
   <div class="row">
     <span class="tag">1 CONTROL</span>
     <span style="font-size:20px">plain text renders</span>
@@ -170,6 +184,68 @@
     <span class="tag">12b DETAILS STATE</span>
     <span id="dtstate" style="font-size:16px">(script did not run)</span>
   </div>
+</div><!-- /colL -->
+
+<div class="col colR">
+  <!--
+    13 自定义元素 <songloft-progress-ring>（songloft-org/songloft#341）。
+    这一组测的是**产品实现本身**：entrypoint.sh 每次运行把
+    lib/features/home/presentation/render/elements/ 拷进探针 lib/ 再编译，
+    probe_main.dart 调的是产品的 SongloftCustomElements.ensureRegistered()。
+
+    五个 40x40 虚线盒，尺寸一律走 inline style（也就是同时验了「CSS width/height
+    是否真的到得了 renderStyle」—— 到不了就会退成 36px 默认边长，一眼看得出）。
+
+      A 属性驱动重绘   HTML 里 value="0"（只有轨道），脚本在 +600ms 改成 25
+                       → 应出现 **1/4 圈**深绿弧。仍是纯轨道 = attributeDidUpdate
+                       那条链没触发重绘
+      B 越界夹紧       value="500" max="100" → 应是**整圈**（不是空、也不是绕多圈）
+      C 非法值不崩     value="oops" max="0"（退化区间）stroke-width="-3"
+                       → 应只画轨道且**页面其余部分照常**；整页白/该盒空白 = 崩了。
+                       `color="var(--probe-blue)"` 也归这一类：**属性里的 var()
+                       在 WebF 下解析不出来**（CSSColor.parseColor 只在样式系统
+                       预先展开过 var 的场景下工作，拿原始 `var(...)` 字符串返回
+                       null），元素按「无效颜色」处理 → 退回继承来的黑色。
+                       故轨道应是**淡黑色细圈**，不是淡红也不是淡蓝。
+                       哪天它变蓝了 = WebF 支持了，可以回头放宽文档的说法。
+                       flutter.log 里应有两条 `不是有效数字/不是有效颜色` 警告
+      D 主题跟随       不写 color 属性，靠 CSS `#ringD { color: var(--probe-ring) }`
+                       （currentColor 语义）。脚本在 +600ms 把该变量由红改绿。
+                       绿 3/4 圈 = CSS 变量驱动的重绘也走通了；红 = 只有首帧对，
+                       运行时改主题不重绘（此时应改用 color 属性驱动）
+      E 负向对照       <songloft-not-registered>，同样的属性与尺寸但**没注册**。
+                       必须是**空的虚线盒**。它里面也画出环 = 说明弧不是我们的
+                       Dart 元素画的（例如某个 CSS/垫片副作用），整组结论作废
+    13b 是同一件事的文字化断言（截图糊掉时的兜底），期望：
+      A.rect=40x40  A.value="25"  E.rect=40x40  ring=""  static=""
+      rect=0x0 → WidgetElement 压根没拿到盒模型（不是没画，是没有盒子）。
+      两个 var 读回都是 ""：**WebF 的 getComputedStyle 不暴露自定义属性**
+      （实测结论；static 那个是从未被改过的 :root 变量，作对照用），所以
+      「读回是空」不能用来判断 setProperty 有没有生效 —— 那个只能看 D 的颜色。
+      若哪天 ring="" 而 static 有值，才说明是 setProperty 真的没写进去。
+  -->
+  <div class="row">
+    <span class="tag">13 RING</span>
+    <span class="ringrow">
+      <songloft-progress-ring id="ringA" class="ringbox" value="0" max="100"
+        color="#2e7d32" style="width:40px;height:40px"></songloft-progress-ring>
+      <songloft-progress-ring id="ringB" class="ringbox" value="500" min="0" max="100"
+        color="#3f51b5" stroke-width="6" style="width:40px;height:40px"></songloft-progress-ring>
+      <songloft-progress-ring id="ringC" class="ringbox" value="oops" max="0"
+        stroke-width="-3" color="var(--probe-blue)" style="width:40px;height:40px"></songloft-progress-ring>
+      <songloft-progress-ring id="ringD" class="ringbox" value="75" max="100"
+        line-cap="round" stroke-width="5" style="width:40px;height:40px"></songloft-progress-ring>
+      <songloft-not-registered id="ringE" class="ringbox" value="75" max="100"
+        color="#2e7d32" style="width:40px;height:40px"></songloft-not-registered>
+    </span>
+  </div>
+
+  <div class="row">
+    <span class="tag">13b RING STATE</span>
+    <span id="ringstate" style="font-size:12px">(script did not run)</span>
+  </div>
+</div><!-- /colR -->
+</div><!-- /cols -->
 
   <style>
     .dtrow { display: flex; gap: 20px; font-size: 14px; }
@@ -193,6 +269,14 @@
       width: 40px; height: 40px; display: block;
       background: var(--probe-d);
     }
+
+    .ringrow { display: flex; gap: 10px; align-items: center; }
+    /* 虚线边框由 WebF 自己的盒模型绘制，环由我们的 CustomPaint 绘制 ——
+       两者分离，所以「有框无环」（E）与「有框有环」（A~D）一眼可辨。 */
+    .ringbox { border: 1px dashed #bbb; }
+    :root { --probe-ring: #c62828; --probe-blue: #3f51b5; }
+    /* 刻意不给 color 属性，验 currentColor 那条链 */
+    #ringD { color: var(--probe-ring); }
   </style>
   <script>
     // 用 setAttribute 而不是 dataset：实测 WebF 里 documentElement.dataset 时机
@@ -241,6 +325,54 @@
         // 同时回传到 flutter.log（截图糊掉时还有文字证据）
         console.log('[probe] details ' + text);
       }, 800);
+    });
+
+    // ── 13 自定义元素：运行时更新 + 读回 ──────────────────────────────
+    // 单独一个 DOMContentLoaded 回调，不与 details 那段混在一起：任一段抛异常
+    // 都不该让另一段的 readout 停在 "(script did not run)"，否则会误判成
+    // 「整个内联脚本没跑」。
+    document.addEventListener('DOMContentLoaded', function () {
+      function rectOf(id) {
+        var el = document.getElementById(id);
+        if (!el) return 'missing';
+        try {
+          var r = el.getBoundingClientRect();
+          return Math.round(r.width) + 'x' + Math.round(r.height);
+        } catch (e) { return 'rect-threw'; }
+      }
+      // 刻意延后到首帧之后再改，模拟真实插件「先渲染、再拿到数据更新进度」的时序；
+      // 首帧就写死的话测不出「变更能否触发重绘」。
+      setTimeout(function () {
+        try {
+          // ① 属性驱动（保证重绘的那条路）
+          document.getElementById('ringA').setAttribute('value', '25');
+          // ② CSS 变量驱动（ringD 靠 color: var(--probe-ring) 取色）
+          document.documentElement.style.setProperty('--probe-ring', '#2e7d32');
+        } catch (e) {
+          console.log('[probe] ring update threw: ' + e);
+        }
+        // 两个变量都读：--probe-ring 是刚被 setProperty 改过的，--probe-c 是
+        // :root 里从未动过的。两个都空 = getComputedStyle 不暴露自定义属性
+        // （WebF 实测如此），而不是 setProperty 没生效 —— 这两种原因看起来一样，
+        // 但结论完全相反，必须靠对照区分。
+        function varOf(name) {
+          try {
+            return (getComputedStyle(document.documentElement)
+              .getPropertyValue(name) || '').trim();
+          } catch (e) { return '(threw)'; }
+        }
+        setTimeout(function () {
+          var text =
+            'A.rect=' + rectOf('ringA') +
+            ' A.value=' + JSON.stringify(
+              document.getElementById('ringA').getAttribute('value')) +
+            ' E.rect=' + rectOf('ringE') +
+            ' ring=' + JSON.stringify(varOf('--probe-ring')) +
+            ' static=' + JSON.stringify(varOf('--probe-c'));
+          document.getElementById('ringstate').textContent = text;
+          console.log('[probe] ring ' + text);
+        }, 400);
+      }, 600);
     });
   </script>
 </body>

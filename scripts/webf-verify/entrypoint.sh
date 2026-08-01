@@ -13,6 +13,10 @@ OUT=${OUT:-/out}
 PORT=${PORT:-58991}
 DOCROOT=/tmp/docroot
 ASSETS="$REPO/internal/jsplugin/assets"
+PROBE_HOME=${PROBE_HOME:-/opt/webf_probe}
+# 产品的自定义元素目录。刻意直接编译**产品那一份**，不在探针里抄副本：
+# 探针与产品是两个 Dart package，跨 package 相对 import 不可行，所以只能拷。
+ELEMENTS_SRC="$REPO/songloft-player/lib/features/home/presentation/render/elements"
 # 抓屏前等渲染稳定的秒数。WebF 首帧 + woff2 解码 + Xvfb 软渲染都要时间，
 # 给太短会拍到空白帧而误判成「闸失败」。
 SETTLE=${SETTLE:-12}
@@ -28,6 +32,16 @@ rm -rf "$DOCROOT" && mkdir -p "$DOCROOT"
 cp -r "$ASSETS/." "$DOCROOT/"
 cp /opt/probe.html "$DOCROOT/probe.html"
 cp /opt/probe-after.css "$DOCROOT/probe-after.css"
+
+# ── 1b. 把产品的自定义元素源码拷进探针 lib/ ───────────────────────
+# 必须 fail-fast：拷不到就不能悄悄跑一个「没有自定义元素」的探针 ——
+# 那样截图里 ring 全空，看起来跟「元素实现坏了」一模一样，会误判。
+[ -d "$ELEMENTS_SRC" ] || {
+  echo "找不到 $ELEMENTS_SRC，检查 /repo 挂载与子模块 checkout" >&2; exit 1; }
+rm -rf "$PROBE_HOME/lib/elements"
+cp -r "$ELEMENTS_SRC" "$PROBE_HOME/lib/elements"
+log "已拷入产品自定义元素（编译的是产品实现，非副本）："
+(cd "$PROBE_HOME/lib/elements" && sha1sum ./*.dart) | tee "$OUT/elements.sha1"
 
 # ── 2. 从真实 woff2 的 cmap 查图标码点（不猜）────────────────────
 resolve_codepoints() {
