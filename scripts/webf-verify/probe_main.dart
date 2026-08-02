@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -108,6 +109,115 @@ const String _diagnoseJs = r'''
 
 const bool _diagnose = bool.fromEnvironment('DIAGNOSE');
 
+/// `--dart-define=DRAG_PROBE=true` 时启用合成拖动（songloft-org/songloft#341 Step 3）。
+///
+/// **默认关。** 探针本体只截图、没有交互驱动能力，而「`<songloft-slider>` 真的能被
+/// 拖动」这件事截图证明不了 —— 它必须由真实的 hit-test → Flutter 手势路径走一遍。
+/// 但合成指针事件会改变页面状态（滑块位置、插件侧的值），给既有 13 组的截图基线引入
+/// 不确定性，所以做成显式开关。
+///
+/// `bool.fromEnvironment` **只认字面 `"true"`**（`run.sh` 已做归一化，传 1 也行）。
+const bool _dragProbe = bool.fromEnvironment('DRAG_PROBE');
+
+/// 页面报上来的一个拖动目标：屏幕矩形 + 轴向 + 起止比例。
+class _DragTarget {
+  _DragTarget(Map<String, dynamic> m)
+    : id = '${m['id']}',
+      axis = '${m['axis']}',
+      from = (m['from'] as num).toDouble(),
+      to = (m['to'] as num).toDouble(),
+      rect = Rect.fromLTWH(
+        (m['x'] as num).toDouble(),
+        (m['y'] as num).toDouble(),
+        (m['w'] as num).toDouble(),
+        (m['h'] as num).toDouble(),
+      );
+
+  final String id;
+  final String axis; // 'h' | 'v'
+  final double from;
+  final double to;
+  final Rect rect;
+
+  Offset at(double t) {
+    // 主轴上留 4px 内缩，免得起点正好压在 1px 虚线边框上被边框吃掉命中测试
+    if (axis == 'v') {
+      final double y = rect.top + 4 + (rect.height - 8) * t;
+      return Offset(rect.center.dx, y);
+    }
+    final double x = rect.left + 4 + (rect.width - 8) * t;
+    return Offset(x, rect.center.dy);
+  }
+}
+
+/// 解出 `slDrag` 的载荷。
+///
+/// JS 侧 `invokeMethod(name, payload)` 会把参数摊成 List，且两端一律走 JSON
+/// 字符串 —— WebF 的 method channel 对复杂对象的序列化形态没有稳定契约，字符串是
+/// 唯一两端都确定的载体（与产品侧 `_decodeRequest` 同一结论）。
+List<_DragTarget> _decodeTargets(dynamic args) {
+  dynamic payload = args;
+  if (payload is List && payload.isNotEmpty) payload = payload.first;
+  if (payload is String) {
+    try {
+      payload = jsonDecode(payload);
+    } catch (e) {
+      debugPrint('[probe] slDrag payload not JSON: $e');
+      return const <_DragTarget>[];
+    }
+  }
+  if (payload is! List) return const <_DragTarget>[];
+  final List<_DragTarget> out = <_DragTarget>[];
+  for (final dynamic item in payload) {
+    if (item is Map) {
+      try {
+        out.add(_DragTarget(Map<String, dynamic>.from(item)));
+      } catch (e) {
+        debugPrint('[probe] slDrag target skipped: $e');
+      }
+    }
+  }
+  return out;
+}
+
+/// 合成一次「按下 → 分步移动 → 抬起」。
+///
+/// 为什么是 `WidgetsBinding.handlePointerEvent` 而不是 flutter_test 的
+/// `WidgetTester.drag`：探针是一个真实运行的 app（`flutter build linux` 出来的产物），
+/// 不在测试框架里。`handlePointerEvent` 是走真实 hit-test 与真实手势竞技场的唯一入口，
+/// 所以它测到的正是产品在真机上会遇到的那条路径（含 WebF 的 `RenderWidget.hitTestChildren`
+/// 是否真的把命中传下去、WebF 自己那个 TapGestureRecognizer 会不会抢走手势）。
+///
+/// 三个必须注意的点（都踩过才知道）：
+///   ① `position` 要的是**逻辑**像素。容器里 devicePixelRatio 是 1，所以页面
+///      `getBoundingClientRect()` 的坐标可以直接用；哪天 DPR 不是 1 就要先除。
+///   ② `PointerMoveEvent` **必须带 `delta`**：`DragGestureRecognizer` 累加的是
+///      `event.delta`，不给的话位移永远是 0、识别器永远不接受，表现为「按下有反应、
+///      拖动没反应」。
+///   ③ 每步之间要 `await` 让出事件循环。同一微任务里连着投递，手势竞技场没有机会
+///      在中间做出裁决。
+Future<void> _synthDrag(_DragTarget t, {int steps = 12}) async {
+  const int pointer = 91;
+  Offset prev = t.at(t.from);
+  WidgetsBinding.instance.handlePointerEvent(
+    PointerDownEvent(pointer: pointer, position: prev),
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 32));
+  for (int i = 1; i <= steps; i++) {
+    final Offset next = t.at(t.from + (t.to - t.from) * (i / steps));
+    WidgetsBinding.instance.handlePointerEvent(
+      PointerMoveEvent(pointer: pointer, position: next, delta: next - prev),
+    );
+    prev = next;
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+  }
+  WidgetsBinding.instance.handlePointerEvent(
+    PointerUpEvent(pointer: pointer, position: prev),
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 48));
+  debugPrint('[probe] dragged ${t.id} ${t.axis} ${t.rect} ${t.from}->${t.to}');
+}
+
 class ProbeApp extends StatelessWidget {
   const ProbeApp({super.key});
 
@@ -143,6 +253,29 @@ class ProbeApp extends StatelessWidget {
             // 页面 console 靠它回传，诊断脚本的输出才能落到 flutter.log。
             controller.onJSLog = (level, message) {
               debugPrint('[page] $message');
+            };
+            // 页面 → Dart 的唯一通道，与产品侧宿主桥同一套机制
+            // （`plugin_render_surface_webf.dart` 的 `javascriptChannel.onMethodCall`）。
+            // 这里只用来接「滑块的屏幕坐标」，见 [_synthDrag]。
+            controller.javascriptChannel.onMethodCall = (method, args) async {
+              if (method != 'slDrag') return null;
+              final List<_DragTarget> targets = _decodeTargets(args);
+              debugPrint(
+                '[probe] slDrag: ${targets.length} target(s), DRAG_PROBE=$_dragProbe',
+              );
+              if (!_dragProbe || targets.isEmpty) return null;
+              // 刻意**不在这个回调里 await 拖动**：那样会在 JS 侧的 invokeMethod
+              // 还挂着的时候反过来 evaluateJavaScripts 回 QuickJS，属于重入。
+              // 立刻返回、异步跑，拖完再回调页面。
+              Future<void>(() async {
+                for (final _DragTarget t in targets) {
+                  await _synthDrag(t);
+                }
+                await controller.view.evaluateJavaScripts(
+                  'window.__slDragDone && window.__slDragDone();',
+                );
+              });
+              return null;
             };
             return controller;
           },

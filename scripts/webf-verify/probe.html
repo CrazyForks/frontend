@@ -16,11 +16,20 @@
     4. FLEX GAP     覆盖面最广的单一 CSS 特性（common.css 7 处 + 插件 348 处）。
                     三个方块之间有间距 = 支持
     13. RING        自定义元素 <songloft-progress-ring>，判据见右列该行上方注释
+    14~16 SLIDER    input[type=range] 的能力事实、自定义元素 <songloft-slider>、
+                    以及 common.js 的 range 垫片，判据见右列各行上方注释
 
   版面：WebF 窗口实测只有 1280x717（Xvfb 屏是 1280x900，下方黑色区域是 Flutter
   压根没画的部分），单列纵向已经被 12 组占满，所以从第 13 组起改成**两列**：
   左列 1~12b（原样不动），右列 13 起。加新检查行前先确认它落在 717px 以内 ——
   被截掉的行看起来和「脚本没跑」一模一样。
+
+  合成拖动（DRAG_PROBE）：本页面没有交互驱动能力，「滑块真的能拖」只能由 Dart 侧
+  用 WidgetsBinding.handlePointerEvent 合成 Pointer 事件来验（走的是真实 hit-test →
+  Flutter 手势路径）。坐标由本页把 getBoundingClientRect() 经 WebF methodChannel
+  报给 Dart，拖完 Dart 再回调 window.__slDragDone() 让本页把结果打进 console。
+  **默认关**（--dart-define=DRAG_PROBE=true 才开），免得给既有 13 组的截图基线
+  引入不确定性。
 -->
 <html lang="zh-CN">
 <head>
@@ -244,6 +253,154 @@
     <span class="tag">13b RING STATE</span>
     <span id="ringstate" style="font-size:12px">(script did not run)</span>
   </div>
+
+  <!--
+    14 `input[type=range]` 在 WebF 里的**能力事实**（songloft-org/songloft#341 Step 3）。
+    纯 JS，不涉及任何自定义元素 —— 它回答的是「垫片能怎么写」这个前置问题，
+    每一项的结论都直接决定 common.js 里 rangeSliderShim 的架构，所以固化成回归行。
+
+      qsa      document.querySelectorAll('input[type=range]') 的命中数。
+               0 → 属性选择器在 WebF 下不可用，垫片只能 getElementsByTagName + 逐个判 type
+      val      HTML 里 value="42" 是否到得了 .value 属性。WebF 把 value= 映射到
+               defaultValue（input.dart:200-202），再由 defaultValue setter 在
+               「当前 live 值为空」时灌进 _value（input.dart:61-81），所以应为 "42"
+      min      el.min。实测是**空串**（HTML 里写的是 min="0"，反射的话应得 "0"）——
+               min/max/step 在 WebF 里完全没有实现，只是普通 DOM 属性。
+               垫片必须自己 getAttribute 读。哪天这里出现 "0" 了 = 上游实现了反射
+      ownDesc/protoDesc  .value 的属性描述符落在哪一层。实测两层都有 accessor
+               且 configurable=true（own 那层优先），这决定下面 shadowV 有没有戏
+      shadowV  **本任务最关键的一项**：能否用 Object.defineProperty 在实例上遮蔽
+               .value 的 get/set。判据是**哨兵往返**而不是「defineProperty 没抛异常」——
+               QuickJS 的 exotic get_own_property 处理器优先级高于普通 own property，
+               所以「描述符装上了」不等于「读写真的走我们的访问器」。
+               ok   → 垫片可以事件驱动地拦到 JS 对 .value 的写入（零轮询）
+               FAIL → 只能轮询 diff .value
+      shadowM  同理测 el.matches。miot 用 el.matches(':active') 判断「用户正在拖，
+               别用轮询结果覆盖」，而隐藏后的 input 永远进不了 :active
+               （element.dart:245 的 isActive 只由落在它自己身上的指针事件置位）
+      active   遮蔽之前 el.matches(':active') 的真实返回值（应为 false）
+      evt      JS 侧 el.dispatchEvent(new Event('input')) 能否被同元素上的
+               addEventListener('input') 收到。这是「事件通道本身通不通」的对照项，
+               真正要验的 Dart→JS 那一跳在 15b
+  -->
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">14 RANGE CAPS</span>
+    <span id="rangecaps" class="caps">(script did not run)</span>
+  </div>
+
+  <!--
+    14b WebF 下 input[type=range] 的**原始渲染**。带 data-sl-no-slider，垫片会跳过它
+    （那个属性同时也是给插件的正式退出开关），所以这一格永远显示 WebF 的原生表现：
+      一个可编辑**文本框**（里面是 "42"）= 交接文档记载的表现
+      一个滑块                          = WebF 上游修了 range，本 Step 可以考虑退役
+      **整行连 tag 文字一起消失**        = 实测就是这个（见下）
+
+    实测结论（比交接文档记的「静默渲染成一个可编辑文本框」更严重）：这一整行
+    在 WebF 下**一个像素都不画** —— 没有文本框、没有 "14b RAW RANGE" 那几个字，
+    连这个 div 自己的 `background:#ffe082` 都不出现（这就是把行染成黄色的用意：
+    黄的都看不到，说明不是「input 画得不像滑块」，而是整行的绘制没了）。
+    而 14 组里 tagRect=118x40 / rawRect=120x24 说明**盒模型完全正常**，
+    所以这是绘制层的问题，不是布局塌了。
+
+    没有进一步区分「input 的 widget 盖了一层不透明白」还是「整行 paint 被整体跳过」
+    —— 两者在白底上表现一样，而对本 Step 的结论无影响：垫片把 input 隐藏之后
+    第 16 组那一行（同样染了黄）就正常显示了，行背景、tag、滑块全都在。
+  -->
+  <div class="row" style="background:#ffe082">
+    <span class="tag">14b RAW RANGE</span>
+    <input type="range" id="rawRange" min="0" max="100" value="42"
+      data-sl-no-slider style="width:120px">
+  </div>
+
+  <!--
+    15 自定义元素 `<songloft-slider>` 本身（不经垫片，直接写标签）。
+    与第 13 组同理，测的是**产品实现**：entrypoint.sh 每次把
+    lib/features/home/presentation/render/elements/ 拷进探针再编译。
+
+      H  横向，value=30 max=100 step=10，`color` 属性给深绿。
+         应看到左侧 30% 深绿 + 右侧淡绿轨道 + 一个圆把手
+      V  竖向（orientation="vertical"），value=70。**min 在下、max 在上**，
+         所以填充段应在**下方 70%**、把手在偏上位置。这是音量条的普遍预期，
+         也与 miot 原本用 rotate(-90deg) 转出来的方向一致
+      D  disabled，value=50。整体应明显变淡（×0.38）且**拖不动**
+         （build 在 disabled 时压根不套 GestureDetector）
+      N  负向对照 <songloft-slider-nope>，同样属性但**没注册**：必须是空虚线盒。
+         它里面也画出滑块 = 弧不是我们的 Dart 元素画的，整组结论作废
+
+    DRAG_PROBE 开启时，H 与 V 会被 Dart 侧合成的 Pointer 事件各拖一次，结果进 15b。
+  -->
+  <div class="row">
+    <span class="tag">15 SLIDER</span>
+    <span class="sldrow">
+      <songloft-slider id="sldH" class="sldbox" value="30" min="0" max="100"
+        step="10" color="#2e7d32" style="width:140px;height:28px"></songloft-slider>
+      <songloft-slider id="sldV" class="sldbox" orientation="vertical" value="70"
+        min="0" max="100" color="#3f51b5" style="width:28px;height:90px"></songloft-slider>
+      <songloft-slider id="sldD" class="sldbox" value="50" disabled
+        color="#2e7d32" style="width:80px;height:28px"></songloft-slider>
+      <songloft-slider-nope id="sldN" class="sldbox" value="70"
+        style="width:40px;height:28px"></songloft-slider-nope>
+    </span>
+  </div>
+
+  <!--
+    15b 15 组的文字化断言 + **Dart→JS 事件通道**的判据（本项目第一次真用
+    Element.dispatchEvent 从 Dart 侧派事件给页面 JS，不能假定它通）：
+      H.rect / V.rect / N.rect  都应是 HTML 里写的尺寸；0x0 → WidgetElement 没拿到盒模型
+      Hin/Hch                   H 上收到的 input / change 次数
+      Vin/Vch                   V 上收到的 input / change 次数
+      Hdata/Vdata               最后一次 input 事件的 event.data（Dart 侧塞进去的新值）
+    DRAG_PROBE 关时四个计数都应是 0（页面自己不动它们）；
+    DRAG_PROBE 开时 in>0 且 ch>0 且 data 是个变了的数 = 整条链通。
+    in=0 而截图里把手确实动了 = 渲染通、事件没通（那插件就收不到通知）。
+  -->
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">15b SLIDER STATE</span>
+    <span id="sldstate" class="caps">(script did not run)</span>
+  </div>
+
+  <!--
+    16 common.js 的 range 垫片（rangeSliderShim）端到端。
+    这里**只写一个普通 `<input type=range>`**，别的什么都不写 —— 剩下的全归垫片：
+    隐藏原 input、插入 <songloft-slider>、双向同步、转写 disabled、
+    把滑块事件重新派回 input。这一格里如果只看到一个文本框，就是垫片没跑。
+
+    左边这个是垫片管的；它旁边不额外画对照（14b 已经是对照了）。
+
+    inline style 刻意写成 **width:100%** 而不是固定 px：垫片会把 inline style 原样
+    拷到滑块上，而 miot #scheduleVolume 用的就是 `style="width:100%"`。这一格顺便验
+    「百分比宽度能不能到得了 WidgetElement 的 renderStyle」—— 到不了就会退成本元素的
+    160px 兜底，16b 的 sldRect 会显示 160xNN 而不是外层容器的 150xNN。
+  -->
+  <div class="row" style="background:#ffe082">
+    <span class="tag">16 SHIM</span>
+    <span style="display:block;width:150px">
+      <input type="range" id="shimRange" min="0" max="100" value="20"
+        data-sl-orientation="horizontal" style="width:100%">
+    </span>
+  </div>
+
+  <!--
+    16b 垫片的文字化断言。全部读的是**原 input**，也就是插件真正会读的那个对象：
+      made      垫片有没有造出滑块（none = 垫片没跑 / 抛异常，去 flutter.log 搜 shim failed）
+      sldRect   滑块的盒子。应是外层容器的 150xNN（说明拷过去的 width:100% 生效了）；
+                160xNN = 百分比没解析出来、退到了元素兜底宽度
+      inRect    原 input 的盒子。应是 **0x0**（display:none 真的生效了）
+      hidden    原 input 的隐藏方式（垫片给它加的 class + inline display 生效了没）
+      v0        垫片跑完时 input.value（应仍是 "20"，垫片不许改初值）
+      push      JS 写 input.value=65 之后，垫片有没有把它推给滑块
+                （读滑块的 value 属性；这是 JS→滑块方向，miot 有 5 处这么写）
+      dis       JS 写 input.disabled=true 之后滑块的 disabled 属性（utils.js:96 的路径）
+      在 DRAG_PROBE 开时还有：
+      drag      拖完之后 input.value
+      in/ch     原 input 上收到的 input / change 次数（miot 的两个监听器就挂在这）
+      act       拖动中 input.matches(':active') 的值 —— true 说明连
+                「插件靠 :active 判断别覆盖」这条也复原了；false 则要靠垫片自己抑制
+  -->
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">16b SHIM STATE</span>
+    <span id="shimstate" class="caps">(script did not run)</span>
+  </div>
 </div><!-- /colR -->
 </div><!-- /cols -->
 
@@ -269,6 +426,14 @@
       width: 40px; height: 40px; display: block;
       background: var(--probe-d);
     }
+
+    /* 多行文字断言块。写死 width 而不用 flex:1：右列已经写死 462px，
+       flex-grow 若在 WebF 下表现异常会把这块挤成 0 宽而整段静默消失。 */
+    .caps { font-size: 11px; line-height: 14px; width: 330px; color: #111; }
+    .sldrow { display: flex; gap: 10px; align-items: center; }
+    /* 虚线框由 WebF 的盒模型绘制，滑块由我们的 CustomPaint 绘制 —— 两者分离，
+       所以「有框无滑块」（N）与「有框有滑块」（H/V/D）一眼可辨。 */
+    .sldbox { border: 1px dashed #bbb; }
 
     .ringrow { display: flex; gap: 10px; align-items: center; }
     /* 虚线边框由 WebF 自己的盒模型绘制，环由我们的 CustomPaint 绘制 ——
@@ -373,6 +538,241 @@
           console.log('[probe] ring ' + text);
         }, 400);
       }, 600);
+    });
+
+    // ── 14/15/16 滑块 ────────────────────────────────────────────────
+    // 又是单独一个 DOMContentLoaded 回调（与 details / ring 两段并列）：任一段抛
+    // 异常都不该让别人的 readout 停在 "(script did not run)"。
+    //
+    // common.js 在 <head> 里就把它的 applyOnReady 注册到了 DOMContentLoaded 上，
+    // 同一事件按注册顺序回调 → 垫片一定先跑，本段读到的是垫片之后的 DOM。
+    document.addEventListener('DOMContentLoaded', function () {
+      function put(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
+        // 截图会糊，flutter.log 才是断言通道
+        console.log('[probe] ' + id + ' ' + text);
+      }
+      function rectOf(el) {
+        if (!el) return 'missing';
+        try {
+          var r = el.getBoundingClientRect();
+          return Math.round(r.width) + 'x' + Math.round(r.height);
+        } catch (e) { return 'rect-threw'; }
+      }
+      function box(el) {
+        if (!el) return null;
+        try {
+          var r = el.getBoundingClientRect();
+          if (!r || !(r.width > 0) || !(r.height > 0)) return null;
+          return { x: r.left, y: r.top, w: r.width, h: r.height };
+        } catch (e) { return null; }
+      }
+      // 不用 querySelector('songloft-slider')：WebF 对自定义标签的类型选择器
+      // 支持面不敢假定（collectByTag 在 common.js 里就是为此退回
+      // getElementsByTagName 的）。这里直接扫兄弟节点，垫片把滑块插在原 input 之后。
+      function siblingSlider(input) {
+        var p = input && input.parentNode;
+        if (!p) return null;
+        for (var i = 0; i < p.childNodes.length; i++) {
+          var n = p.childNodes[i];
+          if (n.nodeType === 1 && n.tagName &&
+              n.tagName.toLowerCase() === 'songloft-slider') return n;
+        }
+        return null;
+      }
+
+      // ── 14 能力事实（纯 JS，全在 rawRange 上做；它带 data-sl-no-slider，
+      //    所以垫片不会碰它，测的是 WebF 的原生行为）────────────────────
+      var raw = document.getElementById('rawRange');
+      var caps = [];
+      function cap(name, fn) {
+        try { caps.push(name + '=' + fn()); }
+        catch (e) { caps.push(name + '=threw:' + ((e && e.message) || e)); }
+      }
+      var rawEvents = 0;
+      cap('qsa', function () {
+        return document.querySelectorAll('input[type=range]').length;
+      });
+      cap('val', function () { return JSON.stringify(raw.value); });
+      cap('min', function () { return String(raw.min); });
+      cap('ownDesc', function () {
+        var d = Object.getOwnPropertyDescriptor(raw, 'value');
+        return d ? (typeof d.get) + '/cfg=' + d.configurable : 'none';
+      });
+      cap('protoDesc', function () {
+        var p = Object.getPrototypeOf(raw), depth = 0;
+        while (p) {
+          var d = Object.getOwnPropertyDescriptor(p, 'value');
+          if (d) return 'd' + depth + '/' + (typeof d.get) + '/cfg=' + d.configurable;
+          p = Object.getPrototypeOf(p); depth++;
+        }
+        return 'none';
+      });
+      cap('active', function () { return String(raw.matches(':active')); });
+      // **判据是哨兵往返，不是「defineProperty 没抛异常」**：QuickJS 的 exotic
+      // get_own_property 处理器优先级高于普通 own property，描述符装上了也可能
+      // 读写照旧走原生。
+      cap('shadowV', function () {
+        var store = raw.value;
+        Object.defineProperty(raw, 'value', {
+          configurable: true,
+          get: function () { return store; },
+          set: function (v) { store = String(v); }
+        });
+        raw.value = '77';
+        var got = raw.value;
+        raw.value = '42'; // 复原（访问器装上了就写我们的 store，没装上就写原生，都对）
+        return got === '77' ? 'ok' : 'FAIL(read=' + JSON.stringify(got) + ')';
+      });
+      cap('shadowM', function () {
+        var orig = raw.matches;
+        Object.defineProperty(raw, 'matches', {
+          configurable: true, writable: true,
+          value: function (sel) {
+            if (sel === ':active') return true;
+            return orig.call(raw, sel);
+          }
+        });
+        return String(raw.matches(':active')) + '/' + String(raw.matches('#rawRange'));
+      });
+      cap('rawRect', function () { return rectOf(raw); });
+      // 与 rawRect 一起构成「14b 整行变白」的数字侧证据：这两个盒子都正常，
+      // 说明是绘制被 input 的 widget 盖住，不是布局塌了。
+      cap('tagRect', function () {
+        return rectOf(raw.parentNode.getElementsByClassName('tag')[0]);
+      });
+      try {
+        raw.addEventListener('input', function () { rawEvents++; });
+        raw.dispatchEvent(new Event('input'));
+      } catch (e) {
+        caps.push('evtThrew=' + ((e && e.message) || e));
+      }
+
+      // ── 15 自定义元素直接用 ───────────────────────────────────────
+      var sldH = document.getElementById('sldH');
+      var sldV = document.getElementById('sldV');
+      var st = { hIn: 0, hCh: 0, vIn: 0, vCh: 0, hData: null, vData: null };
+      function watch(el, inKey, chKey, dataKey) {
+        if (!el) return;
+        el.addEventListener('input', function (e) {
+          st[inKey]++;
+          st[dataKey] = e && e.data !== undefined ? e.data : '(no .data)';
+        });
+        el.addEventListener('change', function () { st[chKey]++; });
+      }
+      watch(sldH, 'hIn', 'hCh', 'hData');
+      watch(sldV, 'vIn', 'vCh', 'vData');
+
+      // ── 16 垫片端到端（全部读**原 input**，也就是插件真正会读的那个对象）──
+      var shim = document.getElementById('shimRange');
+      var made = siblingSlider(shim);
+      var sh = { in: 0, ch: 0, act: null, pushed: null, dis: null, dragged: null };
+      if (shim) {
+        shim.addEventListener('input', function () {
+          sh.in++;
+          // 拖动**中**读 :active —— 这是 miot js/playback.js:403 的判据，
+          // 隐藏后的 input 本来永远进不了 :active，能为 true 说明垫片补回来了
+          try { sh.act = shim.matches(':active'); } catch (e) { sh.act = 'threw'; }
+        });
+        shim.addEventListener('change', function () { sh.ch++; });
+      }
+      var shimV0 = shim ? JSON.stringify(shim.value) : 'missing';
+      var shimHidden = 'n/a';
+      try {
+        shimHidden = made
+          ? ('cls=' + JSON.stringify(shim.className) +
+             '/disp=' + JSON.stringify(shim.style.display || ''))
+          : 'no-slider';
+      } catch (e) { shimHidden = 'threw'; }
+
+      var finalized = false;
+      function finalize() {
+        if (finalized) return;
+        finalized = true;
+        // disabled 转写放最后测：它会让滑块拖不动，早测会打断上面的拖动断言。
+        // 读完立刻恢复，免得截图里第 16 组停在「变淡的禁用态」让人误判成渲染坏了。
+        try {
+          if (shim) shim.disabled = true;
+          sh.dis = made ? JSON.stringify(made.getAttribute('disabled')) : 'n/a';
+          if (shim) shim.disabled = false;
+        } catch (e) { sh.dis = 'threw'; }
+
+        put('rangecaps', caps.join('  ') + '  evt=' + rawEvents);
+        put('sldstate',
+          'H.rect=' + rectOf(sldH) + ' V.rect=' + rectOf(sldV) +
+          ' N.rect=' + rectOf(document.getElementById('sldN')) +
+          '  Hin=' + st.hIn + '/Hch=' + st.hCh + '/Hdata=' + JSON.stringify(st.hData) +
+          '  Vin=' + st.vIn + '/Vch=' + st.vCh + '/Vdata=' + JSON.stringify(st.vData));
+        put('shimstate',
+          'made=' + (made ? made.tagName.toLowerCase() : 'none') +
+          ' sldRect=' + rectOf(made) + ' inRect=' + rectOf(shim) +
+          ' hidden=' + shimHidden + ' v0=' + shimV0 +
+          '  push=' + sh.pushed + ' dis=' + sh.dis +
+          '  drag=' + JSON.stringify(sh.dragged) +
+          ' in=' + sh.in + '/ch=' + sh.ch + ' act=' + String(sh.act));
+      }
+      // Dart 侧合成拖动跑完会回调这里；DRAG_PROBE 关的时候它永远不来，
+      // 所以下面还挂了一个兜底定时器，两条路都收敛到同一个 finalize（有 once 闸）。
+      window.__slDragDone = function () {
+        try { sh.dragged = shim ? shim.value : null; } catch (e) { sh.dragged = 'threw'; }
+        finalize();
+      };
+
+      // JS→滑块方向（miot 有 5 处这么写 input.value）：写完给垫片一拍时间再读
+      setTimeout(function () {
+        try {
+          if (shim) shim.value = 65;
+          sh.pushed = made ? JSON.stringify(made.getAttribute('value')) : 'n/a';
+        } catch (e) { sh.pushed = 'threw'; }
+      }, 400);
+
+      // 采坐标**单独一拍、而且要够晚**（1800ms），两个理由都是实测踩出来的：
+      //   ① 紧跟在 setAttribute 之后同步读 getBoundingClientRect()，垫片造出来的
+      //      滑块会返回 0x0（那次 setAttribute 触发了 requestUpdateState，布局还没
+      //      落定），于是它悄悄从拖动目标里漏掉，16b 显示 in=0/ch=0 ——
+      //      看起来跟「事件没通」一模一样，极易误判。
+      //   ② 本页其它几组的 readout 会在 800ms / 1000ms 把 span 从一行文字撑成两行，
+      //      **把下面的行整体往下推 14px**。坐标采早了，合成指针就打在滑块上边缘外，
+      //      同样表现为「拖了但没反应」。必须等所有 DOM 文字写完再采。
+      //      （15b / 14 的 readout 在 finalize 里才写，那已经晚于拖动，不影响。）
+      setTimeout(function () {
+        // 把坐标报给 Dart 侧（合成 Pointer 事件需要真实屏幕坐标）。
+        // WebF 是整屏 Scaffold body，devicePixelRatio 在容器里是 1，
+        // 所以页面坐标 == Flutter 的逻辑坐标，可以直接用。
+        try {
+          var mc = window.webf && window.webf.methodChannel;
+          if (mc && typeof mc.invokeMethod === 'function') {
+            var targets = [];
+            function push(id, axis, from, to) {
+              var b = box(document.getElementById(id));
+              if (!b) return;
+              targets.push({ id: id, axis: axis, from: from, to: to,
+                             x: b.x, y: b.y, w: b.w, h: b.h });
+            }
+            push('sldH', 'h', 0.15, 0.85);
+            push('sldV', 'v', 0.75, 0.15);
+            if (made) {
+              var b = box(made);
+              if (b) targets.push({ id: 'shimSlider', axis: 'h', from: 0.1, to: 0.9,
+                                    x: b.x, y: b.y, w: b.w, h: b.h });
+              // 拿不到盒子就把原因喊出来 —— 静默漏掉这个目标会让 16b 的
+              // in=0/ch=0 被误读成「Dart→JS 事件没通」
+              else console.log('[probe] shim slider has no box: ' + rectOf(made));
+            }
+            console.log('[probe] dragTargets ' + JSON.stringify(targets));
+            mc.invokeMethod('slDrag', JSON.stringify(targets));
+          } else {
+            console.log('[probe] no methodChannel, drag probe skipped');
+          }
+        } catch (e) {
+          console.log('[probe] slDrag invoke threw: ' + e);
+        }
+      }, 1800);
+
+      // 兜底：DRAG_PROBE 关（或 Dart 侧没回调）时也要出 readout。
+      // 6.5s = 1800ms 起拖 + 3 段合成拖动各约 0.5s 的余量，仍远小于 SETTLE(12s)。
+      setTimeout(finalize, 6500);
     });
   </script>
 </body>

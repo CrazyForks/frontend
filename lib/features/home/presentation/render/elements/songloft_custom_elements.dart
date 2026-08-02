@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:webf/webf.dart';
 
 import 'songloft_progress_ring.dart';
+import 'songloft_slider.dart';
 
 /// WebF 自定义元素注册点（songloft-org/songloft#341）。
 ///
@@ -46,6 +47,7 @@ class SongloftCustomElements {
       kSongloftProgressRingTag,
       (context) => SongloftProgressRingElement(context),
     );
+    _define(kSongloftSliderTag, (context) => SongloftSliderElement(context));
   }
 
   /// 逐个元素包 try/catch，理由与 `common.js` 的 `runShims` 一致：

@@ -4,6 +4,7 @@
 #   ./scripts/webf-verify/run.sh                 # 跑图标连字生死闸
 #   ./scripts/webf-verify/run.sh --build         # 强制重建镜像
 #   PROBE_URL=http://... ./scripts/webf-verify/run.sh   # 换成渲染真实插件页
+#   DRAG_PROBE=1 ./scripts/webf-verify/run.sh     # 额外对 14~16 组的滑块合成拖动
 #
 # 产出（宿主）：songloft-player/scripts/webf-verify/out/
 #   probe.png       截图（判据见 probe.html 顶部注释）
@@ -24,11 +25,15 @@ if [ "${1:-}" = '--build' ] || ! docker image inspect "$IMAGE" >/dev/null 2>&1; 
   docker build -t "$IMAGE" "$HERE"
 fi
 
-# DIAGNOSE 最终落到 Dart 的 bool.fromEnvironment，它**只认字面 "true"**，
+# DIAGNOSE / DRAG_PROBE 最终落到 Dart 的 bool.fromEnvironment，它**只认字面 "true"**，
 # 传 1 会被静默当成 false（诊断脚本不注入、日志里什么都没有）。这里归一化。
 case "${DIAGNOSE:-}" in
   1|yes|on|true) DIAGNOSE=true ;;
   *) DIAGNOSE='' ;;
+esac
+case "${DRAG_PROBE:-}" in
+  1|yes|on|true) DRAG_PROBE=true ;;
+  *) DRAG_PROBE='' ;;
 esac
 
 mkdir -p "$OUT"
@@ -47,6 +52,7 @@ docker run --rm \
   ${SETTLE:+-e SETTLE="$SETTLE"} \
   ${FONT_FIX:+-e FONT_FIX="$FONT_FIX"} \
   ${DIAGNOSE:+-e DIAGNOSE="$DIAGNOSE"} \
+  ${DRAG_PROBE:+-e DRAG_PROBE="$DRAG_PROBE"} \
   "$IMAGE"
 
 echo

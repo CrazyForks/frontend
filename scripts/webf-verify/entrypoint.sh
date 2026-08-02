@@ -197,6 +197,7 @@ if ! flutter build linux --release \
       --dart-define=PROBE_URL="$PROBE_URL" \
       --dart-define=FONT_PRELOAD_DIR="$FONT_PRELOAD_DIR" \
       --dart-define=DIAGNOSE="${DIAGNOSE:-}" \
+      --dart-define=DRAG_PROBE="${DRAG_PROBE:-}" \
       >"$OUT/build.log" 2>&1; then
   echo '构建失败，日志末尾：' >&2
   tail -60 "$OUT/build.log" >&2
