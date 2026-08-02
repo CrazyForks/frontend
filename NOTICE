@@ -27,8 +27,14 @@ What this means for you, the recipient of a binary release:
       https://github.com/songloft-org/songloft-player   (this client)
       https://github.com/songloft-org/songloft          (server / parent repo)
       https://github.com/openwebf/webf                  (WebF)
-  Each release records the exact commit it was built from.
-- A copy of the GPL-3.0 license text ships alongside each binary release.
+  Each release records the exact commit it was built from: every release has
+  a CORRESPONDING-SOURCE.txt asset naming the repositories, the tag and the
+  exact commit SHAs used for that build.
+- A copy of the GPL-3.0 license text is in this repository at
+  LICENSES/GPL-3.0.txt, and is attached to every binary release as
+  LICENSE-GPL-3.0.txt.
+- The Web build is not affected: WebF does not support Flutter Web and is not
+  linked there, so the Web bundle remains governed by Apache-2.0 alone.
 
 Building this client from source with the WebF dependency removed yields a
 binary containing no GPL-licensed code, to which Apache-2.0 alone applies.

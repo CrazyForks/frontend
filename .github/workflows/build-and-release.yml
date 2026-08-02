@@ -563,6 +563,74 @@ jobs:
           echo "=== Release Assets ==="
           ls -lh final-assets/ || echo "(no assets)"
 
+      # GPLv3 合规（songloft-org/songloft#341）：原生平台构建链接 WebF（GPL-3.0-only，
+      # 无链接例外），所以我们分发的每个原生二进制整体受 GPL-3.0 约束。GPLv3 要求
+      # 随程序一并给出许可证全文（§4/§5）与完整对应源码的获取方式（§6）。
+      # 这两个文件因此必须挂在**每一个** release 上，dev 预发布也算分发。
+      - name: Attach GPL-3.0 license text + corresponding source notice
+        run: |
+          # 与父仓库 release.yml 的同名 step 对称：本次一个产物都没有（所有构建 job
+          # 全失败）时不挂许可证文件。否则会发出一个「只有两份许可证文本、没有任何
+          # 二进制」的 release，比空 release 更让人误以为有东西可下。
+          if ! compgen -G "final-assets/*" > /dev/null 2>&1; then
+            echo "本次 release 没有任何构建产物，跳过 GPL 附件"
+            exit 0
+          fi
+
+          mkdir -p final-assets
+          cp LICENSES/GPL-3.0.txt final-assets/LICENSE-GPL-3.0.txt
+
+          TAG="${{ steps.release_info.outputs.tag }}"
+          COMMIT="${GITHUB_SHA}"
+          # WebF 的解析版本取自 pubspec.lock（不是 pubspec.yaml 的 ^ 约束），
+          # 这样记下来的是本次构建真正链接的那个版本。
+          WEBF_VERSION=$(awk '/^  webf:/{f=1} f&&/^    version:/{gsub(/"/,"",$2); print $2; exit}' pubspec.lock)
+          [ -n "$WEBF_VERSION" ] || WEBF_VERSION="see pubspec.lock"
+
+          cat > final-assets/CORRESPONDING-SOURCE.txt <<EOF
+          Songloft client -- COMPLETE CORRESPONDING SOURCE
+          =================================================
+
+          The native platform builds in this release (Android .apk, iOS .ipa,
+          Windows .zip/.msix, macOS .zip/.dmg, Linux .tar.gz/.deb/.rpm/.AppImage)
+          link against WebF, which is licensed GPL-3.0-only with no linking
+          exception. Each of those binaries is therefore governed AS A WHOLE by
+          the GNU General Public License, version 3 -- a verbatim copy of which
+          is attached to this release as LICENSE-GPL-3.0.txt.
+
+          You are entitled to the complete corresponding source code of that
+          combined work. This is exactly what it was built from:
+
+            Client (this repository)
+              https://github.com/${GITHUB_REPOSITORY}
+              release tag : ${TAG}
+              commit      : ${COMMIT}
+              (git clone https://github.com/${GITHUB_REPOSITORY}.git && git checkout ${COMMIT})
+
+            WebF (rendering engine, GPL-3.0-only)
+              https://github.com/openwebf/webf
+              version     : ${WEBF_VERSION}   (as resolved in pubspec.lock)
+
+            Songloft server (Apache-2.0, separate program)
+              https://github.com/songloft-org/songloft
+
+          Build instructions live in docs/build_guide.md in the client
+          repository; the exact toolchain versions and build commands used for
+          this release are in .github/workflows/build-and-release.yml at the
+          commit above, and the full build logs are retained on the workflow
+          run for this release.
+
+          The Web bundle (songloft-web-*.tar.gz) does NOT contain WebF -- WebF
+          does not support Flutter Web -- and remains under Apache-2.0 alone,
+          as does the client source code itself (see LICENSE and NOTICE).
+
+          Third-party component list and license notices: NOTICE.
+          EOF
+
+          echo "=== GPL compliance assets ==="
+          ls -l final-assets/LICENSE-GPL-3.0.txt final-assets/CORRESPONDING-SOURCE.txt
+          cat final-assets/CORRESPONDING-SOURCE.txt
+
       - name: Delete existing release (for branch builds)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         env:

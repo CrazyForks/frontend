@@ -5,7 +5,11 @@ group: Applications/Multimedia
 vendor: Songloft
 packager: Songloft Team
 packagerEmail: dev@songloft.org
-license: MIT
+# RPM 的 License 标的是**这个包**（二进制）的许可，不是源码的许可：
+# 客户端源码是 Apache-2.0，但打出来的二进制链接了 GPL-3.0-only 的 WebF
+# （无链接例外，songloft-org/songloft#341），故整体按 GPL-3.0 分发。
+# 原值 MIT 两头都不对。详见 NOTICE 的 DISTRIBUTION LICENSE 段。
+license: GPL-3.0-only
 url: https://github.com/songloft-org/songloft
 keywords:
   - Music

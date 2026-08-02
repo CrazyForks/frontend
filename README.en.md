@@ -225,6 +225,16 @@ Default credentials: admin / admin
 
 ## License
 
-This project is open-sourced under the [Apache-2.0 license](LICENSE).
+The **source code** of this project is open-sourced under the [Apache-2.0 license](LICENSE).
+
+> **⚠️ Binary releases are distributed under GPL-3.0 (read this first)**
+>
+> The native platform builds (Android / iOS / Windows / macOS / Linux) link against [WebF](https://github.com/openwebf/webf) to render JS plugin pages, and WebF is **GPL-3.0-only with no linking exception**. Apache-2.0 is one-way compatible with GPLv3, so the combination is permitted — but the resulting work, i.e. every binary we distribute, **is governed as a whole by GPL-3.0**:
+>
+> - The binary you received is licensed to you under **GPL-3.0, not Apache-2.0**;
+> - You are entitled to the complete corresponding source code — [this repository](https://github.com/songloft-org/songloft-player), the [server repository](https://github.com/songloft-org/songloft), and [WebF](https://github.com/openwebf/webf); every release ships a note recording the exact tag/commit it was built from;
+> - You may modify it and redistribute it under the terms of GPL-3.0.
+>
+> The full GPL-3.0 text is at [LICENSES/GPL-3.0.txt](LICENSES/GPL-3.0.txt) and is attached to every release. **The Web build contains no WebF** (WebF does not support Flutter Web) and remains governed by Apache-2.0 alone; the same applies to a build made from source with the WebF dependency removed. See the "DISTRIBUTION LICENSE" section of [NOTICE](NOTICE) for details.
 
 > **LGPL Compliance Note**: On Windows/Linux, this client uses `just_audio_media_kit` to call libmpv (LGPL-2.1+) as the audio backend. The Windows package includes an **audio-only LGPL build** (without GPL encoders like libx264/libx265); Linux dynamically links the system libmpv. See [NOTICE](NOTICE) for the full list of third-party components, license types, and source availability.
