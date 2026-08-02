@@ -1,11 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/window_visibility.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../settings/presentation/providers/settings_provider.dart';
 import 'plugin_render_controller.dart';
 import 'plugin_render_surface_webf.dart';
 import 'plugin_render_surface_webview.dart';
@@ -17,12 +15,23 @@ import 'plugin_render_surface_webview.dart';
 ///
 /// 抽出它同时消掉了 `plugin_tab_page_native` 与 `plugin_webview_page_native`
 /// 里两份逐字重复的超时 / 错误视图 / token 注入 / 重建计数逻辑。
-class PluginRenderView extends ConsumerStatefulWidget {
+///
+/// 刻意是纯 `StatefulWidget`、不读任何 provider：用哪个引擎由宿主解析后经
+/// [engine] 传入（见 `pluginRenderEngineForProvider`）。需要 provider 的是各引擎
+/// 的渲染面自己（如 WebF 面要读播放器状态），它们各自持有 `ref`。
+class PluginRenderView extends StatefulWidget {
   /// 已经拼好的完整插件页 URL（含 theme / access_token / embed）。
   final String url;
 
   /// 当前生效主题（`light` / `dark`）。
   final String theme;
+
+  /// 用哪个引擎渲染。由宿主按插件声明解析后传入
+  /// （`pluginRenderEngineForProvider`），本 widget 不自己去读任何偏好。
+  ///
+  /// 宿主必须在**引擎确定之后**才挂载本 widget，否则会先起一个引擎再换成另一个，
+  /// 整页加载两次。
+  final PluginRenderEngine engine;
 
   /// 见 `PluginRenderSurfaceWebView.useHybridComposition`。
   final bool useHybridComposition;
@@ -36,15 +45,16 @@ class PluginRenderView extends ConsumerStatefulWidget {
     super.key,
     required this.url,
     required this.theme,
+    required this.engine,
     required this.onControllerReady,
     this.useHybridComposition = true,
   });
 
   @override
-  ConsumerState<PluginRenderView> createState() => _PluginRenderViewState();
+  State<PluginRenderView> createState() => _PluginRenderViewState();
 }
 
-class _PluginRenderViewState extends ConsumerState<PluginRenderView>
+class _PluginRenderViewState extends State<PluginRenderView>
     with WidgetsBindingObserver {
   static const Duration _pageLoadTimeout = Duration(seconds: 20);
 
@@ -67,13 +77,8 @@ class _PluginRenderViewState extends ConsumerState<PluginRenderView>
   /// 必须换 key 重建才能重新走环境创建（songloft-org/songloft#271）。
   int _reloadSeq = 0;
 
-  /// 当前引擎。默认系统 WebView；WebF 是 0.x beta，切换是用户显式行为。
-  ///
-  /// 在 [build] 里 watch，切换时整棵渲染面随 `_engine` 分支重建。
-  PluginRenderEngine _engine = PluginRenderEngine.webView;
-
   /// 是否需要为独立原生表面做「移出 widget 树以销毁」的处理（#293）。
-  bool get _needsHwndUnmount => _engine.usesPlatformView;
+  bool get _needsHwndUnmount => widget.engine.usesPlatformView;
 
   @override
   void initState() {
@@ -81,6 +86,20 @@ class _PluginRenderViewState extends ConsumerState<PluginRenderView>
     WidgetsBinding.instance.addObserver(this);
     windowVisibleNotifier.addListener(_onWindowVisibilityChanged);
     _startLoadTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant PluginRenderView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.engine != widget.engine) {
+      // 换引擎等于换渲染面：复位加载态，否则会卡在上一引擎遗留的错误/完成态。
+      // （正常不该发生 —— 宿主等引擎确定后才挂载本 widget；这里只是自愈兜底。）
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      _startLoadTimer();
+    }
   }
 
   @override
@@ -167,14 +186,6 @@ class _PluginRenderViewState extends ConsumerState<PluginRenderView>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final engine = ref.watch(pluginRenderEngineProvider);
-    if (engine != _engine) {
-      // 换引擎等于换渲染面：复位加载态，否则会卡在上一引擎遗留的错误/完成态。
-      _engine = engine;
-      _isLoading = true;
-      _errorMessage = null;
-      _startLoadTimer();
-    }
     // 刻意不叫 mounted：那会遮蔽 State.mounted。
     final surfaceMounted = !_needsHwndUnmount || _hwndVisible;
 
@@ -194,7 +205,7 @@ class _PluginRenderViewState extends ConsumerState<PluginRenderView>
   }
 
   Widget _buildSurface() {
-    switch (_engine) {
+    switch (widget.engine) {
       case PluginRenderEngine.webView:
         return PluginRenderSurfaceWebView(
           key: ValueKey(_reloadSeq),

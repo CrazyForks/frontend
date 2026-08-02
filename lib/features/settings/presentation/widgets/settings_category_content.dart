@@ -47,7 +47,6 @@ import 'frontend_upgrade_dialog.dart';
 import 'github_proxy_dialog.dart';
 import 'upgrade_dialog.dart';
 import '../providers/settings_provider.dart';
-import '../../../home/presentation/render/plugin_render_controller.dart';
 
 /// 设置分类数量（与 [buildSettingsCategories] 返回长度一致）。
 /// 供 `/settings/category/:index` 路由做越界防御，避免在 redirect 里依赖 l10n。
@@ -724,43 +723,12 @@ class _SettingsCategoryContentState
           ),
           const Divider(height: 1),
           const JSPluginManager(),
-          // 渲染引擎开关只对 native 有意义：Web 端插件页永远走 iframe，
-          // WebF 不支持 Flutter Web（编译期就过不去）。
-          if (!kIsWeb) ...[
-            const Divider(height: 1),
-            _buildPluginRenderEngineTile(l10n),
-          ],
+          // 刻意没有「渲染引擎」开关：引擎由每个插件的 plugin.json 声明
+          // （songloft-org/songloft#341），插件作者才知道自家页面在哪个引擎下
+          // 正常，用户级全局开关只会把「某个插件坏了」放大成「所有插件一起坏」。
         ],
       ),
     ];
-  }
-
-  Widget _buildPluginRenderEngineTile(AppLocalizations l10n) {
-    final engine = ref.watch(pluginRenderEngineProvider);
-    return ListTile(
-      leading: const Icon(Icons.web_asset_outlined),
-      title: Text(l10n.settingsPluginRenderEngineTitle),
-      subtitle: Text(l10n.settingsPluginRenderEngineSubtitle),
-      trailing: SegmentedButton<PluginRenderEngine>(
-        segments: [
-          ButtonSegment(
-            value: PluginRenderEngine.webView,
-            label: Text(l10n.settingsPluginRenderEngineSystem),
-          ),
-          ButtonSegment(
-            value: PluginRenderEngine.webF,
-            label: Text(l10n.settingsPluginRenderEngineWebF),
-          ),
-        ],
-        selected: {engine},
-        showSelectedIcon: false,
-        onSelectionChanged: (selection) {
-          ref
-              .read(pluginRenderEngineProvider.notifier)
-              .setEngine(selection.first);
-        },
-      ),
-    );
   }
 
   // ── 缓存管理 ──

@@ -20,6 +20,13 @@ class JSPlugin {
   final List<String> permissions;
   final String filePath;
   final String status; // 'active', 'inactive', 'error'
+
+  /// 插件 `plugin.json` 声明的渲染引擎（`'webview'` / `'webf'`）。
+  ///
+  /// 老服务端不返回该字段、插件不声明时为 null / 空串，一律按 `webview` 处理
+  /// （解析走 `PluginRenderEngine.fromManifestValue`）。原样保留字符串而不在
+  /// 这里就转成 enum：data 层不该依赖 presentation 层的渲染枚举。
+  final String? renderEngine;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -36,6 +43,7 @@ class JSPlugin {
     this.permissions = const [],
     required this.filePath,
     required this.status,
+    this.renderEngine,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -58,6 +66,11 @@ class JSPlugin {
           [],
       filePath: json['file_path'] as String? ?? '',
       status: json['status'] as String? ?? 'inactive',
+      // 容错：老服务端无此字段；非字符串（后端换类型 / 代理注入脏数据）也不抛。
+      renderEngine:
+          json['render_engine'] is String
+              ? json['render_engine'] as String
+              : null,
       createdAt:
           json['created_at'] != null
               ? DateTime.parse(json['created_at'] as String)

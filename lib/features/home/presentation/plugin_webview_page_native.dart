@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../settings/presentation/providers/settings_provider.dart';
 import 'plugin_theme_utils.dart';
 import 'render/plugin_render_controller.dart';
+import 'render/plugin_render_engine_provider.dart';
 import 'render/plugin_render_view.dart';
 
 /// 插件全屏页面（原生平台实现）
@@ -59,6 +60,18 @@ class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage> {
     final brightness = MediaQuery.of(context).platformBrightness;
     final theme = resolveEffectiveTheme(themeMode, brightness);
 
+    // 渲染引擎由插件自己的 plugin.json 声明（songloft-org/songloft#341）。本页只
+    // 拿到拼好的 URL（路由参数就是 URL），故先从 URL 反解 entryPath。
+    // null = 引擎还没确定 → 只显示 loading，**不挂渲染面**：先按默认 WebView 渲染
+    // 再切 WebF 会让整页加载两次。理由见 provider 注释。
+    final entryPath = pluginEntryPathFromUrl(widget.pluginUrl);
+    final engine =
+        entryPath == null
+            // URL 不是标准插件页形态（理论上不该发生）：按默认引擎渲染，不要卡在
+            // loading 上把页面变成永久转圈。
+            ? PluginRenderEngine.webView
+            : ref.watch(pluginRenderEngineForProvider(entryPath));
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -91,11 +104,16 @@ class _PluginWebViewPageState extends ConsumerState<PluginWebViewPage> {
         ),
         body: SafeArea(
           top: false,
-          child: PluginRenderView(
-            url: _buildPluginUrl(theme),
-            theme: theme,
-            onControllerReady: (controller) => _renderController = controller,
-          ),
+          child:
+              engine == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : PluginRenderView(
+                    url: _buildPluginUrl(theme),
+                    theme: theme,
+                    engine: engine,
+                    onControllerReady:
+                        (controller) => _renderController = controller,
+                  ),
         ),
       ),
     );

@@ -9,25 +9,32 @@
 ///   - `PluginRenderSurface*`：各引擎自己的渲染面 + 宿主桥 + 主题下推
 library;
 
-/// 可选的插件页渲染引擎。
+/// 单个插件声明的渲染引擎。
+///
+/// **不是用户偏好**：由插件自己的 `plugin.json` 里的 `render_engine` 字段声明，
+/// 后端经 `GET /api/v1/jsplugins` 的 `render_engine` 透传。设置页刻意不提供
+/// 全局覆盖开关 —— 插件作者才知道自家页面在哪个引擎下正常，用户级开关只会让
+/// 「某个插件坏了」变成「所有插件一起坏」。
 ///
 /// 仅 native 平台有意义：Web 端永远走 iframe（`*_stub.dart`），WebF 不支持
 /// Flutter Web（其 `lib/` 内有 39 处无条件 `import 'dart:ffi'`，是编译失败而
 /// 非运行时降级）。
 enum PluginRenderEngine {
-  /// `flutter_inappwebview`，当前默认。
+  /// `flutter_inappwebview`，插件未声明时的默认。
   webView,
 
   /// WebF，渲染进 Flutter 管线、零 platform view。
   webF;
 
-  /// 持久化用的字符串（见 `AppPreferences.getPluginRenderEngine`）。
-  String get prefValue => this == PluginRenderEngine.webF ? 'webf' : 'webview';
-
-  /// 未知值一律回落到 [webView]：这是随时可回退的保守默认，
-  /// 而 WebF 是 0.x beta，不该因为一个脏 pref 就把用户推上去。
-  static PluginRenderEngine fromPrefValue(String? value) =>
-      value == 'webf' ? PluginRenderEngine.webF : PluginRenderEngine.webView;
+  /// 解析 manifest / API 里的 `render_engine` 字段。
+  ///
+  /// 缺失（老服务端不返回该字段）、空串、大小写变体与非法值一律回落到
+  /// [webView]：那是随时能跑的保守默认，而 WebF 是 0.x beta，不该因为一个
+  /// 拼错的字段就把插件推上去。
+  static PluginRenderEngine fromManifestValue(String? value) =>
+      value?.trim().toLowerCase() == 'webf'
+          ? PluginRenderEngine.webF
+          : PluginRenderEngine.webView;
 
   /// 该引擎的渲染面是否是独立的原生表面（platform view）。
   ///

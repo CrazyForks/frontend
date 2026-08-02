@@ -7,6 +7,7 @@ import '../../../core/storage/secure_storage.dart';
 import '../../settings/presentation/providers/settings_provider.dart';
 import 'plugin_theme_utils.dart';
 import 'render/plugin_render_controller.dart';
+import 'render/plugin_render_engine_provider.dart';
 import 'render/plugin_render_view.dart';
 
 /// 插件 Tab 页面（原生平台实现）
@@ -64,6 +65,11 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
     final brightness = MediaQuery.of(context).platformBrightness;
     final theme = resolveEffectiveTheme(themeMode, brightness);
 
+    // 渲染引擎由插件自己的 plugin.json 声明（songloft-org/songloft#341），需要先
+    // 拿到插件列表才知道用哪个。null = 还不知道 → 只显示 loading，**不挂渲染面**：
+    // 先按默认 WebView 渲染再切 WebF 会让整页加载两次。理由见 provider 注释。
+    final engine = ref.watch(pluginRenderEngineForProvider(widget.entryPath));
+
     // 接管 Android 硬件返回键：优先让页面内部后退，无更多历史时再退出应用
     // （songloft-org/songloft#273）。前提是 shell 子 Navigator 保持挂载，
     // 返回键才能分发到本页 PopScope——保活逻辑见 shell_layout.dart。
@@ -79,15 +85,20 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
       },
       child: SafeArea(
         bottom: false,
-        child: PluginRenderView(
-          url: _buildPluginUrl(theme),
-          theme: theme,
-          // Tab 靠 shell 层 Offstage 保活，Hybrid Composition 下反复切换会让
-          // overlay 重建异常、把底部 NavigationBar 抹成黑块，故用 Virtual
-          // Display（songloft-org/songloft#273）。
-          useHybridComposition: false,
-          onControllerReady: (controller) => _renderController = controller,
-        ),
+        child:
+            engine == null
+                ? const Center(child: CircularProgressIndicator())
+                : PluginRenderView(
+                  url: _buildPluginUrl(theme),
+                  theme: theme,
+                  engine: engine,
+                  // Tab 靠 shell 层 Offstage 保活，Hybrid Composition 下反复切换
+                  // 会让 overlay 重建异常、把底部 NavigationBar 抹成黑块，故用
+                  // Virtual Display（songloft-org/songloft#273）。
+                  useHybridComposition: false,
+                  onControllerReady:
+                      (controller) => _renderController = controller,
+                ),
       ),
     );
   }
