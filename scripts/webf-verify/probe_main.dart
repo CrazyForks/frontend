@@ -218,6 +218,53 @@ Future<void> _synthDrag(_DragTarget t, {int steps = 12}) async {
   debugPrint('[probe] dragged ${t.id} ${t.axis} ${t.rect} ${t.from}->${t.to}');
 }
 
+/// 从 **Dart 侧**推一次安全区，走产品 `_pushToPage()` 的同一条路
+/// （songloft-org/songloft#341 Step 5）。
+///
+/// 探针页第 17 组自己也 postMessage 一轮，但那验的是 `common.js` 的 handler；
+/// 产品里真正的发起方是 Dart 的 `evaluateJavaScripts('window.postMessage({...},"*")')`，
+/// 那一跳有两件只有真跑才知道的事：① 字面量拼接（尤其嵌套花括号）在 QuickJS 里
+/// 能不能过；② `toStringAsFixed(2)` 产出的 `22.00` 这种形态在 JS 侧是不是数字
+/// （common.js 的 handler 只接受 `typeof v === 'number'`，字符串会被跳过）。
+///
+/// 字面量刻意与 `plugin_render_surface_webf.dart` 的 `_insetsSignature` 逐字符同形。
+///
+/// 容器里 `MediaQuery.viewPadding` 基本是 0（Xvfb 无刘海），所以这里推的是**人为的
+/// 非零值**，且与页面那轮刻意不同（bottom 22 而不是 30），否则读数一样就分不清
+/// 是谁写进去的。
+///
+/// 由**页面**在它自己那一轮读完之后经 methodChannel（`slSafeArea`）叫起来，
+/// 不用固定延时赌时序 —— 与第 16 组的 `slDrag` 同一个套路。
+void _pushSafeAreaFromDart(WebFController c) {
+  const EdgeInsets fake = EdgeInsets.fromLTRB(9, 7, 8, 22);
+  String n(double v) => v.toStringAsFixed(2);
+  final String sig =
+      '{top:${n(fake.top)},right:${n(fake.right)},'
+      'bottom:${n(fake.bottom)},left:${n(fake.left)}}';
+  Future<void>(() async {
+    // 每一步都单独打日志 + 单独 try/catch：静默失败会让 flutter.log 里
+    // 「什么都没有」，那与「压根没调度」看起来一模一样，无法归因。
+    try {
+      debugPrint('[probe] safearea pushing from Dart: $sig');
+      await c.view.evaluateJavaScripts(
+        'window.postMessage({type:\'songloft-safe-area\',insets:$sig},"*")',
+      );
+      debugPrint('[probe] safearea dart-push returned');
+    } catch (e, st) {
+      debugPrint('[probe] safearea dart-push threw: $e\n$st');
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    try {
+      await c.view.evaluateJavaScripts(
+        'window.__saReport && window.__saReport();',
+      );
+    } catch (e) {
+      debugPrint('[probe] safearea __saReport threw: $e');
+    }
+  });
+}
+
 class ProbeApp extends StatelessWidget {
   const ProbeApp({super.key});
 
@@ -246,6 +293,23 @@ class ProbeApp extends StatelessWidget {
                 debugPrint('[probe] onJSError: $msg');
               },
               onLoad: (c) {
+                // ⚠️ 这个回调在**本探针页**上实测不会被调用（日志里从来没有
+                // 「onLoad fired」）。交接文档里那条「DIAGNOSE=1 却没有 [diag]
+                // 输出、原因未查明」就是同一个现象，根因在这里查明了：
+                //
+                // `onLoad` 由 `controller.checkCompleted()` 触发，而它在
+                // `document.hasPendingRequest` 为真时**直接 return**
+                // （`launcher/controller.dart:1734`）。本页第 11 组刻意留了两个
+                // `<img src="">`，WebF 会把空 src 解析成文档自身 URL 去请求，
+                // 拿到 HTML 后解码失败（日志里那两条 `Failed to decode image
+                // (mime=text/html)` 就是它），页面因此永远到不了 complete。
+                //
+                // **这是探针页特有的**：真实插件页由后端 `stripEmptySrcAttrs`
+                // 在 injectHTMLHead 阶段就把空 src 剥掉了，不会卡在这一步。
+                // 但结论仍然是：探针里任何「页面加载完之后做点什么」都不要挂在
+                // onLoad 上 —— 让页面自己在确定的时点经 methodChannel 叫 Dart
+                // （`slDrag` / `slSafeArea` 都是这个套路）。
+                debugPrint('[probe] onLoad fired');
                 if (_diagnose) c.view.evaluateJavaScripts(_diagnoseJs);
               },
             );
@@ -258,6 +322,11 @@ class ProbeApp extends StatelessWidget {
             // （`plugin_render_surface_webf.dart` 的 `javascriptChannel.onMethodCall`）。
             // 这里只用来接「滑块的屏幕坐标」，见 [_synthDrag]。
             controller.javascriptChannel.onMethodCall = (method, args) async {
+              // 第 17 组：页面读完自己那一轮后叫我们推安全区（Step 5）。
+              if (method == 'slSafeArea') {
+                _pushSafeAreaFromDart(controller);
+                return null;
+              }
               if (method != 'slDrag') return null;
               final List<_DragTarget> targets = _decodeTargets(args);
               debugPrint(

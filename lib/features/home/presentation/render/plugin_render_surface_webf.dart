@@ -84,6 +84,13 @@ class _PluginRenderSurfaceWebFState
   String? _lastPushedStateSig;
   bool _pageReady = false;
 
+  /// 最近一次从 `MediaQuery` 读到的安全区，与最近一次**已推给页面**的签名。
+  ///
+  /// 分成两个字段而不是一个：build() 每次都会更新前者（此时页面可能还没 ready，
+  /// 推不出去），`_pageReady` 转 true 时要拿它补推首屏值。
+  EdgeInsets _safeAreaInsets = EdgeInsets.zero;
+  String? _lastPushedInsetsSig;
+
   /// controller 缓存键。用**去掉 query 的 URL**：`?theme=` 会随主题变化，
   /// 带上它会让切主题变成「换了一个插件」从而整页重载。
   late final String _controllerName =
@@ -204,6 +211,39 @@ class _PluginRenderSurfaceWebFState
     );
   }
 
+  /// 安全区（刘海屏 / 圆角屏 / 手势条）下推 —— WebF 不实现
+  /// `env(safe-area-inset-*)`（songloft-org/songloft#341）。
+  ///
+  /// WebF 里 `css/keywords.dart` 那 6 个 `SAFE_AREA_INSET*` / `ENV` 常量是全库
+  /// 无引用的死常量，连解析入口都没有，所以插件页写 `env()` 在 WebF 下会顶到状态栏
+  /// 或被下巴切掉。宿主这边负责把真实 inset 注入成 CSS 变量 `--sl-safe-*`，
+  /// 插件侧统一写 `var(--sl-safe-bottom)`（默认值与三种环境下的取值见
+  /// `internal/jsplugin/assets/common.css` 里那段注释）。
+  ///
+  /// 用 `viewPadding` 而不是 `padding`：前者是「不扣掉键盘遮挡」的安全区，
+  /// 与浏览器 `env(safe-area-inset-*)` 的语义一致（软键盘弹出时 `env()` 不变）。
+  /// 注意插件页外层是 `SafeArea`（`plugin_tab_page_native.dart` 是
+  /// `SafeArea(bottom: false)`），而 Flutter 的 `MediaQuery.removePadding` 会把
+  /// `viewPadding` 一并按已消费的 `padding` 扣减，所以这里读到的正是**剩给页面
+  /// 自己处理**的那部分 —— 上层已经让开的边不会被重复内缩。
+  void _syncSafeArea(EdgeInsets insets) {
+    _safeAreaInsets = insets;
+    if (!_pageReady) return;
+    final sig = _insetsSignature(insets);
+    // 去重：MediaQuery 依赖变化会让 build() 反复跑（转屏、进退全屏、键盘），
+    // 不去重就是每帧一次 evaluateJavaScripts。
+    if (sig == _lastPushedInsetsSig) return;
+    _lastPushedInsetsSig = sig;
+    _pushToPage("{type:'songloft-safe-area',insets:$sig}");
+  }
+
+  /// 既当去重签名又当推送载荷 —— 两者用同一份字符串，不可能不一致。
+  static String _insetsSignature(EdgeInsets i) {
+    String n(double v) => v.toStringAsFixed(2);
+    return '{top:${n(i.top)},right:${n(i.right)},'
+        'bottom:${n(i.bottom)},left:${n(i.left)}}';
+  }
+
   void _listenPlayerState() {
     ref.listen<PlayerState>(playerStateProvider, (prev, next) {
       final sig = _hostDispatcher.stateSignature(next);
@@ -234,10 +274,18 @@ class _PluginRenderSurfaceWebFState
       networkOptions: const WebFNetworkOptions(enableHttpCache: false),
       onLoad: (_) {
         _pageReady = true;
+        // 安全区必须在这里补推一次，两个理由：
+        //   ① 首屏 —— build() 早于 onLoad，那时 `_pageReady` 还是 false 推不出去；
+        //   ② 重挂 —— 超 `maxAliveInstances` 被 dispose 后重建时页面 JS 状态归零，
+        //      「注入过一次就不管」会让重挂后的页面永久丢掉安全区。
+        // 清签名而不是直接推：让 `_syncSafeArea` 里那条去重判断照常生效。
+        _lastPushedInsetsSig = null;
+        _syncSafeArea(_safeAreaInsets);
         widget.onLoadStop();
       },
       onLoadError: (error, stack) {
         _pageReady = false;
+        _lastPushedInsetsSig = null;
         widget.onError(error.message);
       },
       // 页面内的 JS 异常必须落日志。
@@ -264,6 +312,9 @@ class _PluginRenderSurfaceWebFState
   @override
   Widget build(BuildContext context) {
     _listenPlayerState();
+    // 在 build() 里读，是为了建立 MediaQuery 依赖：转屏 / 进退全屏 / 键盘弹出
+    // 都会让本 widget 重建，从而自动重推。去重在 `_syncSafeArea` 内部做。
+    _syncSafeArea(MediaQuery.viewPaddingOf(context));
 
     return FutureBuilder<void>(
       // 图标字体必须在渲染面出字之前注册好，否则首屏图标是豆腐块。

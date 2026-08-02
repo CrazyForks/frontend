@@ -18,11 +18,14 @@
     13. RING        自定义元素 <songloft-progress-ring>，判据见右列该行上方注释
     14~16 SLIDER    input[type=range] 的能力事实、自定义元素 <songloft-slider>、
                     以及 common.js 的 range 垫片，判据见右列各行上方注释
+    17. SAFE AREA   安全区变量 --sl-safe-*（宿主注入替代 env(safe-area-inset-*)），
+                    顺带把 max() / clamp() / var() fallback 的可用性钉成回归行
 
   版面：WebF 窗口实测只有 1280x717（Xvfb 屏是 1280x900，下方黑色区域是 Flutter
   压根没画的部分），单列纵向已经被 12 组占满，所以从第 13 组起改成**两列**：
   左列 1~12b（原样不动），右列 13 起。加新检查行前先确认它落在 717px 以内 ——
   被截掉的行看起来和「脚本没跑」一模一样。
+  （右列到 17b 为止实测落在 ~610px，还有余量；再加就要考虑第三列或缩行距。）
 
   合成拖动（DRAG_PROBE）：本页面没有交互驱动能力，「滑块真的能拖」只能由 Dart 侧
   用 WidgetsBinding.handlePointerEvent 合成 Pointer 事件来验（走的是真实 hit-test →
@@ -401,6 +404,76 @@
     <span class="tag">16b SHIM STATE</span>
     <span id="shimstate" class="caps">(script did not run)</span>
   </div>
+
+  <!--
+    17 安全区变量 --sl-safe-*（songloft-org/songloft#341 Step 5）。
+    WebF 不实现 env(safe-area-inset-*)，改为「宿主注入 CSS 变量 + 插件写 var()」。
+
+    八个盒子都是 `width:20px; height:0; box-sizing:content-box`，所以
+    **getBoundingClientRect().height 就等于它的 padding-bottom 求值结果** ——
+    数字化断言不依赖任何 getComputedStyle（13b 已实测 WebF 的 getComputedStyle
+    不暴露自定义属性，读回永远是空串，用它判不了任何事）。
+
+    注入走**真实生产路径**：页面自己
+    `window.postMessage({type:'songloft-safe-area',insets:{...}},'*')`，
+    与 Dart 侧 `_pushToPage()` 发出的字面量完全一致 —— 测的是 common.js 里
+    那个 handler，不是探针自己 setProperty 抄近路。
+    容器里 MediaQuery.padding 基本是 0（Xvfb 无刘海），所以注入的是**人为的
+    非零值** top=11/right=12/bottom=30/left=14，这样「变量真的到了、CSS 真的
+    重算了」才有可观测的证据。
+
+      S  padding-bottom:13px                   **对照组，不含任何变量**。它唯一的
+                                               用途是给 pre 那一轮读数定性：S=13 说明
+                                               「布局已经算过了」，此时 A/H 的读数才
+                                               有意义；S=0 说明整组量早了（首帧未落定），
+                                               pre 全 0 是伪失败，只能看 post
+      A  calc(10px + var(--sl-safe-bottom))    注入前应 10（默认 0px）；注入后应 40
+      B  var(--sl-safe-bottom)                 裸 var 当长度用：注入后应 30
+      H  calc(1px + var(--sl-safe-top))        top 也到了：注入后应 12
+      C  max(24px, var(--sl-safe-bottom))      **WebF 没实现 max()** → 应 0（不是 30）
+      D  clamp(24px, var(--sl-safe-bottom), 96px)  clamp 里能不能塞 var。
+                                               源码读起来不该行（clamp 分支对每个参数
+                                               直接 CSSLength.parseLength，而它不认
+                                               `var(...)`），但**实测是 30，能行** ——
+                                               推测值里含 `var` 时样式系统先做了整值
+                                               替换。这一行就是把这个反直觉的事实钉住
+      J  clamp(24px, var(--sl-safe-top), 96px) 夹紧真的发生了吗：top=11 < 24 → 应 **24**
+                                               （不是 11）。这正是 miot `.fp-controls`
+                                               要的「至少留 24px」语义
+      E  clamp(24px, 41px, 96px)               对照：clamp 本身可用 → 应 41。
+                                               数字刻意与注入值都不同，免得与 D 撞成
+                                               同一个读数而看不出是谁在起作用
+      F  var(--sl-nope, 17px)                  对照：裸 var 的 fallback 通不通 → 应 17
+      G  var(--sl-nope2, env(safe-area-inset-bottom, 19px))
+                                               **本组最关键的一项**：文档要不要推荐
+                                               `var(--x, env(...))` 这种「一份 CSS
+                                               通吃三种环境」的写法，取决于 WebF 会
+                                               把它算成什么。19 = 连 env 的内层
+                                               fallback 都取到了；0 = fallback 链
+                                               在 env() 处断掉 → 文档必须禁止这种写法
+                                               （实测就是 0）
+    17b 是同一件事的文字化断言（截图必然糊掉 —— 这些盒子只有几十像素高）。
+  -->
+  <div class="row" style="align-items:flex-end">
+    <span class="tag">17 SAFE AREA</span>
+    <span class="sarow">
+      <span id="saS" class="sabox" style="padding-bottom:13px;background:#9e9e9e"></span>
+      <span id="saA" class="sabox" style="padding-bottom:calc(10px + var(--sl-safe-bottom))"></span>
+      <span id="saB" class="sabox" style="padding-bottom:var(--sl-safe-bottom)"></span>
+      <span id="saH" class="sabox" style="padding-bottom:calc(1px + var(--sl-safe-top))"></span>
+      <span id="saC" class="sabox" style="padding-bottom:max(24px, var(--sl-safe-bottom))"></span>
+      <span id="saD" class="sabox" style="padding-bottom:clamp(24px, var(--sl-safe-bottom), 96px)"></span>
+      <span id="saJ" class="sabox" style="padding-bottom:clamp(24px, var(--sl-safe-top), 96px)"></span>
+      <span id="saE" class="sabox" style="padding-bottom:clamp(24px, 41px, 96px)"></span>
+      <span id="saF" class="sabox" style="padding-bottom:var(--sl-nope, 17px)"></span>
+      <span id="saG" class="sabox" style="padding-bottom:var(--sl-nope2, env(safe-area-inset-bottom, 19px))"></span>
+    </span>
+  </div>
+
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">17b SAFE AREA STATE</span>
+    <span id="sastate" class="caps">(script did not run)</span>
+  </div>
 </div><!-- /colR -->
 </div><!-- /cols -->
 
@@ -434,6 +507,15 @@
     /* 虚线框由 WebF 的盒模型绘制，滑块由我们的 CustomPaint 绘制 —— 两者分离，
        所以「有框无滑块」（N）与「有框有滑块」（H/V/D）一眼可辨。 */
     .sldbox { border: 1px dashed #bbb; }
+
+    /* 17 组：盒子高度 == padding-bottom 求值结果，所以必须 content-box
+       （common.css 的 reset 把全局设成了 border-box，那样 height:0 与 padding
+       的关系要多绕一层推理）。宽 20px 只为看得见，判据全在 height 上。 */
+    .sarow { display: flex; gap: 6px; align-items: flex-end; }
+    .sabox {
+      display: inline-block; box-sizing: content-box;
+      width: 20px; height: 0; background: #3f51b5;
+    }
 
     .ringrow { display: flex; gap: 10px; align-items: center; }
     /* 虚线边框由 WebF 自己的盒模型绘制，环由我们的 CustomPaint 绘制 ——
@@ -538,6 +620,128 @@
           console.log('[probe] ring ' + text);
         }, 400);
       }, 600);
+    });
+
+    // ── 17 安全区变量 --sl-safe-* ─────────────────────────────────────
+    // 又是单独一个 DOMContentLoaded 回调（与 details / ring / 滑块三段并列）：
+    // 任一段抛异常都不该让别人的 readout 停在 "(script did not run)"。
+    document.addEventListener('DOMContentLoaded', function () {
+      function h(id) {
+        var el = document.getElementById(id);
+        if (!el) return 'missing';
+        try {
+          return String(Math.round(el.getBoundingClientRect().height));
+        } catch (e) { return 'threw'; }
+      }
+      function inlineVar(name) {
+        try {
+          return JSON.stringify(
+            document.documentElement.style.getPropertyValue(name));
+        } catch (e) { return '(threw)'; }
+      }
+
+      // 注入**前**先量一遍，证明默认值那一档（common.css 的
+      // `html.webf-engine { --sl-safe-*: 0px }`）真的生效。
+      // 不能等注入后再回推 0 来测：那时内联样式已经写上，量到的是内联那一档。
+      //
+      // ⚠️ **必须等第 14~16 组全部读完再动手**，不能用固定延时。
+      //
+      // 本组注入 4 个 CSS 变量会让整棵树重算，而第 16 组采集滑块屏幕坐标那一刻
+      // （见下面那段 1800ms 的注释）若正撞上重排在飞，`getBoundingClientRect()`
+      // 会返回 0x0，于是滑块被静默地从拖动目标里漏掉，16b 显示 in=0/ch=0 ——
+      // 看起来跟「Dart→JS 事件没通」一模一样。实测这么撞过一次。
+      //
+      // 所以改成握手：滑块那段的 finalize() 跑完会置 window.__slFinalized，
+      // 本组轮询到它再开始。轮询有上限，那一段抛异常时本组也不会永远不出读数。
+      var slWaitMs = 0;
+      (function waitForSliderGroup() {
+        if (!window.__slFinalized && slWaitMs < 8000) {
+          slWaitMs += 200;
+          setTimeout(waitForSliderGroup, 200);
+          return;
+        }
+        startSafeAreaProbe(slWaitMs >= 8000 ? 'timeout' : 'handshake');
+      })();
+
+      // 首帧布局未必已经落定，量早了拿到的 0 会与「默认值 0px 生效」撞成同一个
+      // 读数（A 期望 10），分不清是「默认值对」还是「压根还没布局」。
+      // **实测 DOMContentLoaded +300ms 时确实全 0**，所以 S 那个不含变量的对照盒
+      // 是必须的：S=13 才说明这一轮读数可信。走到这里时早过了那个窗口。
+      function startSafeAreaProbe(how) {
+        var pre = 'S=' + h('saS') + ' A=' + h('saA') + ' B=' + h('saB') +
+          ' H=' + h('saH');
+
+        // 走真实生产路径：与 Dart 侧 `_pushToPage()` 发出的字面量一字不差 ——
+        // 测的是 common.js 的消息 handler，不是探针自己 setProperty 抄近路。
+        var injected = 'skipped';
+        try {
+          window.postMessage({
+            type: 'songloft-safe-area',
+            insets: { top: 11, right: 12, bottom: 30, left: 14 }
+          }, '*');
+          injected = 'sent';
+        } catch (e) {
+          injected = 'threw:' + ((e && e.message) || e);
+        }
+
+        // 变量变更 → 重排的通知链路是异步的，量早了会拿到旧高度。
+        setTimeout(function () {
+          var text =
+            'pre[' + pre + ']' +
+            ' post[S=' + h('saS') + ' A=' + h('saA') + ' B=' + h('saB') +
+            ' H=' + h('saH') +
+            ' C(max)=' + h('saC') + ' D(clamp+var)=' + h('saD') +
+            ' J(clamp-min)=' + h('saJ') + ' E(clamp)=' + h('saE') +
+            ' F(var-fb)=' + h('saF') + ' G(var-fb-env)=' + h('saG') + ']' +
+            ' msg=' + injected + '/' + how +
+            ' inline[bottom=' + inlineVar('--sl-safe-bottom') +
+            ' top=' + inlineVar('--sl-safe-top') + ']' +
+            ' htmlClass=' + JSON.stringify(document.documentElement.className);
+          document.getElementById('sastate').textContent = text;
+          // 截图里这些盒子只有几十像素高，flutter.log 才是断言通道
+          console.log('[probe] safearea ' + text);
+
+          // 页面这一轮读完了，才请 Dart 侧推它那一轮（见 __saReport 的注释）。
+          // 与第 16 组的 slDrag 同一个套路：由页面在**确定的时点**把控制权交给
+          // Dart，而不是两边各拍一个固定延时去赌谁先谁后。
+          try {
+            var mc = window.webf && window.webf.methodChannel;
+            if (mc && typeof mc.invokeMethod === 'function') {
+              mc.invokeMethod('slSafeArea', '');
+            } else {
+              console.log('[probe] no methodChannel, dart safe-area push skipped');
+            }
+          } catch (e) {
+            console.log('[probe] slSafeArea invoke threw: ' + e);
+          }
+        }, 1000);
+      }
+
+      // Dart→JS 那一跳的断言入口。
+      //
+      // 上面那一轮是**页面自己** postMessage，验的是 common.js 的 handler；
+      // 产品里真正的发起方是 Dart 的 `_pushToPage()`（`evaluateJavaScripts`
+      // 拼一条 `window.postMessage({...},"*")`）。那一跳的字面量拼接、数字格式
+      // （`toStringAsFixed(2)` 产出 `22.00` 这种形态，JS 侧要当数字用）都只能由
+      // Dart 侧真跑一遍才算验过，所以留这个函数给 probe_main.dart 调。
+      // 值刻意与页面那轮不同（bottom 22 而不是 30），否则读数一样就分不清是谁写的。
+      window.__saReport = function () {
+        try {
+          var text = 'A=' + h('saA') + ' B=' + h('saB') + ' H=' + h('saH') +
+            ' J(clamp-min)=' + h('saJ') +
+            ' inline[bottom=' + inlineVar('--sl-safe-bottom') +
+            ' top=' + inlineVar('--sl-safe-top') +
+            ' right=' + inlineVar('--sl-safe-right') +
+            ' left=' + inlineVar('--sl-safe-left') + ']';
+          var el = document.getElementById('sastate');
+          // 追加而不是覆盖：17b 那一行同时留着两轮读数，截图与文字才自洽
+          // （截图是最终态，也就是 Dart 注入的那一轮）。
+          if (el) el.textContent = el.textContent + '  ||  dart[' + text + ']';
+          console.log('[probe] safearea-dart ' + text);
+        } catch (e) {
+          console.log('[probe] safearea-dart threw: ' + e);
+        }
+      };
     });
 
     // ── 14/15/16 滑块 ────────────────────────────────────────────────
@@ -704,6 +908,9 @@
           ' N.rect=' + rectOf(document.getElementById('sldN')) +
           '  Hin=' + st.hIn + '/Hch=' + st.hCh + '/Hdata=' + JSON.stringify(st.hData) +
           '  Vin=' + st.vIn + '/Vch=' + st.vCh + '/Vdata=' + JSON.stringify(st.vData));
+        // 第 17 组要等这一段读完才敢动 CSS 变量（它会触发整棵树重排，撞上本组
+        // 采坐标那一刻就会拿到 0x0）。见 17 组那边的握手注释。
+        window.__slFinalized = true;
         put('shimstate',
           'made=' + (made ? made.tagName.toLowerCase() : 'none') +
           ' sldRect=' + rectOf(made) + ' inRect=' + rectOf(shim) +
