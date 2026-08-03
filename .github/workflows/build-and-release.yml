@@ -609,10 +609,45 @@ jobs:
 
           TAG="${{ steps.release_info.outputs.tag }}"
           COMMIT="${GITHUB_SHA}"
-          # WebF 的解析版本取自 pubspec.lock（不是 pubspec.yaml 的 ^ 约束），
-          # 这样记下来的是本次构建真正链接的那个版本。
-          WEBF_VERSION=$(awk '/^  webf:/{f=1} f&&/^    version:/{gsub(/"/,"",$2); print $2; exit}' pubspec.lock)
-          [ -n "$WEBF_VERSION" ] || WEBF_VERSION="see pubspec.lock"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          # WebF 的版本有两个来源，语义完全不同，GPL §6 的对应源码声明里必须让接收者
+          # 分得清他拿到的是哪一种：
+          #   - pubspec.lock 的 `version:` 是本次构建**真正链接**的解析版本
+          #   - pubspec.yaml 的 `webf: ^X.Y.Z` 只是版本**约束**（一个范围，不是版本）
+          # pubspec.lock 被 .gitignore 忽略、不入库，而本 job 是独立的全新 checkout
+          # 且不跑 flutter pub get，所以 CI 里它**必然不存在**。因此以入库的
+          # pubspec.yaml 为主来源，lock 恰好存在时（本地跑、或将来 lock 入库）才升级
+          # 成精确的解析版本。
+          #
+          # 铁律：`run:` 的默认 shell 是 `bash -e`，`VAR=$(失败命令)` 会让赋值语句
+          # 本身以非零退出 → 整步立刻中止，紧跟其后的兜底行**永远执行不到**。
+          # songloft-org/songloft#341 的 player release run 就是这么炸的：awk 读不到
+          # pubspec.lock → fatal → 8 个构建 job 全绿但 Create Release 整个失败。
+          # 所以下面每个命令替换都带 `|| true`，文件存在性一律先用 `[ -f ]` 守卫。
+          WEBF_RESOLVED=""
+          if [ -f pubspec.lock ]; then
+            WEBF_RESOLVED=$(awk '/^  webf:/{f=1} f&&/^    version:/{gsub(/"/,"",$2); print $2; exit}' pubspec.lock || true)
+          fi
+          WEBF_CONSTRAINT=""
+          if [ -f pubspec.yaml ]; then
+            WEBF_CONSTRAINT=$(awk '$1=="webf:"{print $2; exit}' pubspec.yaml || true)
+          fi
+
+          if [ -n "$WEBF_RESOLVED" ]; then
+            WEBF_VERSION_LINE="version     : ${WEBF_RESOLVED}"
+            WEBF_VERSION_NOTE="(the exact version linked into this build, as resolved in pubspec.lock)"
+          elif [ -n "$WEBF_CONSTRAINT" ]; then
+            WEBF_VERSION_LINE="constraint  : ${WEBF_CONSTRAINT}"
+            WEBF_VERSION_NOTE="(this is the version CONSTRAINT declared in pubspec.yaml, NOT the
+              resolved version -- pubspec.lock is not committed to this
+              repository. The exact version linked into this build is in the
+              \"flutter pub get\" output of the build log linked below.)"
+          else
+            WEBF_VERSION_LINE="version     : see the \"flutter pub get\" output of the build log"
+            WEBF_VERSION_NOTE="(neither pubspec.lock nor pubspec.yaml could be read in the release
+              job; the build log linked below is authoritative.)"
+          fi
 
           cat > final-assets/CORRESPONDING-SOURCE.txt <<EOF
           Songloft client -- COMPLETE CORRESPONDING SOURCE
@@ -636,7 +671,9 @@ jobs:
 
             WebF (rendering engine, GPL-3.0-only)
               https://github.com/openwebf/webf
-              version     : ${WEBF_VERSION}   (as resolved in pubspec.lock)
+              ${WEBF_VERSION_LINE}
+              ${WEBF_VERSION_NOTE}
+              build log   : ${RUN_URL}
 
             Songloft server (Apache-2.0, separate program)
               https://github.com/songloft-org/songloft
