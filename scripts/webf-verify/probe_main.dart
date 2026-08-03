@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+// gestures：PointerScrollEvent 只在这里导出（material.dart 没带出来），
+// 合成滚轮滚动要用，见 [_synthScroll]。
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webf/webf.dart';
@@ -109,6 +113,49 @@ const String _diagnoseJs = r'''
 
 const bool _diagnose = bool.fromEnvironment('DIAGNOSE');
 
+/// 可选的**自定义**诊断脚本，base64 编码后经 `--dart-define=DIAGNOSE_JS_B64=` 传入
+/// （`run.sh` 的 `DIAGNOSE_JS=<宿主上的 .js 文件>`）。
+///
+/// 为什么要 base64：dart-define 的值要穿过 shell → docker -e → flutter build
+/// 三层，而诊断脚本里必然有引号、`$`、换行。base64 是唯一不用逐层转义的形态。
+///
+/// 为什么要「可换」：[_diagnoseJs] 那份是通用的（主题/CSS 变量/宿主桥在不在），
+/// 但**每个插件页的判据都不一样**（downloader 要量 6 列 x 坐标与 sticky 表头，
+/// miot 要量竖向滑块几何与安全区求值）。这些判据只能在页面自身上下文里读，
+/// 而真实插件页改不了 —— 所以脚本必须能从外面换。
+const String _diagnoseJsB64 = String.fromEnvironment('DIAGNOSE_JS_B64');
+
+String get _effectiveDiagnoseJs {
+  if (_diagnoseJsB64.isEmpty) return _diagnoseJs;
+  try {
+    return utf8.decode(base64Decode(_diagnoseJsB64));
+  } catch (e) {
+    debugPrint('[probe] DIAGNOSE_JS_B64 解码失败，退回内置脚本: $e');
+    return _diagnoseJs;
+  }
+}
+
+/// `onLoad` 之外的**兜底注入**延时（秒）。
+///
+/// `onLoad` 在 `WebF.fromControllerName` 这条挂载路径下**可能永不触发**
+/// （`checkCompleted()` 在 `document.hasPendingRequest` 为真时直接 return，
+/// `launcher/controller.dart:1734`）—— 探针页因为两个空 `img src` 就是这样。
+/// 真实插件页由后端 `stripEmptySrcAttrs` 剥掉空 src 所以**应当**会触发，
+/// 但「应当」不是「一定」：任何一张加载不出来的图、任何一个挂住的请求
+/// 都会把这个闸永久关上，而表现是「DIAGNOSE=1 却一行 `[diag]` 都没有」，
+/// 与「脚本本身报错」完全无法区分。
+///
+/// 所以改成「onLoad 与定时器谁先到算谁」+ 一次性闸（[_diagnoseInjected]）。
+const int _diagnoseFallbackSeconds = 12;
+bool _diagnoseInjected = false;
+
+void _injectDiagnose(WebFController c, String why) {
+  if (!_diagnose || _diagnoseInjected) return;
+  _diagnoseInjected = true;
+  debugPrint('[probe] 注入诊断脚本（触发源：$why）');
+  c.view.evaluateJavaScripts(_effectiveDiagnoseJs);
+}
+
 /// `--dart-define=DRAG_PROBE=true` 时启用合成拖动（songloft-org/songloft#341 Step 3）。
 ///
 /// **默认关。** 探针本体只截图、没有交互驱动能力，而「`<songloft-slider>` 真的能被
@@ -216,6 +263,46 @@ Future<void> _synthDrag(_DragTarget t, {int steps = 12}) async {
   );
   await Future<void>.delayed(const Duration(milliseconds: 48));
   debugPrint('[probe] dragged ${t.id} ${t.axis} ${t.rect} ${t.from}->${t.to}');
+}
+
+/// 合成一次**真实滚轮滚动**（`slScroll`，songloft-org/songloft#341 Step 6）。
+///
+/// 为什么不能用页面里的 `el.scrollTop = N`：那条路只挪 scroll offset，而
+/// `position: sticky` 在 WebF 里是靠滚动通知链重算子项偏移的
+/// （`applyStickyChildOffset`）。要判定「sticky 到底成不成」，必须让滚动从
+/// **真实指针事件**进来，走与用户手指/滚轮完全相同的那条路 —— 否则
+/// 「sticky 没实现」与「程序化 scroll 不触发 sticky 重算」这两种完全不同的结论
+/// 无法区分（而它们对插件作者的含义天差地别）。
+///
+/// 用 `PointerScrollEvent` 而不是合成拖动：WebF 的可滚容器在桌面端由
+/// `Listener`/`Scrollable` 消费滚轮，拖动在桌面语义下不滚动（那是移动端的
+/// drag-to-scroll），而验证容器是 Linux 桌面。
+///
+/// ⚠️ 必须先投一个 `PointerHoverEvent` 建立指针位置：`PointerScrollEvent`
+/// 的路由依赖当前 hover 命中的那条链，没 hover 过的位置命中链是空的、
+/// 滚动事件会被丢弃（表现与「容器不可滚」一模一样）。
+Future<void> _synthScroll(Offset at, double dy, {int steps = 8}) async {
+  // Added 也要投：Flutter 的 `PointerRouter` 按 pointer id 维护路由表，
+  // 只投 hover 在某些版本下建不起 mouse tracker 的注解链。
+  WidgetsBinding.instance.handlePointerEvent(
+    const PointerAddedEvent(kind: PointerDeviceKind.mouse),
+  );
+  WidgetsBinding.instance.handlePointerEvent(
+    PointerHoverEvent(kind: PointerDeviceKind.mouse, position: at),
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 120));
+  for (int i = 0; i < steps; i++) {
+    WidgetsBinding.instance.handlePointerEvent(
+      PointerScrollEvent(
+        kind: PointerDeviceKind.mouse,
+        position: at,
+        scrollDelta: Offset(0, dy / steps),
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 48));
+  }
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+  debugPrint('[probe] scrolled at $at by $dy');
 }
 
 /// 从 **Dart 侧**推一次安全区，走产品 `_pushToPage()` 的同一条路
@@ -388,7 +475,7 @@ class ProbeApp extends StatelessWidget {
                 // onLoad 上 —— 让页面自己在确定的时点经 methodChannel 叫 Dart
                 // （`slDrag` / `slSafeArea` 都是这个套路）。
                 debugPrint('[probe] onLoad fired');
-                if (_diagnose) c.view.evaluateJavaScripts(_diagnoseJs);
+                _injectDiagnose(c, 'onLoad');
               },
             );
             // onJSLog 是字段而非构造参数，必须构造后赋值。
@@ -411,6 +498,34 @@ class ProbeApp extends StatelessWidget {
               // 第 17 组：页面读完自己那一轮后叫我们推安全区（Step 5）。
               if (method == 'slSafeArea') {
                 _pushSafeAreaFromDart(controller);
+                return null;
+              }
+              // 诊断脚本请求一次真实滚轮滚动，见 [_synthScroll]。
+              // 载荷 `{"x":..,"y":..,"dy":..}`（同 slDrag：一律走 JSON 字符串，
+              // WebF 的 method channel 对复杂对象的序列化形态没有稳定契约）。
+              // 滚完回调 `window.__slScrollDone()`，页面据此继续下一步 ——
+              // 不用固定延时赌时序。
+              if (method == 'slScroll') {
+                dynamic p = args;
+                if (p is List && p.isNotEmpty) p = p.first;
+                Map<String, dynamic> m = <String, dynamic>{};
+                if (p is String) {
+                  try {
+                    final dynamic d = jsonDecode(p);
+                    if (d is Map) m = Map<String, dynamic>.from(d);
+                  } catch (e) {
+                    debugPrint('[probe] slScroll payload not JSON: $e');
+                  }
+                }
+                final double x = (m['x'] as num?)?.toDouble() ?? 0;
+                final double y = (m['y'] as num?)?.toDouble() ?? 0;
+                final double dy = (m['dy'] as num?)?.toDouble() ?? 300;
+                Future<void>(() async {
+                  await _synthScroll(Offset(x, y), dy);
+                  await controller.view.evaluateJavaScripts(
+                    'window.__slScrollDone && window.__slScrollDone();',
+                  );
+                });
                 return null;
               }
               if (method != 'slDrag') return null;
@@ -439,6 +554,14 @@ class ProbeApp extends StatelessWidget {
             // navigationDelegate: ...)` 是过时/错误的文档）。setter 会顺带同步到
             // 已经建好的 view（`controller.dart:288-294`）。
             _installNavigationDelegate(controller);
+            // 诊断脚本的兜底注入：见 [_diagnoseFallbackSeconds]。
+            // 不能只挂 onLoad —— 那个闸可能永不开，而失败形态与「脚本报错」
+            // 无法区分。谁先到算谁，[_injectDiagnose] 自带一次性闸。
+            if (_diagnose) {
+              Timer(const Duration(seconds: _diagnoseFallbackSeconds), () {
+                _injectDiagnose(controller, 'timer');
+              });
+            }
             return controller;
           },
           loadingWidget: const Center(child: CircularProgressIndicator()),

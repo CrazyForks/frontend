@@ -5,6 +5,7 @@
 #   ./scripts/webf-verify/run.sh --build         # 强制重建镜像
 #   PROBE_URL=http://... ./scripts/webf-verify/run.sh   # 换成渲染真实插件页
 #   DRAG_PROBE=1 ./scripts/webf-verify/run.sh     # 额外对 14~16 组的滑块合成拖动
+#   DIAGNOSE_JS=./my-checks.js ./scripts/webf-verify/run.sh  # 换掉内置诊断脚本
 #
 # 产出（宿主）：songloft-player/scripts/webf-verify/out/
 #   probe.png       截图（判据见 probe.html 顶部注释）
@@ -36,6 +37,22 @@ case "${DRAG_PROBE:-}" in
   *) DRAG_PROBE='' ;;
 esac
 
+# DIAGNOSE_JS=<宿主上的 .js 文件> 用自定义诊断脚本替换探针内置的那份。
+# 内置脚本是通用的（主题 / CSS 变量 / 宿主桥在不在），但**每个插件页的判据都不同**
+# （downloader 要量 6 列 x 坐标与 sticky 表头，miot 要量竖向滑块几何与安全区求值），
+# 而真实插件页改不了 —— 判据只能靠外部注入的脚本在页面自身上下文里读出来。
+#
+# 走 base64：值要穿过 shell → docker -e → flutter build 三层，而脚本里必然有
+# 引号 / `$` / 换行，base64 是唯一不用逐层转义的形态。
+# 指定 DIAGNOSE_JS 时自动打开 DIAGNOSE（否则脚本传进去了也不会被注入）。
+DIAGNOSE_JS_B64=''
+if [ -n "${DIAGNOSE_JS:-}" ]; then
+  [ -f "$DIAGNOSE_JS" ] || { echo "[run] DIAGNOSE_JS 文件不存在：$DIAGNOSE_JS" >&2; exit 1; }
+  DIAGNOSE_JS_B64=$(base64 -w0 < "$DIAGNOSE_JS")
+  DIAGNOSE=true
+  echo "[run] 自定义诊断脚本：$DIAGNOSE_JS（$(wc -c <"$DIAGNOSE_JS") 字节）"
+fi
+
 mkdir -p "$OUT"
 echo "[run] 主仓库根：$REPO_ROOT"
 echo "[run] 输出目录：$OUT"
@@ -52,6 +69,7 @@ docker run --rm \
   ${SETTLE:+-e SETTLE="$SETTLE"} \
   ${FONT_FIX:+-e FONT_FIX="$FONT_FIX"} \
   ${DIAGNOSE:+-e DIAGNOSE="$DIAGNOSE"} \
+  ${DIAGNOSE_JS_B64:+-e DIAGNOSE_JS_B64="$DIAGNOSE_JS_B64"} \
   ${DRAG_PROBE:+-e DRAG_PROBE="$DRAG_PROBE"} \
   "$IMAGE"
 
