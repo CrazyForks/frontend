@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webf/webf.dart';
 
 import '../../../player/domain/player_state.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../plugin_host_dispatch.dart';
 import 'elements/songloft_custom_elements.dart';
+import 'plugin_file_bridge.dart';
 import 'plugin_render_controller.dart';
 import 'plugin_render_fonts.dart';
 
@@ -164,8 +166,123 @@ class _PluginRenderSurfaceWebFState
     if (req == null) {
       return jsonEncode({'ok': false, 'error': 'malformed host call payload'});
     }
+    // `files` 命名空间只在 WebF 路径上存在，所以在这里截住、不进
+    // `PluginHostDispatcher`（那个文件刻意 web-safe，而文件读取必然要 dart:io）。
+    // 理由与作用域的完整说明见 `plugin_file_bridge.dart` 的头注释。
+    if (req['ns'] == 'files') {
+      try {
+        final data = await PluginFileBridge.handle(
+          req['method'] as String?,
+          (req['params'] is Map)
+              ? Map<String, dynamic>.from(req['params'] as Map)
+              : <String, dynamic>{},
+        );
+        return jsonEncode({'ok': true, 'data': data});
+      } catch (e) {
+        return jsonEncode({'ok': false, 'error': e.toString()});
+      }
+    }
     final result = await _hostDispatcher.handleCall(req);
     return jsonEncode(result);
+  }
+
+  // ── 外链导航（songloft-org/songloft#341 Step 6）──────────────────────
+  /// `window.open` 与 `<a href>` 点击的决策处理器。
+  ///
+  /// ## 为什么需要它（归因，与「window.open 是 no-op」的表面现象不同）
+  ///
+  /// WebF 的 `Window.open` 在 Dart 侧**是有实现的**（`dom/window.dart:71-74`）：
+  /// 它调 `view.handleNavigationAction(...)`，而那里第一件事就是问
+  /// `navigationDelegate`；产品没设 delegate 时拿到的是一个用默认处理器的新
+  /// delegate，而默认处理器 **无条件返回 `cancel`**
+  /// （`module/navigation.dart:85-106`）。所以「什么都没发生」不是 C++ 桥吞掉了
+  /// 调用，而是被默认导航策略拦下了。
+  ///
+  /// 「C++ 到底有没有把 `window.open` 转发到 Dart」无法从 pub 包源码核实
+  /// （`bridge/core/frame/window.cc` 不随包发布），**已在验证容器里实测确认转发**：
+  /// 装上 delegate 后 `window.open('…/sl-open-1')` 与
+  /// `window.open('…/sl-open-2','_blank')` 两种调用形态都各触发一次决策回调，
+  /// 拿到的 `action.target` 与传入 URL 逐字符相同（WebF 的 Dart 绑定只声明了
+  /// `args[0]`，多余的 `'_blank'` 无害）。→ 因此**不需要任何 JS 垫片**。
+  ///
+  /// ## 三档决策与各自的理由
+  ///
+  /// 1. **`#` 开头 → `allow`**。`handleNavigationAction` 里 hash 的
+  ///    `pushState` + `HashChangeEvent` 处理**排在 cancel 检查之后**
+  ///    （`view_controller.dart:1126-1134`），一刀切 cancel 会让页内锚点跳转
+  ///    彻底失灵。
+  /// 2. **同源 http(s) → `cancel` + 一条 warn**。刻意**不放行**：`navigate` 分支是
+  ///    `rootController.load(target)`（`:1138-1143`），会把整个插件页替换掉 ——
+  ///    而 URL 上带着 `access_token`、宿主那边的 loading / 20s 超时 / 返回键状态
+  ///    全部错位。也刻意**不丢给系统浏览器**：那是插件自己的页面，扔到浏览器里
+  ///    既没有 token 也不该脱离宿主。留一条 warn 让插件作者知道「WebF 下别做
+  ///    多页跳转」。
+  /// 3. **外部 http(s) / mailto / tel → 系统浏览器 + `cancel`**。这正是 miot
+  ///    小米账号二次验证要的行为（它的登录页是小米的站点，本来就不该在插件页里开）。
+  ///
+  /// 其余 scheme（相对路径、`javascript:`、自定义 scheme）一律 `cancel` + 日志。
+  /// **一律以 cancel 收尾**是唯一安全的默认：任何 `allow` 都意味着整页被换掉。
+  Future<WebFNavigationActionPolicy> _decideNavigation(
+    WebFNavigationAction action,
+  ) async {
+    final target = action.target.trim();
+    if (target.startsWith('#')) {
+      return WebFNavigationActionPolicy.allow;
+    }
+    final uri = Uri.tryParse(target);
+    if (uri == null || !uri.hasScheme) {
+      debugPrint('[plugin][nav] blocked relative navigation: $target');
+      return WebFNavigationActionPolicy.cancel;
+    }
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme == 'http' || scheme == 'https') {
+      if (_isSameOrigin(uri, action.source)) {
+        debugPrint(
+          '[plugin][nav] blocked in-page navigation (WebF 下插件页不支持整页跳转): '
+          '$target',
+        );
+        return WebFNavigationActionPolicy.cancel;
+      }
+    } else if (scheme != 'mailto' && scheme != 'tel') {
+      debugPrint('[plugin][nav] blocked unsupported scheme: $target');
+      return WebFNavigationActionPolicy.cancel;
+    }
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      debugPrint('[plugin][nav] launched externally ok=$ok: $target');
+    } catch (e) {
+      debugPrint('[plugin][nav] launch failed: $target ($e)');
+    }
+    return WebFNavigationActionPolicy.cancel;
+  }
+
+  /// 同源判定：scheme + host + port 严格相等（与后端 HLS 反代的同源判定同一种
+  /// 保守写法）。`source` 拿不到时按「非同源」处理 —— 那会把它交给系统浏览器，
+  /// 比误判成同源后 cancel 掉、用户点了没反应要好。
+  static bool _isSameOrigin(Uri target, String? source) {
+    if (source == null || source.isEmpty) return false;
+    final src = Uri.tryParse(source);
+    if (src == null) return false;
+    return target.scheme == src.scheme &&
+        target.host == src.host &&
+        target.port == src.port;
+  }
+
+  /// 装 delegate。
+  ///
+  /// **必须在 controller 构造之后**：`navigationDelegate` 不是构造参数
+  /// （`launcher/controller.dart:799-828` 的参数列表里没有它 —— 上游
+  /// `navigation.dart:96-103` 的文档示例写成 `WebFController(navigationDelegate:)`
+  /// 是过时/错误的文档），它是构造后可写的属性，setter 会把值同步到已经建好的
+  /// view（`controller.dart:288-294`）。
+  ///
+  /// 两个调用点都要装：`_createController()`（首次）与 `onControllerCreated`
+  /// （被 `WebFControllerManager` 淘汰后重建时 `createController` 不一定再跑，
+  /// 与那里兜住 `_controller` 引用和桥是同一个理由）。
+  void _installNavigationDelegate(WebFController controller) {
+    final delegate = WebFNavigationDelegate();
+    delegate.setDecisionHandler(_decideNavigation);
+    controller.navigationDelegate = delegate;
   }
 
   static Map<String, dynamic>? _decodeRequest(dynamic args) {
@@ -305,6 +422,7 @@ class _PluginRenderSurfaceWebFState
       debugPrint('[plugin][console] $message');
     };
     controller.javascriptChannel.onMethodCall = _onMethodCall;
+    _installNavigationDelegate(controller);
     _controller = controller;
     return controller;
   }
@@ -332,6 +450,10 @@ class _PluginRenderSurfaceWebFState
             // 被淘汰后重建时 createController 不一定再跑，这里兜住引用与桥。
             _controller = controller;
             controller.javascriptChannel.onMethodCall = _onMethodCall;
+            // delegate 同理要重设：没有它页面里的外链会退回上游那个「无条件
+            // cancel」的默认处理器 —— 表现是「重挂之后点外链没反应」，
+            // 而首次挂载时是好的，极难归因。
+            _installNavigationDelegate(controller);
             widget.onControllerReady(this);
           },
           loadingWidget: const SizedBox.expand(),

@@ -20,6 +20,12 @@
                     以及 common.js 的 range 垫片，判据见右列各行上方注释
     17. SAFE AREA   安全区变量 --sl-safe-*（宿主注入替代 env(safe-area-inset-*)），
                     顺带把 max() / clamp() / var() fallback 的可用性钉成回归行
+    18. STEP6       三项经宿主桥下沉的能力事实：data: URL 的两个消费点（<img src>
+                    与 CSS background-image）、btoa/Blob.arrayBuffer/FileReader
+                    的存在性、input[type=file] 的原生表现与垫片端到端链路、
+                    <table> 的警告垫片。判据全在右列该组上方的注释里，
+                    而**读数通道是 flutter.log 里的 `[probe] step6` 那一行**
+                    （截图里 18b 只够看个大概）
 
   版面：WebF 窗口实测只有 1280x717（Xvfb 屏是 1280x900，下方黑色区域是 Flutter
   压根没画的部分），单列纵向已经被 12 组占满，所以从第 13 组起改成**两列**：
@@ -59,6 +65,10 @@
     .colL { width: 762px; }
     .colR { width: 462px; }
     .colR .tag { width: 118px; }
+    /* 右列 12 组行距压到 8px：加第 18 组后 12px 会把 18b 挤出 717px 的可见区，
+       而被截掉的行看起来和「脚本没跑」一模一样（文件头「版面」那段的警告）。
+       只影响纵向位置，各组判据不变。 */
+    .colR .row { margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -474,6 +484,90 @@
     <span class="tag">17b SAFE AREA STATE</span>
     <span id="sastate" class="caps">(script did not run)</span>
   </div>
+
+  <!--
+    18 STEP6 — 三项经宿主桥下沉的能力事实（songloft-org/songloft#341 Step 6）。
+
+    这一组问的全是「WebF 的 C++/QuickJS 侧到底有没有这个东西」，而 C++ 源码不随
+    pub 包发布（webf-0.24.27 顶层只有 android/ example/ include/ lib/ … ，
+    include/ 里只有 webf_bridge.h），**只能实测**。所以本组刻意做得很密：
+    一次运行同时钉住 6 件事，省掉 6 轮容器往返。
+
+    视觉行（18）只有两个 16px 方块，判据全在 18b 的文字与 flutter.log 里：
+
+      IMG  <img src="data:image/png;base64,…">        → 出现青色方块 = data: URL 走
+                                                        img.dart 的 WebFBundle.fromUrl
+                                                        分支可用（源码已核实支持，这里
+                                                        只做回归）
+      BG   background-image: url(data:image/png;…)     → **本组最关键的一项**。
+                                                        CSS 背景图走 css/background.dart
+                                                        而不是 img.dart，那条链路没追完；
+                                                        且 data: URL 里含逗号与分号，
+                                                        CSS url() 的词法解析可能切错。
+                                                        出现青色方块 = miot 全屏播放器的
+                                                        bgImage 能沿用同一个 data: URL；
+                                                        空白 = 那一处必须另找出路
+
+    18b 报的文字项：
+
+      open=            typeof window.open。'function' 只说明**绑定存在**，不代表
+                       C++ 会把调用转发到 Dart。真正的判据在 flutter.log：
+                       没有 delegate 时应出现上游那句
+                       `Attempting to navigate WebF to an external WebF page`；
+                       装了 delegate 时应出现探针自己那句 `[probe] nav decision`。
+                       两个 URL 刻意不同（sl-open-1 / sl-open-2），用来区分
+                       「单参」与「带 target 的双参」两种调用形态 —— miot
+                       js/auth.js:95 是双参，而 WebF 的 Dart 绑定
+                       (`dom/window.dart:43`) 只声明了 args[0]
+      btoa / atob      base64 编解码。缺了就必须自己写编码表
+      FileReader       缺了就不能垫 FileList/File（Step 4 设计文档 §2.3 的前提）
+      Blob / arrBuf    Blob.prototype.arrayBuffer —— blob→base64 的唯一同步可得路径
+      blobText         `new Blob(['..']).text()` 真的能 await 出内容吗（有没有绑定
+                       ≠ 能不能用）
+      b64rt            端到端往返：Blob → arrayBuffer → btoa → data: URL 是否与
+                       预期字符串逐字符相等。这是「能拼出 data: URL」的**唯一**
+                       可信判据
+      fileVisHidden    `<input type=file hidden>` 的盒子尺寸。非 0 = WebF **不认**
+                       HTML hidden 属性 → 连插件刻意隐藏的那个 input 都会在页面上
+                       占掉一行（Step 4 设计文档 §2.3 的待测项 15）
+      fileVisRaw       同样的 input，但带 `data-sl-no-file-picker` 退出开关
+                       （垫片不碰它）→ 它永远反映 WebF 的**原生**表现：
+                       非 0 即证实「file input 静默变成一个占位文本框」。
+                       这一行是垫片落地**之后**唯一还能测到原生行为的对照组
+      fileVis+shimmed  垫片接管的那个 input：装上后尺寸应变 0 且 shimmed=yes。
+                       **两项必须一起看** —— 单看尺寸 0 会与「WebF 认了 hidden
+                       属性」撞成同一个读数
+      progClick        `el.click()`（程序化调用）会不会派发 DOM click 到监听器。
+                       决定 file 垫片是「拦 click 事件」还是「必须覆写实例 click
+                       方法」（Step 4 设计文档 §2.4 的待测项 14）。
+                       实测就算是 true 也两条都做 —— 见 common.js 里的理由
+      picked           file 垫片端到端：`click()` → 垫片 → 宿主桥 → Dart 的 canned
+                       应答 → change 事件。`probe.m3u/8` = 整条链路真的通了。
+                       `viaLast:` 前缀说明 `event.data` 挂不上、走的是主通道
+                       `SongloftPlugin.lastPickedFiles`（那是设计里的预期兜底）
+      tableMark        tableWarnShim 有没有给 <table> 打上
+                       `data-sl-table-unsupported`。配合 flutter.log 里那条
+                       `[songloft] WebF 不支持原生 <table>` 的 warn 一起看。
+                       页面里那个 <table> 刻意 `display:none` —— 本组只验「警告
+                       与标记」，表格退化成什么样子是源码层面已经定死的事
+                       （_UnknownHTMLElement + display:block），不需要占版面复现
+  -->
+  <div class="row" style="align-items:center;margin-bottom:6px">
+    <span class="tag">18 STEP6</span>
+    <span class="s6row">
+      <img id="s6img" class="s6box" alt="data-url img">
+      <span id="s6bg" class="s6box"></span>
+      <input type="file" id="s6fileH" hidden>
+      <input type="file" id="s6fileRaw" data-sl-no-file-picker>
+      <input type="file" id="s6fileV">
+      <table id="s6table" style="display:none"><tbody><tr><td>t</td></tr></tbody></table>
+    </span>
+  </div>
+
+  <div class="row" style="align-items:flex-start;margin-bottom:0">
+    <span class="tag">18b STEP6 STATE</span>
+    <span id="s6state" class="caps">(script did not run)</span>
+  </div>
 </div><!-- /colR -->
 </div><!-- /cols -->
 
@@ -503,6 +597,9 @@
     /* 多行文字断言块。写死 width 而不用 flex:1：右列已经写死 462px，
        flex-grow 若在 WebF 下表现异常会把这块挤成 0 宽而整段静默消失。 */
     .caps { font-size: 11px; line-height: 14px; width: 330px; color: #111; }
+    /* 18b 的读数比别人长得多（一次钉住 20 来项），所以单独放宽到整列宽 + 缩字号，
+       让它落在 717px 的可见区里。判据通道仍然是 flutter.log。 */
+    #s6state { width: 336px; font-size: 10px; line-height: 12px; }
     .sldrow { display: flex; gap: 10px; align-items: center; }
     /* 虚线框由 WebF 的盒模型绘制，滑块由我们的 CustomPaint 绘制 —— 两者分离，
        所以「有框无滑块」（N）与「有框有滑块」（H/V/D）一眼可辨。 */
@@ -511,6 +608,16 @@
     /* 17 组：盒子高度 == padding-bottom 求值结果，所以必须 content-box
        （common.css 的 reset 把全局设成了 border-box，那样 height:0 与 padding
        的关系要多绕一层推理）。宽 20px 只为看得见，判据全在 height 上。 */
+    /* 18 组：两个 16px 方块并排。写死 width/height 而不靠图片固有尺寸 ——
+       固有尺寸拿不到时盒子会塌成 0，那与「data: URL 没解码」看起来一样。
+       所以盒子一定有，判据是**里面有没有青色**。 */
+    .s6row { display: flex; gap: 8px; align-items: center; }
+    .s6box {
+      display: block; width: 16px; height: 16px;
+      border: 1px solid #bbb; box-sizing: content-box;
+      background-repeat: no-repeat; background-size: 16px 16px;
+    }
+
     .sarow { display: flex; gap: 6px; align-items: flex-end; }
     .sabox {
       display: inline-block; box-sizing: content-box;
@@ -980,6 +1087,174 @@
       // 兜底：DRAG_PROBE 关（或 Dart 侧没回调）时也要出 readout。
       // 6.5s = 1800ms 起拖 + 3 段合成拖动各约 0.5s 的余量，仍远小于 SETTLE(12s)。
       setTimeout(finalize, 6500);
+    });
+
+    // ── 18 Step 6：三项经宿主桥下沉的能力事实 ──────────────────────────
+    //
+    // 又是单独一个 DOMContentLoaded 回调（与 details / ring / 滑块 / 安全区四段并列）：
+    // 任一段抛异常都不该让别人的 readout 停在 "(script did not run)"。
+    //
+    // 本组问的全是「C++/QuickJS 侧到底有没有这个东西」——那一层不随 pub 包发布，
+    // **只能实测**。判据全写在上面 18 组那段 HTML 注释里。
+    document.addEventListener('DOMContentLoaded', function () {
+      // 16x16 纯青色 PNG（79 字节），用 zlib+struct 现造的，不引外部资源：
+      // 探针容器里没有网络，且这一项要测的正是「不发请求也能出图」。
+      var PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mOQ' +
+        'bu8nCTGMahjVMHw1AACyXjEQBmoK9AAAAABJRU5ErkJggg==';
+      var DATA_URL = 'data:image/png;base64,' + PNG_B64;
+      var parts = [];
+      function put(k, v) { parts.push(k + '=' + v); }
+      function ty(v) { try { return typeof v; } catch (e) { return 'threw'; } }
+      function rect(id) {
+        var el = document.getElementById(id);
+        if (!el) return 'missing';
+        try {
+          var r = el.getBoundingClientRect();
+          return Math.round(r.width) + 'x' + Math.round(r.height);
+        } catch (e) { return 'threw'; }
+      }
+      function flush() {
+        var text = parts.join(' ');
+        var el = document.getElementById('s6state');
+        if (el) el.textContent = text;
+        console.log('[probe] step6 ' + text);
+      }
+
+      // ① data: URL 两个消费点。**必须由 JS 赋值而不是写在 HTML 属性里**：
+      // 静态 HTML 的图片加载发生在解析期，而 common.js 的空 src 访问器垫片
+      // 只挡运行时赋值 —— 两条路径混在一起就分不清是谁的功劳/锅。
+      try {
+        document.getElementById('s6img').src = DATA_URL;
+        put('imgSet', 'ok');
+      } catch (e) { put('imgSet', 'threw'); }
+      try {
+        document.getElementById('s6bg').style.backgroundImage = 'url(' + DATA_URL + ')';
+        put('bgSet', 'ok');
+      } catch (e) { put('bgSet', 'threw'); }
+
+      // ② base64 / Blob / FileReader 存在性
+      put('btoa', ty(window.btoa));
+      put('atob', ty(window.atob));
+      put('FileReader', ty(window.FileReader));
+      put('Blob', ty(window.Blob));
+      put('File', ty(window.File));
+      put('FileList', ty(window.FileList));
+      put('arrBuf', (window.Blob && window.Blob.prototype)
+        ? ty(window.Blob.prototype.arrayBuffer) : 'n/a');
+      put('objURL', (window.URL) ? ty(window.URL.createObjectURL) : 'no-URL');
+
+      // ③ `<input type=file>` 的原生表现。
+      // shimmed 那一项是给「common.js 加了 file 垫片之后」留的回归位：
+      // 之后这两行的尺寸会变 0（垫片强制 display:none），单看尺寸会与
+      // 「WebF 认了 hidden 属性」撞成同一个读数，必须靠标记区分。
+      put('fileVisHidden', rect('s6fileH'));
+      put('fileVisRaw', rect('s6fileRaw'));
+      put('fileVis', rect('s6fileV'));
+      put('shimmed', document.getElementById('s6fileV')
+        .hasAttribute('data-sl-file-shim') ? 'yes' : 'no');
+      put('shimRespectsOptOut', document.getElementById('s6fileRaw')
+        .hasAttribute('data-sl-file-shim') ? 'BROKEN' : 'ok');
+      put('tableMark', document.getElementById('s6table')
+        .hasAttribute('data-sl-table-unsupported') ? 'yes' : 'no');
+
+      // ④ 程序化 click() 会不会派发 DOM click 事件到监听器。
+      // 用一个**新建的**元素而不是页面上现成的：现成元素可能已经被别的垫片
+      // 装过监听器，测出来的就不是「纯 click() 语义」了。
+      var probeBtn = document.createElement('span');
+      probeBtn.textContent = '.';
+      probeBtn.style.display = 'none';
+      var clicked = false;
+      probeBtn.addEventListener('click', function () { clicked = true; });
+      document.body.appendChild(probeBtn);
+      try {
+        probeBtn.click();
+        put('clickCalled', 'ok');
+      } catch (e) { put('clickCalled', 'threw'); }
+
+      // ⑤ blob → base64 端到端往返。**这才是「能拼出 data: URL」的判据** ——
+      // 上面那些 typeof 只证明绑定存在，不证明能用（WebF 里
+      // ImageType.blob 就是个从 Kraken 继承来的死枚举值）。
+      var expect = 'aGk=';   // btoa('hi')
+      var blob = null;
+      try { blob = new Blob(['hi'], { type: 'text/plain' }); } catch (e) { blob = null; }
+      put('blobMade', blob ? 'ok' : 'no');
+      if (blob && typeof blob.text === 'function') {
+        blob.text().then(function (s) {
+          put('blobText', JSON.stringify(s));
+        }, function (err) {
+          put('blobText', 'rej:' + ((err && err.message) || err));
+        });
+      } else {
+        put('blobText', 'n/a');
+      }
+      if (blob && typeof blob.arrayBuffer === 'function' &&
+          typeof window.btoa === 'function') {
+        blob.arrayBuffer().then(function (buf) {
+          try {
+            var bytes = new Uint8Array(buf);
+            var s = '';
+            for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+            var b64 = window.btoa(s);
+            put('b64rt', b64 === expect ? 'ok' : 'got:' + b64);
+          } catch (e) {
+            put('b64rt', 'threw:' + ((e && e.message) || e));
+          }
+        }, function (err) {
+          put('b64rt', 'rej:' + ((err && err.message) || err));
+        });
+      } else {
+        put('b64rt', 'n/a');
+      }
+
+      // ⑥ file 垫片端到端：click() → 垫片 → 宿主桥 → Dart 的 canned 应答 →
+      // change 事件。probe_main.dart 侧收 songloftHost/files.pickFile 后返回
+      // 一个固定文件，所以「picked=…」出现就意味着整条链路真的走通了
+      // （不是「垫片装上了」而已）。
+      var picked = 'none';
+      var fileEl = document.getElementById('s6fileV');
+      if (fileEl) {
+        fileEl.addEventListener('change', function (ev) {
+          var f = (ev && ev.data && ev.data.files && ev.data.files[0]) || null;
+          if (!f) {
+            var lp = window.SongloftPlugin && window.SongloftPlugin.lastPickedFiles;
+            f = (lp && lp[0]) || null;
+            picked = f ? 'viaLast:' + f.name + '/' + (f.text || '').length : 'change-nodata';
+          } else {
+            picked = f.name + '/' + (f.text || '').length;
+          }
+        });
+      }
+
+      // ⑦ window.open。**放在最后、且延后到别的读数都取完**：万一将来某个
+      // delegate 返回 allow，整页会被替换掉，那之前的读数就全丢了。
+      // 两次调用刻意用不同 URL 与不同参数个数：miot js/auth.js:95 是双参
+      // （`window.open(url, '_blank')`），而 WebF 的 Dart 绑定只声明 args[0]。
+      setTimeout(function () {
+        put('open', ty(window.open));
+        try {
+          window.open('https://example.com/sl-open-1');
+          put('open1', 'called');
+        } catch (e) { put('open1', 'threw:' + ((e && e.message) || e)); }
+        try {
+          window.open('https://example.com/sl-open-2', '_blank');
+          put('open2', 'called');
+        } catch (e) { put('open2', 'threw:' + ((e && e.message) || e)); }
+
+        // 触发 file 垫片（若已安装）。放在 open 之后：它是异步的，且会弹
+        // 一个 Dart 侧的选择器（探针里是 canned 应答，不会真弹 UI）。
+        try {
+          if (fileEl) fileEl.click();
+          put('fileClick', 'called');
+        } catch (e) { put('fileClick', 'threw:' + ((e && e.message) || e)); }
+
+        setTimeout(function () {
+          put('progClick', clicked ? 'dispatched' : 'no-dispatch');
+          put('picked', picked);
+          put('imgRect', rect('s6img'));
+          put('bgRect', rect('s6bg'));
+          flush();
+        }, 1200);
+      }, 2600);
     });
   </script>
 </body>

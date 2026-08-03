@@ -265,6 +265,84 @@ void _pushSafeAreaFromDart(WebFController c) {
   });
 }
 
+/// Step 6 · `window.open` 的**决定性实验**（songloft-org/songloft#341）。
+///
+/// 问题：WebF 的 `Window.open`（`dom/window.dart:71-74`）在 Dart 侧是有实现的
+/// —— 它调 `handleNavigationAction`，而默认 decision handler 无条件返回 `cancel`
+/// （`module/navigation.dart:85-106`）。但 `window.open` 的**入口**在 C++ 桥
+/// （`bridge/core/frame/window.cc`），那一层不随 pub 包发布，所以
+/// 「C++ 到底有没有把调用转发到 Dart 的 binding」**无法从源码核实**。
+///
+/// 两种情形导向完全不同的修法：
+///   A. C++ 转发 → 现状只是被默认策略 cancel 掉 → 装一个 delegate 就够，无需 JS 垫片
+///   B. C++ 自己 return 就结束 → Dart 永远不被调到 → 只能 JS 垫片覆写 window.open
+///
+/// **本探针把两者一次分辨清楚**，不需要跑两轮：
+///   - 装 delegate 时先打一条 `[probe] nav delegate installed`（证明装上了）
+///   - 收到决策请求时打 `[probe] nav decision target=…`（证明 C++ 真的转发了）
+/// 于是 flutter.log 里：
+///   installed + decision → **情形 A**
+///   installed 但无 decision → **情形 B**（不是「delegate 没装上」）
+///   连 installed 都没有 → 探针自己的问题，先修探针
+///
+/// 一律返回 `cancel`：返回 allow 会让 WebF 自己 `rootController.load(target)`
+/// 把整页替换掉（`view_controller.dart:1138-1143`），探针页当场消失、后续读数全丢。
+/// 唯一例外是 `#` 锚点 —— `handleNavigationAction` 里 hash 的 pushState +
+/// HashChangeEvent 处理**排在 cancel 检查之后**（`:1126-1134`），cancel 掉页内
+/// 跳转就不工作了。产品侧同一条逻辑，见
+/// `plugin_render_surface_webf.dart` 的 `_createNavigationDelegate()`。
+void _installNavigationDelegate(WebFController controller) {
+  final delegate = WebFNavigationDelegate();
+  delegate.setDecisionHandler((action) async {
+    debugPrint(
+      '[probe] nav decision target=${action.target} '
+      'source=${action.source} type=${action.navigationType}',
+    );
+    if (action.target.trim().startsWith('#')) {
+      return WebFNavigationActionPolicy.allow;
+    }
+    return WebFNavigationActionPolicy.cancel;
+  });
+  controller.navigationDelegate = delegate;
+  debugPrint('[probe] nav delegate installed');
+}
+
+/// Step 6 · `input[type=file]` 桥的**canned 应答**。
+///
+/// 探针里刻意不接真的 `file_picker`（那会拉起系统文件选择器、在 Xvfb 里
+/// 没有可点的东西，且给探针 package 引入产品依赖）。这里回一个固定文件，
+/// 目的是把**链路**钉住：JS `input.click()` → common.js 的 file 垫片 →
+/// `songloft.host` methodChannel → Dart → 应答 → 垫片派发 `change` →
+/// 页面读到 `event.data.files[0].text`。
+///
+/// 页面那边只要打出 `picked=probe.m3u/8` 就说明整条链路真的通了；
+/// 只装上垫片但桥不通时会显示 `change-nodata` 或 `none`，两者可辨。
+String _cannedHostReply(String payload) {
+  Map<String, dynamic>? req;
+  try {
+    final decoded = jsonDecode(payload);
+    if (decoded is Map) req = Map<String, dynamic>.from(decoded);
+  } catch (_) {
+    req = null;
+  }
+  final String ns = '${req?['ns']}';
+  final String method = '${req?['method']}';
+  debugPrint(
+    '[probe] host call ns=$ns method=$method params=${req?['params']}',
+  );
+  if (ns == 'files' && method == 'pickFile') {
+    return jsonEncode({
+      'ok': true,
+      'data': {
+        'files': [
+          {'name': 'probe.m3u', 'size': 8, 'text': '#EXTM3U\n'},
+        ],
+      },
+    });
+  }
+  return jsonEncode({'ok': false, 'error': 'probe: unhandled $ns.$method'});
+}
+
 class ProbeApp extends StatelessWidget {
   const ProbeApp({super.key});
 
@@ -322,6 +400,14 @@ class ProbeApp extends StatelessWidget {
             // （`plugin_render_surface_webf.dart` 的 `javascriptChannel.onMethodCall`）。
             // 这里只用来接「滑块的屏幕坐标」，见 [_synthDrag]。
             controller.javascriptChannel.onMethodCall = (method, args) async {
+              // 第 18 组：宿主桥（`common.js` 的 invokeViaWebF 走这个方法名）。
+              if (method == 'songloftHost') {
+                dynamic payload = args;
+                if (payload is List && payload.isNotEmpty) {
+                  payload = payload.first;
+                }
+                return _cannedHostReply(payload is String ? payload : '');
+              }
               // 第 17 组：页面读完自己那一轮后叫我们推安全区（Step 5）。
               if (method == 'slSafeArea') {
                 _pushSafeAreaFromDart(controller);
@@ -346,6 +432,13 @@ class ProbeApp extends StatelessWidget {
               });
               return null;
             };
+            // Step 6：`window.open` 的决定性实验，见 [_installNavigationDelegate]。
+            // 必须在 controller 构造**之后**赋值 —— `navigationDelegate` 不是构造
+            // 参数（`launcher/controller.dart:799-828` 的参数列表里没有它，上游
+            // `navigation.dart:96-103` 文档示例里那个 `WebFController(
+            // navigationDelegate: ...)` 是过时/错误的文档）。setter 会顺带同步到
+            // 已经建好的 view（`controller.dart:288-294`）。
+            _installNavigationDelegate(controller);
             return controller;
           },
           loadingWidget: const Center(child: CircularProgressIndicator()),
