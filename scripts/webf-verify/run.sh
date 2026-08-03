@@ -9,6 +9,9 @@
 #
 # 产出（宿主）：songloft-player/scripts/webf-verify/out/
 #   probe.png       截图（判据见 probe.html 顶部注释）
+#   pixels.txt      **绘制层判据**：在 probe.png 上按页面报的坐标逐点取色的 PASS/FAIL。
+#                   截图里「元素盒子有尺寸」不等于「像素被画出来了」，这一份才管后者。
+#                   渲染真实插件页时为一行 skip 说明（探针页专属）
 #   build.log       Flutter/CMake 构建日志
 #   flutter.log     探针运行期 stdout/stderr
 #   codepoints.txt  从真实 woff2 cmap 查到的图标码点

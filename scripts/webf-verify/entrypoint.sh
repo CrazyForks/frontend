@@ -223,6 +223,104 @@ import -display :99 -window root "$OUT/probe.png" 2>>"$OUT/xvfb.log" || {
 }
 log "截图已落 $OUT/probe.png"
 
+# ── 6b. 绘制层判据：在截图上逐点取色 ─────────────────────────────
+# 为什么需要这一步：探针页里那些 `imgSet=ok` / `bgRect=16x16` / `naturalWidth`
+# **只证明元素盒子有尺寸、赋值没抛异常**，不证明像素真被画出来了。实测一个
+# 硬编码 1×1 红点 PNG 三项全正常、截图里方块却是灰的 —— 判据从缝里漏过去了。
+# 唯一可信的证据在帧缓冲里，所以只能抓屏取色。
+#
+# 坐标与期望颜色由**页面自己**经 console 报上来（`[probe] step6-px img=x,y,HEX …`），
+# 不写死在这里：版面一改死坐标就静默失效，表现是「PASS 变 FAIL」，看起来像 WebF 坏了。
+# 渲染真实插件页时这一行压根不存在 → 整步跳过（不是失败）。
+# 主判据是**存在性**（期望颜色在整张截图里出现了多少像素），不是点取色 ——
+# 点取色对版面漂移敏感：页面报坐标的那一刻（≈3.8s）与抓屏那一刻（SETTLE=12s）
+# 之间，上面几组的异步读数还在往 DOM 里写文字，把下面的行整体推下去。
+# 第一版就栽在这里：三个方块**都画出来了**，但点取色全 FAIL（y 差 96px），
+# 差一点被误判成「WebF 画不出 data: URL 图」。
+# 三个方块的颜色在整页里唯一（刻意选的），所以「出现了 ≈196 个该色像素」
+# 就是充分证据；点取色降级为附注，用来发现坐标漂移。
+sample_pixels() {
+  local line
+  # 同一条 console 消息在 flutter.log 里会出现两次（一次裸文本、一次带引号），
+  # 所以先 tr -d '"' 再取最后一条 —— 否则 want 会带上一个尾引号。
+  line=$(grep -o 'step6-px .*' "$OUT/flutter.log" | tr -d '"' | tail -1 || true)
+  if [ -z "$line" ]; then
+    echo 'no step6-px line in flutter.log（渲染的不是探针页，或第 18 组没跑完）' \
+      >"$OUT/pixels.txt"
+    log '跳过取色判据（flutter.log 里没有 step6-px）'
+    return 0
+  fi
+  local st=0
+  python3 - "$OUT/probe.png" "$OUT/pixels.txt" "${line#step6-px }" <<'PY' || st=$?
+import subprocess, sys
+
+png, report, spec = sys.argv[1], sys.argv[2], sys.argv[3]
+
+
+def im(args):
+    return subprocess.run(['convert', png] + args,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def exact(hexcolor):
+    """整张截图里颜色恰好等于 hexcolor 的像素数 + 它们的外接矩形。
+
+    极性必须是「匹配 -> 白、不匹配 -> 黑」：这样 %[fx:mean] 直接就是匹配比例，
+    而 %@（trim 外接矩形，按角落像素当背景色）也正好圈出匹配区域，一趟出两个数。
+    反过来写（匹配 -> 黑）会让 mean 变成「不匹配比例」—— 读数接近 1，
+    很容易被当成「几乎整页都是这个颜色」。
+    """
+    common = ['-fill', 'black', '+opaque', '#' + hexcolor,
+              '-fill', 'white', '-opaque', '#' + hexcolor]
+    res = im(common + ['-format', '%[fx:mean] %w %h %@', 'info:']).split()
+    try:
+        n = round(float(res[0]) * int(res[1]) * int(res[2]))
+        bbox = res[3] if len(res) > 3 else '?'
+    except Exception:
+        n, bbox = -1, '?'
+    return n, bbox
+
+
+def point(x, y):
+    txt = im(['-crop', '1x1+%s+%s' % (x, y), '+repage', '-depth', '8', 'txt:-'])
+    for tok in txt.replace('(', ' ').replace(')', ' ').split():
+        if tok.startswith('#') and len(tok) >= 7:
+            return tok[1:7].upper()
+    return '??'
+
+
+lines, fail = [], 0
+for tok in spec.split():
+    name, _, val = tok.partition('=')
+    bits = val.split(',')
+    if len(bits) != 3:
+        lines.append('%s: SKIP (%s)' % (name, val))
+        continue
+    x, y, want = bits[0], bits[1], bits[2].upper()
+    n, bbox = exact(want)
+    got = point(x, y)
+    verdict = 'PASS' if n > 0 else 'FAIL'
+    if n <= 0:
+        fail = 1
+    note = ''
+    if n > 0 and got != want:
+        # 画出来了但报的坐标上不是它 —— 坐标漂移，不是绘制失败
+        note = '  [坐标已漂移，判定看 present]'
+    lines.append('%s: %s want=%s present=%dpx bbox=%s point@%s,%s=%s%s'
+                 % (name, verdict, want, n, bbox, x, y, got, note))
+
+out = '\n'.join(lines) + '\n'
+open(report, 'w').write(out)
+sys.stdout.write(out)
+sys.exit(0 if fail == 0 else 3)
+PY
+  # 刻意**不**让容器 exit 1：本容器的产物是「事实」，判定留给读结论的人。
+  # ctl（纯 CSS 背景色）FAIL 才说明取色环节自己坏了；img/bg FAIL 是 WebF 的事实。
+  [ "$st" = 0 ] || log '取色判据有 FAIL —— 先看 ctl 那行：ctl 也 FAIL 说明取色环节自己坏了'
+  return 0
+}
+sample_pixels
+
 # 顺带记录一份环境事实，方便回看
 {
   echo "glibc: $(ldd --version | head -1)"

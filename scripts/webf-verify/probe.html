@@ -25,7 +25,12 @@
                     的存在性、input[type=file] 的原生表现与垫片端到端链路、
                     <table> 的警告垫片。判据全在右列该组上方的注释里，
                     而**读数通道是 flutter.log 里的 `[probe] step6` 那一行**
-                    （截图里 18b 只够看个大概）
+                    （截图里 18b 只够看个大概；base64 三项的完整详情在
+                     `[probe] step6-b64` 那行）。
+                    ⚠️ 那四个 16px 方块的判据**不在**这行文字里，而在
+                    **out/pixels.txt** —— 它是抓屏后按页面报的坐标逐点取色的
+                    PASS/FAIL。原因：`imgSet=ok` / `bgRect=16x16` / `naturalWidth`
+                    只证明「盒子有尺寸、赋值没抛异常」，**不证明像素被画出来了**
 
   版面：WebF 窗口实测只有 1280x717（Xvfb 屏是 1280x900，下方黑色区域是 Flutter
   压根没画的部分），单列纵向已经被 12 组占满，所以从第 13 组起改成**两列**：
@@ -493,20 +498,36 @@
     include/ 里只有 webf_bridge.h），**只能实测**。所以本组刻意做得很密：
     一次运行同时钉住 6 件事，省掉 6 轮容器往返。
 
-    视觉行（18）只有两个 16px 方块，判据全在 18b 的文字与 flutter.log 里：
+    视觉行（18）是三个 16px 方块，判据全在 18b 的文字、out/pixels.txt 与 flutter.log 里：
 
-      IMG  <img src="data:image/png;base64,…">        → 出现青色方块 = data: URL 走
-                                                        img.dart 的 WebFBundle.fromUrl
-                                                        分支可用（源码已核实支持，这里
-                                                        只做回归）
-      BG   background-image: url(data:image/png;…)     → **本组最关键的一项**。
+      IMG  <img src="data:image/png;base64,…">        → 应画出**青色** #1B878F。
+                                                        data: URL 走 img.dart 的
+                                                        WebFBundle.fromUrl 分支
+      BG   background-image: url(data:image/png;…)     → 应画出**洋红** #FF00FF
+                                                        （刻意与 IMG 不同色，这样一个
+                                                        像素就能分辨是哪条路成了）。
                                                         CSS 背景图走 css/background.dart
                                                         而不是 img.dart，那条链路没追完；
                                                         且 data: URL 里含逗号与分号，
                                                         CSS url() 的词法解析可能切错。
-                                                        出现青色方块 = miot 全屏播放器的
+                                                        出现洋红 = miot 全屏播放器的
                                                         bgImage 能沿用同一个 data: URL；
-                                                        空白 = 那一处必须另找出路
+                                                        不是洋红 = 那一处必须另找出路
+      CTL  background-color: #0000FF（纯 CSS，无图）   → **抓屏取色的阳性对照**，
+                                                        必须是蓝的。连它都不蓝就说明
+                                                        坐标/取色环节自己坏了，
+                                                        而不是 data: URL 画不出图
+
+    ⚠️⚠️ **两个 data-URL 方块的判据必须落在「截图里真的出现那个颜色」上，
+    不能用 `imgSet=ok` / `bgSet=ok` / `bgRect=16x16` / `naturalWidth`。**
+    本组旧版就是那么写的，结果结构上漏掉了绘制层：实测一个硬编码 1×1 红点 PNG
+    虽然 `naturalWidth` 报 1/1、盒子尺寸也正常，**截图里那个方块却是灰的**。
+    `imgSet` 只证明「赋值没抛异常」、`bgRect` 只证明「元素盒子有尺寸」，
+    **都不证明像素被画出来了**。
+    所以页面把三个方块的中心坐标 + 期望颜色写进 flutter.log 的一行
+    `[probe] step6-px img=x,y,HEX bg=… ctl=…`，抓屏后由 entrypoint.sh 用
+    ImageMagick 逐点取色比对，结论落在 out/pixels.txt（PASS/FAIL 逐行）。
+    坐标由页面自己量（getBoundingClientRect），不写死 —— 版面一改死坐标就废。
 
     18b 报的文字项：
 
@@ -524,9 +545,26 @@
       Blob / arrBuf    Blob.prototype.arrayBuffer —— blob→base64 的唯一同步可得路径
       blobText         `new Blob(['..']).text()` 真的能 await 出内容吗（有没有绑定
                        ≠ 能不能用）
-      b64rt            端到端往返：Blob → arrayBuffer → btoa → data: URL 是否与
-                       预期字符串逐字符相等。这是「能拼出 data: URL」的**唯一**
-                       可信判据
+      btoaHi           `btoa` 的**二进制安全性**单点判据：`btoa('\x89PNG')` 必须是
+                       `iVBORw==`。实测 WebF 给的是 `wolQTg==` —— 它把 > 0x7F 的
+                       码点当字符先做了一次 UTF-8 编码（`0xC2 0x89` 正是 U+0089 的
+                       UTF-8），已登记为上游缺陷。**这一项预期是 FAIL**，
+                       它在这里是为了守住「宿主为什么要自带编码表」这个前提：
+                       哪天它变成 ok 了，才可以考虑退回 btoa
+      b64rt            **256 种字节值全覆盖**的往返：Blob(Uint8Array 0..255) →
+                       arrayBuffer → btoa → 与预期 base64 逐字符比对。
+                       旧版这里用的是 `new Blob(['hi'])` —— 纯 ASCII，**全程没有
+                       一个字节 > 0x7F**，结构上抓不到 btoa 的二进制不安全，
+                       于是那个真缺陷从判据的缝里溜过去了。二进制路径的用例
+                       **必须含高位字节**，这是这一版最重要的加固
+      dataUrl          同一个 256 字节 blob 走**产品自己那条路**
+                       （`SongloftPlugin.blobToDataURL`，内部是 common.js 的
+                       `bytesToBase64` 自带编码表，不用 btoa），与预期 data: URL
+                       逐字符比对。b64rt 测的是「上游坏在哪」，这一项测的是
+                       「我们的绕法到底对不对」—— 后者才是回归判据
+      mismatch@N       上面两项失败时的形态：N = 第一个不相等的字符下标，
+                       后面跟 got/exp 各一个字符。**刻意不打完整 344 字符**：
+                       18b 那行读数已经是全组最长，塞进去会把别的行挤出截图
       fileVisHidden    `<input type=file hidden>` 的盒子尺寸。非 0 = WebF **不认**
                        HTML hidden 属性 → 连插件刻意隐藏的那个 input 都会在页面上
                        占掉一行（Step 4 设计文档 §2.3 的待测项 15）
@@ -557,6 +595,10 @@
     <span class="s6row">
       <img id="s6img" class="s6box" alt="data-url img">
       <span id="s6bg" class="s6box"></span>
+      <!-- 抓屏取色的阳性对照：纯 CSS 背景色，不经任何图片解码路径。 -->
+      <span id="s6ctl" class="s6box" style="background-color:#0000ff"></span>
+      <!-- 1×1 PNG 被 CSS 放大到 16×16：区分「data: URL 画不出图」与「1×1 放大画不出」。 -->
+      <img id="s6img1" class="s6box" alt="1x1 data-url img">
       <input type="file" id="s6fileH" hidden>
       <input type="file" id="s6fileRaw" data-sl-no-file-picker>
       <input type="file" id="s6fileV">
@@ -1097,11 +1139,26 @@
     // 本组问的全是「C++/QuickJS 侧到底有没有这个东西」——那一层不随 pub 包发布，
     // **只能实测**。判据全写在上面 18 组那段 HTML 注释里。
     document.addEventListener('DOMContentLoaded', function () {
-      // 16x16 纯青色 PNG（79 字节），用 zlib+struct 现造的，不引外部资源：
+      // 两张 16x16 纯色 PNG（各 79 字节），用 zlib+struct 现造的，不引外部资源：
       // 探针容器里没有网络，且这一项要测的正是「不发请求也能出图」。
-      var PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mOQ' +
-        'bu8nCTGMahjVMHw1AACyXjEQBmoK9AAAAABJRU5ErkJggg==';
-      var DATA_URL = 'data:image/png;base64,' + PNG_B64;
+      //
+      // **两张刻意不同色**：<img> 用青色、CSS background-image 用洋红。
+      // 同色时抓屏取到一个方块是那个颜色，分不清是哪条路成了 —— 而这两条路在
+      // WebF 里是两套完全不同的实现（img.dart vs css/background.dart）。
+      var PNG_CYAN = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mOQ' +
+        'bu8nCTGMahjVMHw1AACyXjEQBmoK9AAAAABJRU5ErkJggg==';    // #1B878F
+      var PNG_MAGENTA = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4' +
+        'z/CfJMQwqmFUw/DVAAAg0/4QFUWCjwAAAABJRU5ErkJggg==';    // #FF00FF
+      // **1×1** 纯绿 PNG（69 字节），由 CSS 的 16px 盒子放大显示。
+      // 存在的理由：交接文档里记着「一个硬编码 1×1 红点 PNG 虽然 naturalWidth 报 1/1，
+      // 截图里那个方块却是灰的」。若 16×16 的两张画得出来、这张画不出来，
+      // 那个观察的真因就是「1×1 放大」而不是「data: URL 不可用」——
+      // 两者对插件作者的含义完全不同（后者要另找出路，前者只要别用 1×1 占位图）。
+      var PNG_1PX_GREEN = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mNg' +
+        '+M8AAAICAQBF9FLUAAAAAElFTkSuQmCC';                    // #00FF00
+      var DATA_URL = 'data:image/png;base64,' + PNG_CYAN;
+      var BG_DATA_URL = 'data:image/png;base64,' + PNG_MAGENTA;
+      var PX1_DATA_URL = 'data:image/png;base64,' + PNG_1PX_GREEN;
       var parts = [];
       function put(k, v) { parts.push(k + '=' + v); }
       function ty(v) { try { return typeof v; } catch (e) { return 'threw'; } }
@@ -1118,7 +1175,58 @@
         var el = document.getElementById('s6state');
         if (el) el.textContent = text;
         console.log('[probe] step6 ' + text);
+        // base64 三项的完整详情单独一行：18b 那行装不下（见 shortB64 的注释）
+        if (b64detail.length) console.log('[probe] step6-b64 ' + b64detail.join(' '));
       }
+
+      /**
+       * 绘制层判据：把三个方块的**中心坐标 + 期望颜色**写进 console，
+       * entrypoint.sh 抓屏后用 ImageMagick 逐点取色比对，结论落 out/pixels.txt。
+       *
+       * 为什么必须这么绕（而不是在页面里判）：页面**没有任何办法**知道自己有没有被
+       * 真的画出来 —— `naturalWidth` / `getBoundingClientRect` / computed style
+       * 全都只反映「解码/布局阶段的记账」。实测一个 1×1 红点 PNG 三项全正常、
+       * 截图里方块却是灰的。唯一可信的证据在**帧缓冲**里，只能抓屏取色。
+       *
+       * 为什么坐标由页面报、不写死在 shell 里：版面一改死坐标就静默失效
+       * （取到的是白底 → 报 FAIL → 看起来像 WebF 坏了）。
+       * 容器里 devicePixelRatio 是 1、探针 Scaffold 无 AppBar/padding，
+       * 所以页面坐标 == 屏幕坐标（与第 16 组合成拖动同一个前提）。
+       *
+       * ⚠️ **必须排在所有异步读数之后**（见调用点的 9s 定时器）：上面几组
+       * （尤其 17b 安全区、16 滑块）的读数是异步落 DOM 的，文字一变行数就变，
+       * 会把下面的行**整体推下去**。第一版把它跟 flush() 排在一起（≈3.8s），
+       * 结果三个方块明明都画出来了，报的 y 却比抓屏时的真实位置小 96px，
+       * 点取色全 FAIL，差一点被误判成「WebF 画不出 data: URL 图」。
+       * 这也是为什么 shell 侧的**主判据是「该颜色在整页出现了多少像素」**
+       * （与坐标无关），点取色只作附注。
+       */
+      function reportPixels() {
+        var want = [
+          ['img', 's6img', '1B878F'],
+          ['bg', 's6bg', 'FF00FF'],
+          ['ctl', 's6ctl', '0000FF'],
+          ['img1px', 's6img1', '00FF00']
+        ];
+        var toks = [];
+        for (var i = 0; i < want.length; i++) {
+          var el = document.getElementById(want[i][1]);
+          if (!el) { toks.push(want[i][0] + '=missing'); continue; }
+          try {
+            var r = el.getBoundingClientRect();
+            // 取中心：16x16 内容盒 + 1px 边框，中心离边框足够远，
+            // 不会被边框色或抗锯齿污染。
+            toks.push(want[i][0] + '=' + Math.round(r.left + r.width / 2) + ',' +
+              Math.round(r.top + r.height / 2) + ',' + want[i][2]);
+          } catch (e) { toks.push(want[i][0] + '=threw'); }
+        }
+        console.log('[probe] step6-px ' + toks.join(' '));
+      }
+
+      // 9s：所有异步读数（18 组 flush ≈3.8s、16 组 finalize 6.5s、17b 安全区往返）
+      // 都已落 DOM，版面不再变；而抓屏在 SETTLE（默认 12s）时发生，留 3s 余量。
+      // ⚠️ 把 SETTLE 调到 10s 以下时这一行会失效（entrypoint 会报「没有 step6-px」）。
+      setTimeout(reportPixels, 9000);
 
       // ① data: URL 两个消费点。**必须由 JS 赋值而不是写在 HTML 属性里**：
       // 静态 HTML 的图片加载发生在解析期，而 common.js 的空 src 访问器垫片
@@ -1128,9 +1236,13 @@
         put('imgSet', 'ok');
       } catch (e) { put('imgSet', 'threw'); }
       try {
-        document.getElementById('s6bg').style.backgroundImage = 'url(' + DATA_URL + ')';
+        document.getElementById('s6bg').style.backgroundImage = 'url(' + BG_DATA_URL + ')';
         put('bgSet', 'ok');
       } catch (e) { put('bgSet', 'threw'); }
+      try {
+        document.getElementById('s6img1').src = PX1_DATA_URL;
+        put('img1Set', 'ok');
+      } catch (e) { put('img1Set', 'threw'); }
 
       // ② base64 / Blob / FileReader 存在性
       put('btoa', ty(window.btoa));
@@ -1174,12 +1286,79 @@
       // ⑤ blob → base64 端到端往返。**这才是「能拼出 data: URL」的判据** ——
       // 上面那些 typeof 只证明绑定存在，不证明能用（WebF 里
       // ImageType.blob 就是个从 Kraken 继承来的死枚举值）。
-      var expect = 'aGk=';   // btoa('hi')
+      //
+      // ⚠️ 用例是**全部 256 种字节值**，不是旧版那个 `new Blob(['hi'])`。
+      // 'hi' 是纯 ASCII、全程没有一个字节 > 0x7F，于是那个用例**结构上**不可能
+      // 抓到「btoa 不是二进制安全的」这个真缺陷（它只在 >0x7F 时把码点当字符
+      // 做一次 UTF-8 编码），而所有图片都含高位字节。二进制路径的判据必须含高位字节。
+      var B256_EXPECT =
+        'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4v' +
+        'MDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5f' +
+        'YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6P' +
+        'kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/' +
+        'wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v' +
+        '8PHy8/T19vf4+fr7/P3+/w==';
+      var B256_MIME = 'application/octet-stream';
+
+      // 失败时只报「第一个不相等的字符下标 + got/exp 各一字符」。
+      // 344 字符的完整串塞进 18b 会把别的检查行挤出截图。
+      // 详细版：给 flutter.log 看。
+      function cmpB64(got, exp) {
+        if (got === exp) return 'ok';
+        if (typeof got !== 'string') return 'type:' + (typeof got);
+        // 短用例（如 btoaHi 的 8 字符）直接打全串，最好读
+        if (exp.length <= 16) return 'got:' + got + '(exp:' + exp + ')';
+        for (var i = 0; i < Math.max(got.length, exp.length); i++) {
+          if (got.charAt(i) !== exp.charAt(i)) {
+            // 打 8 字符窗口而不是单字符：单字符看不出是「整体错位」还是「个别位错」，
+            // 而这两者指向完全不同的根因（长度/编码 vs 字节值）。
+            return 'mismatch@' + i + ':g[' + got.substr(i, 8) + ']e[' +
+              exp.substr(i, 8) + ']/len' + got.length + 'v' + exp.length;
+          }
+        }
+        return 'ok';
+      }
+
+      // 精简版：给 18b 那一行截图看。**必须精简** —— 18b 的读数已经是全组最长，
+      // 塞进三条 base64 详情会把它自己的尾巴挤出截图（实测就发生过）。
+      // 完整详情在 flutter.log 的 `[probe] step6-b64` 那行，两级冗余度各管一处。
+      function shortB64(detail) {
+        if (detail === 'ok') return 'ok';
+        var m = /mismatch@(\d+)/.exec(detail);
+        return m ? 'BAD@' + m[1] : 'BAD';
+      }
+      var b64detail = [];
+      function putB64(key, detail) {
+        b64detail.push(key + '=' + detail);
+        put(key, shortB64(detail));
+      }
+
+      // ⑤a `btoa` 的二进制安全性单点判据（不依赖 Blob，独立成立）。
+      // 期望 `iVBORw==`；WebF 实测给 `wolQTg==`（已登记上游缺陷），**这一项预期 FAIL**。
+      // 留着它是为了守住「宿主为什么自带编码表」这个前提 —— 它哪天变 ok 才可以退回 btoa。
+      try {
+        putB64('btoaHi', typeof window.btoa === 'function'
+          ? cmpB64(window.btoa('\x89PNG'), 'iVBORw==')
+          : 'n/a');
+      } catch (e) { put('btoaHi', 'threw'); }
+
+      var bytes256 = null;
+      try {
+        bytes256 = new Uint8Array(256);
+        for (var bi = 0; bi < 256; bi++) bytes256[bi] = bi;
+      } catch (e) { bytes256 = null; }
       var blob = null;
-      try { blob = new Blob(['hi'], { type: 'text/plain' }); } catch (e) { blob = null; }
+      try {
+        blob = new Blob([bytes256], { type: B256_MIME });
+      } catch (e) { blob = null; }
       put('blobMade', blob ? 'ok' : 'no');
-      if (blob && typeof blob.text === 'function') {
-        blob.text().then(function (s) {
+      put('blobSize', blob ? String(blob.size) : 'n/a');
+      // blobText 换回一个小 ASCII blob：这一项问的是「Blob.text() 有没有真绑上」，
+      // 与二进制安全无关，用 256 字节反而读数不可打印。
+      var txtBlob = null;
+      try { txtBlob = new Blob(['hi'], { type: 'text/plain' }); } catch (e) { txtBlob = null; }
+      if (txtBlob && typeof txtBlob.text === 'function') {
+        txtBlob.text().then(function (s) {
           put('blobText', JSON.stringify(s));
         }, function (err) {
           put('blobText', 'rej:' + ((err && err.message) || err));
@@ -1187,15 +1366,15 @@
       } else {
         put('blobText', 'n/a');
       }
+      // ⑤b 上游路径：Blob → arrayBuffer → btoa
       if (blob && typeof blob.arrayBuffer === 'function' &&
           typeof window.btoa === 'function') {
         blob.arrayBuffer().then(function (buf) {
           try {
-            var bytes = new Uint8Array(buf);
+            var bs = new Uint8Array(buf);
             var s = '';
-            for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-            var b64 = window.btoa(s);
-            put('b64rt', b64 === expect ? 'ok' : 'got:' + b64);
+            for (var i = 0; i < bs.length; i++) s += String.fromCharCode(bs[i]);
+            putB64('b64rt', cmpB64(window.btoa(s), B256_EXPECT));
           } catch (e) {
             put('b64rt', 'threw:' + ((e && e.message) || e));
           }
@@ -1204,6 +1383,26 @@
         });
       } else {
         put('b64rt', 'n/a');
+      }
+      // ⑤c **产品路径**：SongloftPlugin.blobToDataURL（内部走 common.js 自带的
+      // bytesToBase64 编码表，不用 btoa）。这一项才是回归判据 —— 它挂了就意味着
+      // 所有「带鉴权头拉图 → data: URL」的绕法在 WebF 下全坏。
+      var SP = window.SongloftPlugin;
+      if (blob && SP && typeof SP.blobToDataURL === 'function') {
+        try {
+          SP.blobToDataURL(blob).then(function (url) {
+            var prefix = 'data:' + B256_MIME + ';base64,';
+            if (typeof url !== 'string' || url.indexOf(prefix) !== 0) {
+              put('dataUrl', 'badprefix:' + String(url).slice(0, 40));
+            } else {
+              putB64('dataUrl', cmpB64(url.slice(prefix.length), B256_EXPECT));
+            }
+          }, function (err) {
+            put('dataUrl', 'rej:' + ((err && err.message) || err));
+          });
+        } catch (e) { put('dataUrl', 'threw:' + ((e && e.message) || e)); }
+      } else {
+        put('dataUrl', SP ? 'no-fn' : 'no-SP');
       }
 
       // ⑥ file 垫片端到端：click() → 垫片 → 宿主桥 → Dart 的 canned 应答 →
@@ -1250,6 +1449,8 @@
         setTimeout(function () {
           put('progClick', clicked ? 'dispatched' : 'no-dispatch');
           put('picked', picked);
+          // rect 只证明「盒子有尺寸」，**不证明像素被画出来**（见 18 组注释里的
+          // 红点 PNG 教训）。绘制层判据靠下面那行 step6-px + 抓屏取色。
           put('imgRect', rect('s6img'));
           put('bgRect', rect('s6bg'));
           flush();
