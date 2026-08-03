@@ -14,6 +14,7 @@ import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/error_view.dart';
 import '../../../player/domain/playback_context.dart';
 import '../../../player/presentation/providers/player_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../playlist/presentation/providers/playlist_view_provider.dart';
 import '../providers/category_provider.dart';
 import 'library_view_switcher.dart';
@@ -81,12 +82,20 @@ class _FacetGridViewState extends ConsumerState<FacetGridView> {
       ResponsiveSnackBar.show(context, message: l10n.libraryNoPlayableSongs);
       return;
     }
+    final ctx = PlaybackContext(widget.field, value);
+    final prefs = await ref.read(appPreferencesProvider.future);
+    final lastSongId = prefs.getLastPlayedSong(ctx);
+    int startIndex = 0;
+    if (lastSongId != null) {
+      final idx = songs.indexWhere((s) => s.id == lastSongId);
+      if (idx >= 0) startIndex = idx;
+    }
     ref
         .read(playerStateProvider.notifier)
         .playPlaylist(
           songs,
-          startIndex: 0,
-          context: PlaybackContext(widget.field, value),
+          startIndex: startIndex,
+          context: ctx,
         );
     if (!mounted) return;
     ResponsiveSnackBar.show(

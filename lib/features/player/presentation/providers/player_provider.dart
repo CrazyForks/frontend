@@ -273,6 +273,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
             await prefs.setCurrentIndex(state.currentIndex);
             await prefs.setPositionMs(state.currentTime.inMilliseconds);
             await prefs.setSourceContext(state.playbackContext);
+            if (state.playbackContext != null && state.currentSong != null) {
+              await prefs.setLastPlayedSong(
+                state.playbackContext!,
+                state.currentSong!.id,
+              );
+            }
           }
         } catch (e) {
           debugPrint('[Player] Failed to save playback state: $e');
@@ -663,6 +669,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
     // 取消之前的预加载
     _prefetchCancelToken?.cancel('operation changed');
+
+    // 切换上下文前，保存离开的上下文的最后播放歌曲
+    final departingCtx = state.playbackContext;
+    final departingSong = state.currentSong;
+    if (departingCtx != null && departingSong != null) {
+      ref.read(appPreferencesProvider.future).then((prefs) {
+        prefs.setLastPlayedSong(departingCtx, departingSong.id);
+      });
+    }
 
     // 递增代次，使正在进行的后台加载自动取消
     _loadGeneration = _queueLoader.invalidate();
@@ -1071,10 +1086,28 @@ class PlayerNotifier extends Notifier<PlayerState> {
       }
 
       // playPlaylist 内部会递增 _loadGeneration，取消之前的后台加载
-      final startIndex =
-          state.playMode == PlayMode.random
-              ? _random.nextInt(firstPageSongs.length)
-              : 0;
+      // 尝试从上次播放位置恢复
+      final prefs = await ref.read(appPreferencesProvider.future);
+      final lastSongId = prefs.getLastPlayedSong(
+        PlaybackContext.playlist(playlistId),
+      );
+      int startIndex;
+      if (lastSongId != null) {
+        final resumeIndex = firstPageSongs.indexWhere(
+          (s) => s.id == lastSongId,
+        );
+        startIndex =
+            resumeIndex >= 0
+                ? resumeIndex
+                : (state.playMode == PlayMode.random
+                    ? _random.nextInt(firstPageSongs.length)
+                    : 0);
+      } else {
+        startIndex =
+            state.playMode == PlayMode.random
+                ? _random.nextInt(firstPageSongs.length)
+                : 0;
+      }
       await playPlaylist(
         firstPageSongs,
         startIndex: startIndex,

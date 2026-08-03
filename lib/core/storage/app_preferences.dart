@@ -383,6 +383,47 @@ class AppPreferences {
     await _prefs.remove(_sourceContextKey);
   }
 
+  // ── 每个播放上下文（歌单/分面维度）最后播放的歌曲 ──
+
+  static const _contextLastSongKey = 'context_last_song_map';
+  static const _contextLastSongMaxEntries = 200;
+
+  String _contextKey(PlaybackContext ctx) => '${ctx.type}:${ctx.key}';
+
+  Map<String, int> _getContextLastSongMap() {
+    final raw = _prefs.getString(_contextLastSongKey);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return decoded.map((k, v) => MapEntry(k, v as int));
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  Future<void> setLastPlayedSong(PlaybackContext ctx, int songId) async {
+    final map = _getContextLastSongMap();
+    final key = _contextKey(ctx);
+    map.remove(key);
+    map[key] = songId;
+    while (map.length > _contextLastSongMaxEntries) {
+      map.remove(map.keys.first);
+    }
+    await _prefs.setString(_contextLastSongKey, jsonEncode(map));
+  }
+
+  int? getLastPlayedSong(PlaybackContext ctx) {
+    return _getContextLastSongMap()[_contextKey(ctx)];
+  }
+
+  Future<void> clearLastPlayedSong(PlaybackContext ctx) async {
+    final map = _getContextLastSongMap();
+    if (map.remove(_contextKey(ctx)) != null) {
+      await _prefs.setString(_contextLastSongKey, jsonEncode(map));
+    }
+  }
+
   static const _shortcutsEnabledKey = 'shortcuts_enabled';
   static const _shortcutBindingsKey = 'shortcut_bindings';
 
