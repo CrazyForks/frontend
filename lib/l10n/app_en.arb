@@ -2598,5 +2598,38 @@
   "playHistoryDeleteEntry": "Remove this entry",
   "playHistoryOperationFailed": "Operation failed, please try again",
   "playHistorySongMissing": "This song is no longer in the list; the rest have been added to the queue",
-  "scrollToTop": "Scroll to top"
+  "scrollToTop": "Scroll to top",
+  "settingsLicensesTitle": "Open source licenses",
+  "settingsLicensesSubtitle": "Distribution license and third-party components",
+  "licensesDistributionSection": "Distribution license",
+  "licensesDistributionHeadline": "Binaries of this client are distributed under the GNU General Public License, version 3 (GPL-3.0).",
+  "licensesDistributionWhy": "Why: the client links against the WebF rendering engine, which is GPL-3.0-only with no linking exception. Every installer we distribute is therefore governed as a whole by GPL-3.0.",
+  "licensesDistributionSource": "The source code itself remains licensed under the Apache License 2.0. Building it yourself with the WebF dependency removed yields a binary containing no GPL code, to which Apache-2.0 alone applies.",
+  "licensesDistributionWeb": "The Web build is not affected: WebF does not support Flutter Web and is not linked there, so the Web bundle remains governed by Apache-2.0 alone.",
+  "licensesSourceSection": "Complete corresponding source",
+  "licensesSourceHint": "You are entitled to the complete corresponding source code of this software. Every release ships a CORRESPONDING-SOURCE.txt asset naming the repositories, the tag and the exact commit SHAs used for that build.",
+  "licensesSourceClient": "Client source",
+  "licensesSourceServer": "Server source",
+  "licensesSourceWebf": "WebF source",
+  "licensesTextsSection": "License texts",
+  "licensesGplTitle": "GNU GPL v3.0 full text",
+  "licensesGplSubtitle": "Bundled inside the installer, readable offline",
+  "licensesNoticeTitle": "Third-party notices (NOTICE)",
+  "licensesNoticeSubtitle": "Licenses and origins of WebF, libmpv, FFmpeg, fonts and more",
+  "licensesFlutterTitle": "All package licenses",
+  "licensesFlutterSubtitle": "Per-package license texts collected by Flutter",
+  "licensesLoadFailed": "Failed to load license text: {error}",
+  "@licensesLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "licensesCopyAll": "Copy full text",
+  "licensesCopied": "Copied to clipboard",
+  "licensesOpenFailed": "Could not open link: {url}",
+  "@licensesOpenFailed": {
+    "placeholders": {
+      "url": { "type": "String" }
+    }
+  }
 }

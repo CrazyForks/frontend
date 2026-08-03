@@ -834,6 +834,18 @@ class _SettingsCategoryContentState
             ),
           ],
           const Divider(height: 1),
+          // 开源许可（songloft-org/songloft#341）。客户端二进制链接 GPL-3.0-only
+          // 的 WebF，整体按 GPL-3.0 分发，GPLv3 §4/§5 要求随附许可全文与源码获取
+          // 方式，这个入口是 App 内的履行点。刻意与「关于」并列而不是塞进关于对话框
+          // ——许可全文与依赖清单都是整页内容，对话框放不下。
+          ListTile(
+            leading: const Icon(Icons.gavel_outlined),
+            title: Text(l10n.settingsLicensesTitle),
+            subtitle: Text(l10n.settingsLicensesSubtitle),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.licenses),
+          ),
+          const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: Text(l10n.settingsAboutTitle),

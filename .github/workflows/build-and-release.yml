@@ -141,6 +141,15 @@ jobs:
         run: |
           mkdir -p assets/icons
           cp web/icons/Icon-512.png assets/icons/app_icon.png
+      # GPLv3 §4 合规（songloft-org/songloft#341）：许可全文已经通过 pubspec 的
+      # `assets:` 进了 data/flutter_assets/LICENSES/（App 内「设置 → 开源许可」读它，
+      # 离线可读）。这里再往 bundle 根放一份，让用户解包后**不用翻 flutter_assets**
+      # 就能看到。tar.gz / deb / rpm / AppImage 都从这个目录打包，一次覆盖四种产物。
+      #
+      # 刻意放在打包**之前**：这几种产物均无代码签名，且即便将来加了签名，签名也发生
+      # 在打包之后、对最终内容计算，所以不存在「往已签名容器里塞文件」的风险。
+      - name: Bundle GPL-3.0 license text into Linux payload
+        run: cp LICENSES/GPL-3.0.txt build/linux/x64/release/bundle/LICENSE-GPL-3.0.txt
       - name: Package tar.gz (基础便携包)
         run: |
           cd build/linux/x64/release/bundle
@@ -212,6 +221,13 @@ jobs:
       - name: Setup NuGet
         uses: nuget/setup-nuget@v2
       - run: flutter build windows --release --dart-define=FRONTEND_VERSION=${{ steps.version.outputs.version }} --dart-define=FRONTEND_BUILD_TIME=${{ steps.version.outputs.build_time }} --dart-define=TRACELY_APP_ID=${{ secrets.TRACELY_APP_ID }} --dart-define=TRACELY_APP_SECRET=${{ secrets.TRACELY_APP_SECRET }} --dart-define=TRACELY_HOST=${{ secrets.TRACELY_HOST }}
+      # 同 Linux：许可全文已在 data/flutter_assets/ 里，这里再往 Release 根放一份，
+      # 让绿色包解开就能看到。.zip 无签名；MSIX 的签名由 fastforge 在**打包之后**
+      # 对最终内容计算，所以提前往 payload 里加文件同样零风险。
+      - name: Bundle GPL-3.0 license text into Windows payload
+        shell: pwsh
+        run: |
+          Copy-Item LICENSES\GPL-3.0.txt build\windows\x64\runner\Release\LICENSE-GPL-3.0.txt
       - name: Package ZIP (绿色便携包)
         shell: pwsh
         run: |
@@ -267,6 +283,17 @@ jobs:
         run: |
           cd build/macos/Build/Products/Release
           zip -r -y "$GITHUB_WORKSPACE/songloft-macos.zip" *.app
+      # 许可全文已在 .app 内（Contents/Frameworks/App.framework/Resources/
+      # flutter_assets/LICENSES/），这里再往 zip **根**追加一份做可发现性。
+      # 刻意只 append 到 zip 根、**不往 .app 包里塞** —— .app 的 codesign 签的是
+      # bundle 内部内容，动它就得重签；zip 根的同级文件与签名完全无关。
+      # DMG 不做同样处理：它由 fastforge 从 .app 生成，改它要动打包/签名流程，
+      # 靠 .app 内的 asset 与 release 附件 LICENSE-GPL-3.0.txt 满足合规。
+      - name: Attach GPL-3.0 license text at ZIP root (does not touch .app signature)
+        run: |
+          cp LICENSES/GPL-3.0.txt LICENSE-GPL-3.0.txt
+          zip -j "$GITHUB_WORKSPACE/songloft-macos.zip" LICENSE-GPL-3.0.txt
+          rm LICENSE-GPL-3.0.txt
       - name: Build DMG
         continue-on-error: true
         run: |
