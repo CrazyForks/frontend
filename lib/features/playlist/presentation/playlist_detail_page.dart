@@ -1290,7 +1290,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              // 播放历史：无条件显示��有无记录要请求才知道，空态由面板承担）
+              // 播放历史：无条件显示（有无记录要请求才知道，空态由面板承担）
               PopupMenuItem(
                 value: 'play_history',
                 child: ListTile(
