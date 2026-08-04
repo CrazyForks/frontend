@@ -14,11 +14,16 @@ import '../../player/presentation/providers/player_provider.dart';
 ///
 /// 本文件 **web-safe**：不 import `dart:io` / `flutter_inappwebview`，故可被
 /// Web 平台的 stub 页面直接引用。平台名由调用方注入（native 传 `Platform.*`，web 传 `'web'`）。
+///
+/// Cookie 读取能力由调用方通过 [cookieProvider] 注入（仅 native 平台提供实现）。
+typedef CookieProvider = Future<Map<String, String>> Function(String origin);
+
 class PluginHostDispatcher {
-  PluginHostDispatcher(this.ref, {required this.platformName});
+  PluginHostDispatcher(this.ref, {required this.platformName, this.cookieProvider});
 
   final WidgetRef ref;
   final String platformName;
+  final CookieProvider? cookieProvider;
 
   /// 处理一次调用，统一返回 `{ok:true, data}` 或 `{ok:false, error}`。
   Future<Map<String, dynamic>> handleCall(Map<String, dynamic> req) async {
@@ -41,6 +46,26 @@ class PluginHostDispatcher {
     String? method,
     Map<String, dynamic> p,
   ) async {
+    if (ns == 'cookies') {
+      switch (method) {
+        case 'get':
+          final provider = cookieProvider;
+          if (provider == null) {
+            throw Exception('getCookies is not available on this platform');
+          }
+          final origin = p['origin'] as String?;
+          if (origin == null || origin.isEmpty) {
+            throw Exception('origin is required');
+          }
+          final uri = Uri.tryParse(origin);
+          if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+            throw Exception('invalid origin: must include scheme and host');
+          }
+          return await provider(origin);
+      }
+      throw Exception('unknown cookies method: $method');
+    }
+
     if (ns == 'host') {
       switch (method) {
         case 'getInfo':
