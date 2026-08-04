@@ -70,6 +70,11 @@ Licensing notes:
   "DISTRIBUTION LICENSE" section above.
 - WebF ships prebuilt native libraries (libwebf.so / .dylib / .dll) which are
   bundled into our binaries by the standard Flutter plugin mechanism.
+- The companion package `webf_cupertino_ui` (Cupertino-style custom elements
+  rendered by WebF, used by plugin pages that opt into the WebF renderer) is a
+  SEPARATE package licensed under Apache-2.0, NOT GPL -- it is listed under
+  item 6 below. It carries no copyleft obligation of its own; the GPL-3.0
+  governance of our binaries stems solely from WebF itself.
 
 --------------------------------------------------------------------------------
 2. libmpv  (used on Windows and Linux via just_audio_media_kit → media_kit)
@@ -135,6 +140,8 @@ each package's pub.dev page for full text.
   - flutter_inappwebview
   - json_annotation, json_serializable
   - volume_controller
+  - webf_cupertino_ui  (Apache-2.0; Cupertino custom elements for the WebF
+    renderer -- see the licensing note under item 1)
 
 --------------------------------------------------------------------------------
 7. Noto Sans SC  (fonts/NotoSansSC-Regular.otf)

@@ -12,6 +12,9 @@ dependencies:
     sdk: flutter
   # 用真实最新版，不要照抄官方文档里过时的 ^0.23.x
   webf: ^0.24.27
+  # webf-ui 的 Cupertino 原生元素。**必须与产品 pubspec.yaml 里的约束保持一致**，
+  # 否则探针验的不是产品那一份实现。
+  webf_cupertino_ui: ^0.4.1
 
 dev_dependencies:
   flutter_test:

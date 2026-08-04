@@ -8,6 +8,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webf/webf.dart';
+// webf-ui 的 Cupertino 原生元素。产品侧在
+// `plugin_render_surface_webf.dart` 的 `_ensureWebFProcessSetup()` 第 ③ 步装，
+// 探针必须装同一份，否则 `<flutter-cupertino-*>` 在这里全是未知标签。
+// 注意这个 import 只能出现在探针自己的文件里 —— 拷进来的 `elements/` 目录
+// 受「只能依赖 flutter 与 webf」约束（见下面那段说明）。
+import 'package:webf_cupertino_ui/webf_cupertino_ui.dart';
 
 // 产品代码，**不是探针自己的副本**。
 //
@@ -78,6 +84,15 @@ Future<void> main() async {
   // 自定义元素同理（且这里调的就是产品的注册入口，见文件头 import 处的说明）。
   // 顺序与产品侧 `_ensureWebFProcessSetup()` 一致。
   SongloftCustomElements.ensureRegistered();
+  // webf-ui 的 Cupertino 元素。产品侧在 `_ensureWebFProcessSetup()` 第 ③ 步调，
+  // 这里必须跟着调，否则探针里 `<flutter-cupertino-*>` 全是 `_UnknownHTMLElement`、
+  // 验不了任何 webf-ui 相关的判据。try/catch 的理由同产品侧：那个函数内部是 31 条
+  // 连续 `defineCustomElement`、**没有逐元素 try/catch**，而重复注册会抛。
+  try {
+    installWebFCupertinoUI();
+  } catch (e) {
+    debugPrint('[probe] installWebFCupertinoUI failed: $e');
+  }
   runApp(const ProbeApp());
 }
 

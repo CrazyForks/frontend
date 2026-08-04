@@ -32,6 +32,14 @@ import 'songloft_slider.dart';
 ///
 /// 一律 `songloft-` 前缀：注册表是全局单例，插件页自己也可能 `defineElement`
 /// 或用带连字符的标签名，前缀是避免撞名的唯一手段。
+///
+/// ── 不在本文件注册的：webf-ui 的 Cupertino 元素 ────────────────────────────
+///
+/// `installWebFCupertinoUI()`（31 个 `<flutter-cupertino-*>`）**刻意不放这里**：
+/// 本目录有铁律「只能 import `flutter` 与 `webf`」（`scripts/webf-verify` 的验证
+/// 探针要跨 package 拷这个目录），而它需要 import `webf_cupertino_ui`。
+/// 它挂在 `../plugin_render_surface_webf.dart` 的 `_ensureWebFProcessSetup()`
+/// 第 ③ 步 —— 那里做的是同一类进程级一次性设置，也有自己的幂等闸。
 class SongloftCustomElements {
   const SongloftCustomElements._();
 

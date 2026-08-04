@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webf/webf.dart';
+import 'package:webf_cupertino_ui/webf_cupertino_ui.dart';
 
 import '../../../player/domain/player_state.dart';
 import '../../../player/presentation/providers/player_provider.dart';
@@ -51,7 +52,7 @@ class PluginRenderSurfaceWebF extends ConsumerStatefulWidget {
 class _PluginRenderSurfaceWebFState
     extends ConsumerState<PluginRenderSurfaceWebF>
     implements PluginRenderController {
-  /// WebF 的两项**进程级**一次性设置。两者都必须在创建任何 controller 之前
+  /// WebF 的三项**进程级**一次性设置。三者都必须在创建任何 controller 之前
   /// 完成，所以放在同一个入口里一次做完。
   static bool _processSetupDone = false;
 
@@ -79,6 +80,29 @@ class _PluginRenderSurfaceWebFState
     // 注册晚了那一页只能拿到 `_UnknownHTMLElement`。详见
     // `elements/songloft_custom_elements.dart` 的头注释。
     SongloftCustomElements.ensureRegistered();
+
+    // ③ webf-ui 的 Cupertino 原生元素（`<flutter-cupertino-*>`，31 个）。
+    //
+    // 为什么不放进 `elements/songloft_custom_elements.dart`：那个目录有铁律
+    // 「只能 import `flutter` 与 `webf`」（`scripts/webf-verify` 要跨 package 拷它），
+    // 而这里要 import `webf_cupertino_ui`。本函数与它是同一类进程级一次性设置、
+    // 已有 `_processSetupDone` 幂等闸，正好是这个调用的落点。
+    //
+    // **必须整体包 try/catch**：`installWebFCupertinoUI()` 内部是 31 条连续的
+    // `WebF.defineCustomElement(...)`，**没有逐元素 try/catch**；而
+    // `defineCustomElement` 对重复注册是**抛异常**（热重启后进程级 registry 仍在）。
+    // 任何一条抛出，后面的元素就全部注册不上。理由与
+    // `SongloftCustomElements._define` 逐个包 try/catch 完全一致：一个元素失败
+    // 只该让**那一个标签**退回 `_UnknownHTMLElement`，不该连带打掉其它元素。
+    //
+    // 插件侧对「元素没注册上」有兜底：`useNativeUI` 特性探测（探
+    // `document.createElement('flutter-cupertino-switch').checked !== undefined`）
+    // 失败时走 HTML 分支，所以这里失败不会让插件页变成空白。
+    try {
+      installWebFCupertinoUI();
+    } catch (e) {
+      debugPrint('[plugin][element] installWebFCupertinoUI failed: $e');
+    }
   }
 
   WebFController? _controller;
