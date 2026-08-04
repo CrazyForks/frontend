@@ -926,15 +926,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
       // 桌面/Web 平台：使用 just_audio 播放器音量
       await _audioHandler.setVolume(clampedVolume / 100);
       debugPrint('[Player] Set player volume: ${clampedVolume / 100}');
-      // 桌面平台持久化音量设置
-      if (!kIsWeb) {
-        try {
-          final prefs = await ref.read(appPreferencesProvider.future);
-          await prefs.setVolume(clampedVolume);
-          pushPreferencesToServer(ref.read(dioProvider));
-        } catch (e) {
-          debugPrint('[Player] Failed to save volume: $e');
-        }
+      try {
+        final prefs = await ref.read(appPreferencesProvider.future);
+        await prefs.setVolume(clampedVolume);
+        pushPreferencesToServer(ref.read(dioProvider));
+      } catch (e) {
+        debugPrint('[Player] Failed to save volume: $e');
       }
     }
   }
