@@ -237,7 +237,7 @@ class _QueueBottomSheetState extends ConsumerState<QueueBottomSheet>
       // Web 端收紧离屏预解码范围，降低队列封面 GPU 纹理累积（原生端为 null 保持默认）。
       scrollCacheExtent: webListCacheExtent,
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).padding.bottom + 16,
+        bottom: MediaQuery.paddingOf(context).bottom + 16,
       ),
       itemCount: state.playlist.length,
       onReorderItem: notifier.moveInPlaylist,
@@ -389,7 +389,7 @@ class _QueueSongItem extends StatelessWidget {
                             // 大幅降低整队列的 GPU 纹理体积（原生端保持 400 不变）。
                             decodeWidth: smallCoverDecodeWidth(
                               48,
-                              MediaQuery.of(context).devicePixelRatio,
+                              MediaQuery.devicePixelRatioOf(context),
                             ),
                             placeholder:
                                 (_, _) => _buildCoverPlaceholder(colorScheme),

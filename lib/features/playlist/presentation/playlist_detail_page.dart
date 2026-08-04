@@ -528,7 +528,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
         if (!hide)
           ScrollToTopFab(
             scrollController: _scrollController,
-            bottomPadding: MediaQuery.of(context).padding.bottom + 96,
+            bottomPadding: MediaQuery.paddingOf(context).bottom + 96,
           ),
       ],
     );
@@ -612,7 +612,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
 
         // 底部安全区域
         SliverToBoxAdapter(
-          child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
+          child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 80),
         ),
       ],
     );
@@ -851,7 +851,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
                 ),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: MediaQuery.of(context).padding.bottom + 80,
+                  height: MediaQuery.paddingOf(context).bottom + 80,
                 ),
               ),
             ],

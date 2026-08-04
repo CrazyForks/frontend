@@ -40,7 +40,7 @@ class CoverImage extends StatelessWidget {
   Widget build(BuildContext context) {
     // 按显示尺寸的物理像素解码（而非原图全分辨率），大幅降低单张解码内存与 GPU 纹理。
     // 封面为方形，仅限宽即可等比缩放。
-    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     final decodeWidth = (size * dpr).clamp(64.0, 1024.0).round();
 
     // 使用 UrlHelper 处理封面 URL（自动拼接 baseUrl + access_token）。

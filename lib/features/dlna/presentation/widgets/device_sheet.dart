@@ -78,7 +78,7 @@ class _DlnaDeviceSheetState extends ConsumerState<DlnaDeviceSheet> {
           if (!dlnaState.isCasting) ...[
             ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.4,
+                maxHeight: MediaQuery.sizeOf(context).height * 0.4,
               ),
               child:
                   dlnaState.devices.isEmpty

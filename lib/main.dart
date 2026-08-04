@@ -497,7 +497,7 @@ class SongloftApp extends ConsumerWidget {
         // 刷新无 BuildContext 场景使用的全局 AppLocalizations 引用
         updateGlobalL10n(AppLocalizations.of(context));
         // 在 builder 中获取 MediaQuery 来应用响应式主题
-        final width = MediaQuery.of(context).size.width;
+        final width = MediaQuery.sizeOf(context).width;
         final screenType = _getScreenType(width);
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final themed = Theme(

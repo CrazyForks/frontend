@@ -78,7 +78,7 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
     final state = ref.watch(playerStateProvider);
     final notifier = ref.read(playerStateProvider.notifier);
     final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
 
     // 播放列表被清空时，自动关闭全屏播放器并返回上一页
     // 同时控制封面脉冲动画

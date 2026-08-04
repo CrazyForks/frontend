@@ -20,7 +20,7 @@ class SongCoverPickerModal extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.sizeOf(context).height * 0.7,
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),

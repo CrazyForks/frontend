@@ -390,7 +390,7 @@ class _SongPickerModalState extends ConsumerState<SongPickerModal> {
     final l10n = AppLocalizations.of(context);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: MediaQuery.sizeOf(context).height * 0.8,
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),

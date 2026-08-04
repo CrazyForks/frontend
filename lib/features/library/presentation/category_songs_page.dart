@@ -405,7 +405,7 @@ class _CategorySongsPageState extends ConsumerState<CategorySongsPage>
               ),
             ),
           SliverToBoxAdapter(
-            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
+            child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 80),
           ),
         ];
       },

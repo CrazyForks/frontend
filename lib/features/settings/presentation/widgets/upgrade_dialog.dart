@@ -216,7 +216,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
       content: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: context.responsiveDialogMaxWidth,
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.6,
         ),
         child: SingleChildScrollView(
           child: Column(

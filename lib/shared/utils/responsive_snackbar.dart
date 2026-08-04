@@ -15,9 +15,8 @@ class ResponsiveSnackBar {
     const double minWidth = 120.0;
     const double screenMargin = 32.0; // 左右各 16dp 屏幕边距
 
-    final mediaQuery = MediaQuery.of(context);
-    final screenWidth = mediaQuery.size.width;
-    final textScaler = mediaQuery.textScaler;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final textScaler = MediaQuery.textScalerOf(context);
     final maxWidth = screenWidth - screenMargin;
 
     // 获取当前主题的默认字体大小（SnackBar content 默认 bodyMedium）

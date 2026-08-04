@@ -152,7 +152,7 @@ class _PlayModeOverlayPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
+    final screenSize = MediaQuery.sizeOf(context);
 
     // 响应式面板尺寸
     final itemHeight = context.responsive<double>(
@@ -190,7 +190,7 @@ class _PlayModeOverlayPanel extends StatelessWidget {
     double top = anchorPosition.dy - panelHeight - 8;
 
     // 如果面板会超出屏幕可见区域，显示在按钮下方
-    final safeAreaTop = MediaQuery.of(context).padding.top;
+    final safeAreaTop = MediaQuery.paddingOf(context).top;
     if (top < safeAreaTop + 16) {
       top = anchorPosition.dy + anchorSize.height + 8;
     }
@@ -421,7 +421,7 @@ class _SleepTimerOverlayPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
+    final screenSize = MediaQuery.sizeOf(context);
 
     // 水平居中对齐按钮，越界回弹
     double left = anchorPosition.dx + anchorSize.width / 2 - _panelWidth / 2;
@@ -431,7 +431,7 @@ class _SleepTimerOverlayPanel extends StatelessWidget {
     }
 
     // 优先向上弹，空间不足则向下
-    final safeAreaTop = MediaQuery.of(context).padding.top;
+    final safeAreaTop = MediaQuery.paddingOf(context).top;
     final spaceAbove = anchorPosition.dy - safeAreaTop - 16;
     final spaceBelow =
         screenSize.height - anchorPosition.dy - anchorSize.height - 16;

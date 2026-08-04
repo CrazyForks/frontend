@@ -338,7 +338,7 @@ class _DrawerSongItem extends StatelessWidget {
                             // 大幅降低整队列的 GPU 纹理体积（原生端保持 400 不变）。
                             decodeWidth: smallCoverDecodeWidth(
                               36,
-                              MediaQuery.of(context).devicePixelRatio,
+                              MediaQuery.devicePixelRatioOf(context),
                             ),
                             placeholder:
                                 (_, _) => _buildCoverPlaceholder(colorScheme),

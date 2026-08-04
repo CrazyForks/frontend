@@ -1252,7 +1252,7 @@ class _JSPluginUpdateDialogState extends ConsumerState<_JSPluginUpdateDialog> {
       content: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: context.responsiveDialogMaxWidth,
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.6,
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -1555,7 +1555,7 @@ class _JSPluginBatchUpdateDialogState
       content: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: context.responsiveDialogMaxWidth,
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.6,
         ),
         child: SingleChildScrollView(
           child: Column(

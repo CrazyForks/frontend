@@ -347,7 +347,7 @@ class _VolumeOverlayPanelState extends State<_VolumeOverlayPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
+    final screenSize = MediaQuery.sizeOf(context);
 
     // 响应式面板尺寸
     final panelWidth = context.responsive<double>(
@@ -396,7 +396,7 @@ class _VolumeOverlayPanelState extends State<_VolumeOverlayPanel> {
     double top = widget.anchorPosition.dy - panelHeight - 8;
 
     // 如果面板会超出屏幕可见区域，显示在按钮下方
-    final safeAreaTop = MediaQuery.of(context).padding.top;
+    final safeAreaTop = MediaQuery.paddingOf(context).top;
     if (top < safeAreaTop + 16) {
       top = widget.anchorPosition.dy + widget.anchorSize.height + 8;
     }

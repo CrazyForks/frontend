@@ -9,8 +9,8 @@ class ResponsiveBreakpoints {
 }
 
 extension ResponsiveContext on BuildContext {
-  double get screenWidth => MediaQuery.of(this).size.width;
-  double get screenHeight => MediaQuery.of(this).size.height;
+  double get screenWidth => MediaQuery.sizeOf(this).width;
+  double get screenHeight => MediaQuery.sizeOf(this).height;
 
   bool get isMobile => screenWidth < ResponsiveBreakpoints.tablet;
   bool get isTablet =>
@@ -34,9 +34,8 @@ extension ResponsiveContext on BuildContext {
   }
 
   bool get isLandscape =>
-      MediaQuery.of(this).orientation == Orientation.landscape;
-  bool get isPortrait =>
-      MediaQuery.of(this).orientation == Orientation.portrait;
+      MediaQuery.orientationOf(this) == Orientation.landscape;
+  bool get isPortrait => MediaQuery.orientationOf(this) == Orientation.portrait;
 
   /// 是否是宽屏（平板以上）
   bool get isWideScreen => screenWidth >= ResponsiveBreakpoints.tablet;

@@ -156,7 +156,7 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
-    final brightness = MediaQuery.of(context).platformBrightness;
+    final brightness = MediaQuery.platformBrightnessOf(context);
     final theme = resolveEffectiveTheme(themeMode, brightness);
 
     ref.listen<PlayerState>(playerStateProvider, (prev, next) {
