@@ -52,6 +52,9 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
   /// 触底加载预留距离
   static const double _loadMoreThreshold = 300.0;
 
+  /// 歌曲行固定高度（SliverFixedExtentList 强制约束，与滚动定位计算一致）
+  static const double _songTileHeight = 72.0;
+
   late final ScrollController _scrollController;
 
   /// 排序模式
@@ -305,6 +308,9 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     if (index < 0) {
       await ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadAll();
       if (!mounted) return;
+      // 等待布局重建，确保 maxScrollExtent 反映全部已加载的歌曲
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
       final fullSongs =
           ref.read(playlistSongsProvider(_playlistIdInt)).value?.items ?? songs;
       index = fullSongs.indexWhere((s) => s.id == currentSong.id);
@@ -323,7 +329,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     final headerExtent = context.useWideLayout ? 0.0 : 300.0;
     final target =
         headerExtent +
-        index * 72.0 -
+        index * _songTileHeight -
         _scrollController.position.viewportDimension / 3;
     _scrollController.animateTo(
       target.clamp(0.0, _scrollController.position.maxScrollExtent),
@@ -508,7 +514,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
         DraggableScrollbarOverlay(
           scrollController: _scrollController,
           totalItemCount: total,
-          estimatedItemHeight: 72.0,
+          estimatedItemHeight: _songTileHeight,
           headerExtent: headerExtent,
           enabled: !hide && total > 20,
           labelBuilder: (index, t) => '$index / $t',
@@ -1508,7 +1514,8 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
 
     // 多选模式：显示 Checkbox
     if (_isSelectMode) {
-      return SliverList(
+      return SliverFixedExtentList(
+        itemExtent: _songTileHeight,
         delegate: SliverChildBuilderDelegate((context, index) {
           final song = songs[index];
           final isSelected = _selectedSongIds.contains(song.id);
@@ -1527,7 +1534,8 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     }
 
     // 正常模式
-    return SliverList(
+    return SliverFixedExtentList(
+      itemExtent: _songTileHeight,
       delegate: SliverChildBuilderDelegate((context, index) {
         final song = songs[index];
         return PlaylistSongTile(
