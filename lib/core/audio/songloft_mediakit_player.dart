@@ -198,8 +198,22 @@ class SongloftMediaKitPlayer extends AudioPlayerPlatform {
         if (errorUri == null ||
             currentMedia == null ||
             errorUri == currentMedia.uri) {
+          // 区分"加载失败"与"播放中错误"（songloft-org/songloft#357）：
+          // 加载阶段（_loadCompleter 未完成）→ 按原逻辑 idle + errorCode，
+          //   由上层 _playCurrent 的 try/catch 捕获并走重试策略。
+          // 播放中（media 已 open 且 load 已完成）→ 视为曲目结束触发自动切歌，
+          //   否则播放器卡在 idle 不会自动前进（典型场景：FLAC 文件尾部解码错误、
+          //   网络流中途断开等不可恢复错误）。
+          final isPlaybackError =
+              _mediaOpened &&
+              (_loadCompleter == null || _loadCompleter!.isCompleted);
           _mediaOpened = false;
-          _completeLoadError(Exception(error));
+          if (isPlaybackError) {
+            _processingState = ProcessingStateMessage.completed;
+            _updatePlaybackEvent();
+          } else {
+            _completeLoadError(Exception(error));
+          }
         }
       }),
       player.stream.playlist.listen((playlist) {
