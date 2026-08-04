@@ -53,7 +53,10 @@ if [ -n "${DIAGNOSE_JS:-}" ]; then
   [ -f "$DIAGNOSE_JS" ] || { echo "[run] DIAGNOSE_JS 文件不存在：$DIAGNOSE_JS" >&2; exit 1; }
   DIAGNOSE_JS_B64=$(base64 -w0 < "$DIAGNOSE_JS")
   DIAGNOSE=true
-  echo "[run] 自定义诊断脚本：$DIAGNOSE_JS（$(wc -c <"$DIAGNOSE_JS") 字节）"
+  # ${VAR} 的花括号不能省：bash 5.3 会把紧跟其后的全角「（」的高位字节当成标识符
+  # 的一部分，于是变量名成了 `DIAGNOSE_JS（`，在 `set -u` 下直接 unbound variable 退出。
+  # 表现是这条文档里写着的路径**一次都跑不起来**，而报错信息里的变量名是乱码。
+  echo "[run] 自定义诊断脚本：${DIAGNOSE_JS}（$(wc -c <"$DIAGNOSE_JS") 字节）"
 fi
 
 mkdir -p "$OUT"
