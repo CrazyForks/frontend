@@ -13,3 +13,8 @@ analyzer:
   exclude:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
+    # WebF 验证探针（songloft-org/songloft#341）的入口，属于**另一个 package**
+    # （scripts/webf-verify/probe_pubspec.yaml），只在容器里编译。它 import
+    # `elements/...` —— 那个目录由 entrypoint.sh 在容器内从产品源码拷进探针 lib/，
+    # 本仓库里压根不存在这条相对路径，留着分析必然报 uri_does_not_exist。
+    - "scripts/webf-verify/probe_main.dart"

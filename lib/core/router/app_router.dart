@@ -18,6 +18,7 @@ import '../../features/jsplugin/presentation/widgets/plugin_registry.dart';
 import '../../features/settings/presentation/duplicate_check_page.dart';
 import '../../features/settings/presentation/shortcut_settings_page.dart';
 import '../../features/settings/presentation/client_download_page.dart';
+import '../../features/settings/presentation/licenses_page.dart';
 import '../../features/settings/presentation/widgets/settings_category_content.dart';
 import '../../features/player/presentation/widgets/mobile_player.dart';
 import '../../features/player/presentation/widgets/desktop_full_player.dart';
@@ -39,6 +40,7 @@ class AppRoutes {
   static const String shortcuts = '/settings/shortcuts';
   static const String clientDownload = '/settings/download';
   static const String pluginRegistry = '/settings/plugin-registry';
+  static const String licenses = '/settings/licenses';
   static const String settingsCategory = '/settings/category/:index';
   static const String plugin = '/plugin';
   static const String pluginTab = '/plugin-tab/:entryPath';
@@ -253,6 +255,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.pluginRegistry,
             builder: (context, state) => const PluginRegistryPage(),
+          ),
+
+          // 开源许可（GPL-3.0 分发声明 + 内嵌许可全文，songloft-org/songloft#341）
+          GoRoute(
+            path: AppRoutes.licenses,
+            builder: (context, state) => const LicensesPage(),
           ),
 
           // 设置分类详情（移动端二级页）。做成真实路由让浏览器/系统返回键回到

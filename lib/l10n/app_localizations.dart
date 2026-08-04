@@ -7560,6 +7560,144 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'已随机打乱歌曲顺序'**
   String get playlistShuffled;
+
+  /// No description provided for @settingsLicensesTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'开源许可'**
+  String get settingsLicensesTitle;
+
+  /// No description provided for @settingsLicensesSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'分发许可与第三方组件'**
+  String get settingsLicensesSubtitle;
+
+  /// No description provided for @licensesDistributionSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'分发许可'**
+  String get licensesDistributionSection;
+
+  /// No description provided for @licensesDistributionHeadline.
+  ///
+  /// In zh, this message translates to:
+  /// **'本客户端的二进制按 GNU 通用公共许可证第 3 版（GPL-3.0）分发。'**
+  String get licensesDistributionHeadline;
+
+  /// No description provided for @licensesDistributionWhy.
+  ///
+  /// In zh, this message translates to:
+  /// **'原因：客户端链接了渲染引擎 WebF，它以 GPL-3.0-only 授权且没有链接例外条款。因此我们分发的每个安装包作为一个整体受 GPL-3.0 约束。'**
+  String get licensesDistributionWhy;
+
+  /// No description provided for @licensesDistributionSource.
+  ///
+  /// In zh, this message translates to:
+  /// **'源码本身仍以 Apache License 2.0 授权。移除 WebF 依赖后自行构建，所得二进制不含 GPL 代码，仅适用 Apache-2.0。'**
+  String get licensesDistributionSource;
+
+  /// No description provided for @licensesDistributionWeb.
+  ///
+  /// In zh, this message translates to:
+  /// **'Web 版不受影响：WebF 不支持 Flutter Web、在该目标上未被链接，故 Web 版仅受 Apache-2.0 约束。'**
+  String get licensesDistributionWeb;
+
+  /// No description provided for @licensesSourceSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'完整对应源码'**
+  String get licensesSourceSection;
+
+  /// No description provided for @licensesSourceHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'你有权获得本软件完整的对应源码。每个发布版本都附带 CORRESPONDING-SOURCE.txt，记录该次构建所用的仓库、标签与准确的提交 SHA。'**
+  String get licensesSourceHint;
+
+  /// No description provided for @licensesSourceClient.
+  ///
+  /// In zh, this message translates to:
+  /// **'客户端源码'**
+  String get licensesSourceClient;
+
+  /// No description provided for @licensesSourceServer.
+  ///
+  /// In zh, this message translates to:
+  /// **'服务端源码'**
+  String get licensesSourceServer;
+
+  /// No description provided for @licensesSourceWebf.
+  ///
+  /// In zh, this message translates to:
+  /// **'WebF 源码'**
+  String get licensesSourceWebf;
+
+  /// No description provided for @licensesTextsSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'许可全文'**
+  String get licensesTextsSection;
+
+  /// No description provided for @licensesGplTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'GNU GPL v3.0 全文'**
+  String get licensesGplTitle;
+
+  /// No description provided for @licensesGplSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'已内置于安装包，离线可读'**
+  String get licensesGplSubtitle;
+
+  /// No description provided for @licensesNoticeTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'第三方组件声明（NOTICE）'**
+  String get licensesNoticeTitle;
+
+  /// No description provided for @licensesNoticeSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'WebF、libmpv、FFmpeg、字体等组件的许可与来源'**
+  String get licensesNoticeSubtitle;
+
+  /// No description provided for @licensesFlutterTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部依赖包许可'**
+  String get licensesFlutterTitle;
+
+  /// No description provided for @licensesFlutterSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'由 Flutter 汇总的逐个依赖包许可全文'**
+  String get licensesFlutterSubtitle;
+
+  /// No description provided for @licensesLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'许可文本加载失败：{error}'**
+  String licensesLoadFailed(String error);
+
+  /// No description provided for @licensesCopyAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制全文'**
+  String get licensesCopyAll;
+
+  /// No description provided for @licensesCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'已复制到剪贴板'**
+  String get licensesCopied;
+
+  /// No description provided for @licensesOpenFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法打开链接：{url}'**
+  String licensesOpenFailed(String url);
 }
 
 class _AppLocalizationsDelegate

@@ -54,3 +54,6 @@ pubspec.lock
 /linux/runner/songloft-server
 /ios/Songloft.xcframework
 /android/app/libs/*.aar
+
+# WebF 验证容器的截图与日志产物（songloft-org/songloft#341）
+/scripts/webf-verify/out/

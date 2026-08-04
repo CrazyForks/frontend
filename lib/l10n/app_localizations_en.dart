@@ -4368,4 +4368,86 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playlistShuffled => 'Songs shuffled';
+
+  @override
+  String get settingsLicensesTitle => 'Open source licenses';
+
+  @override
+  String get settingsLicensesSubtitle =>
+      'Distribution license and third-party components';
+
+  @override
+  String get licensesDistributionSection => 'Distribution license';
+
+  @override
+  String get licensesDistributionHeadline =>
+      'Binaries of this client are distributed under the GNU General Public License, version 3 (GPL-3.0).';
+
+  @override
+  String get licensesDistributionWhy =>
+      'Why: the client links against the WebF rendering engine, which is GPL-3.0-only with no linking exception. Every installer we distribute is therefore governed as a whole by GPL-3.0.';
+
+  @override
+  String get licensesDistributionSource =>
+      'The source code itself remains licensed under the Apache License 2.0. Building it yourself with the WebF dependency removed yields a binary containing no GPL code, to which Apache-2.0 alone applies.';
+
+  @override
+  String get licensesDistributionWeb =>
+      'The Web build is not affected: WebF does not support Flutter Web and is not linked there, so the Web bundle remains governed by Apache-2.0 alone.';
+
+  @override
+  String get licensesSourceSection => 'Complete corresponding source';
+
+  @override
+  String get licensesSourceHint =>
+      'You are entitled to the complete corresponding source code of this software. Every release ships a CORRESPONDING-SOURCE.txt asset naming the repositories, the tag and the exact commit SHAs used for that build.';
+
+  @override
+  String get licensesSourceClient => 'Client source';
+
+  @override
+  String get licensesSourceServer => 'Server source';
+
+  @override
+  String get licensesSourceWebf => 'WebF source';
+
+  @override
+  String get licensesTextsSection => 'License texts';
+
+  @override
+  String get licensesGplTitle => 'GNU GPL v3.0 full text';
+
+  @override
+  String get licensesGplSubtitle =>
+      'Bundled inside the installer, readable offline';
+
+  @override
+  String get licensesNoticeTitle => 'Third-party notices (NOTICE)';
+
+  @override
+  String get licensesNoticeSubtitle =>
+      'Licenses and origins of WebF, libmpv, FFmpeg, fonts and more';
+
+  @override
+  String get licensesFlutterTitle => 'All package licenses';
+
+  @override
+  String get licensesFlutterSubtitle =>
+      'Per-package license texts collected by Flutter';
+
+  @override
+  String licensesLoadFailed(String error) {
+    return 'Failed to load license text: $error';
+  }
+
+  @override
+  String get licensesCopyAll => 'Copy full text';
+
+  @override
+  String get licensesCopied => 'Copied to clipboard';
+
+  @override
+  String licensesOpenFailed(String url) {
+    return 'Could not open link: $url';
+  }
 }

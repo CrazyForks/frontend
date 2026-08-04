@@ -1,0 +1,21 @@
+name: webf_probe
+description: WebF 渲染能力探针（songloft-org/songloft#341），只用于验证，不参与发布。
+publish_to: 'none'
+version: 0.0.1
+
+environment:
+  sdk: ^3.7.0
+  flutter: '>=3.29.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # 用真实最新版，不要照抄官方文档里过时的 ^0.23.x
+  webf: ^0.24.27
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

@@ -141,6 +141,15 @@ jobs:
         run: |
           mkdir -p assets/icons
           cp web/icons/Icon-512.png assets/icons/app_icon.png
+      # GPLv3 §4 合规（songloft-org/songloft#341）：许可全文已经通过 pubspec 的
+      # `assets:` 进了 data/flutter_assets/LICENSES/（App 内「设置 → 开源许可」读它，
+      # 离线可读）。这里再往 bundle 根放一份，让用户解包后**不用翻 flutter_assets**
+      # 就能看到。tar.gz / deb / rpm / AppImage 都从这个目录打包，一次覆盖四种产物。
+      #
+      # 刻意放在打包**之前**：这几种产物均无代码签名，且即便将来加了签名，签名也发生
+      # 在打包之后、对最终内容计算，所以不存在「往已签名容器里塞文件」的风险。
+      - name: Bundle GPL-3.0 license text into Linux payload
+        run: cp LICENSES/GPL-3.0.txt build/linux/x64/release/bundle/LICENSE-GPL-3.0.txt
       - name: Package tar.gz (基础便携包)
         run: |
           cd build/linux/x64/release/bundle
@@ -212,6 +221,13 @@ jobs:
       - name: Setup NuGet
         uses: nuget/setup-nuget@v2
       - run: flutter build windows --release --dart-define=FRONTEND_VERSION=${{ steps.version.outputs.version }} --dart-define=FRONTEND_BUILD_TIME=${{ steps.version.outputs.build_time }} --dart-define=TRACELY_APP_ID=${{ secrets.TRACELY_APP_ID }} --dart-define=TRACELY_APP_SECRET=${{ secrets.TRACELY_APP_SECRET }} --dart-define=TRACELY_HOST=${{ secrets.TRACELY_HOST }}
+      # 同 Linux：许可全文已在 data/flutter_assets/ 里，这里再往 Release 根放一份，
+      # 让绿色包解开就能看到。.zip 无签名；MSIX 的签名由 fastforge 在**打包之后**
+      # 对最终内容计算，所以提前往 payload 里加文件同样零风险。
+      - name: Bundle GPL-3.0 license text into Windows payload
+        shell: pwsh
+        run: |
+          Copy-Item LICENSES\GPL-3.0.txt build\windows\x64\runner\Release\LICENSE-GPL-3.0.txt
       - name: Package ZIP (绿色便携包)
         shell: pwsh
         run: |
@@ -267,6 +283,17 @@ jobs:
         run: |
           cd build/macos/Build/Products/Release
           zip -r -y "$GITHUB_WORKSPACE/songloft-macos.zip" *.app
+      # 许可全文已在 .app 内（Contents/Frameworks/App.framework/Resources/
+      # flutter_assets/LICENSES/），这里再往 zip **根**追加一份做可发现性。
+      # 刻意只 append 到 zip 根、**不往 .app 包里塞** —— .app 的 codesign 签的是
+      # bundle 内部内容，动它就得重签；zip 根的同级文件与签名完全无关。
+      # DMG 不做同样处理：它由 fastforge 从 .app 生成，改它要动打包/签名流程，
+      # 靠 .app 内的 asset 与 release 附件 LICENSE-GPL-3.0.txt 满足合规。
+      - name: Attach GPL-3.0 license text at ZIP root (does not touch .app signature)
+        run: |
+          cp LICENSES/GPL-3.0.txt LICENSE-GPL-3.0.txt
+          zip -j "$GITHUB_WORKSPACE/songloft-macos.zip" LICENSE-GPL-3.0.txt
+          rm LICENSE-GPL-3.0.txt
       - name: Build DMG
         continue-on-error: true
         run: |
@@ -358,7 +385,15 @@ jobs:
           FLUTTER_BINDING: ${{ env.FLUTTER_VERSION }}
         run: |
           set -e
-          TAG=$([[ "$GITHUB_REF" == refs/tags/v* ]] && echo "${GITHUB_REF#refs/tags/}" || echo "dev")
+          # 与 release_info 步骤保持一致：WebF 实验分支发到独立的 dev-webf release，
+          # 这里若仍写 dev，manifest 里的 patchUrl 会指向不存在的路径。
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ "${GITHUB_REF#refs/heads/}" == feat/webf-plugin-render ]]; then
+            TAG="dev-webf"
+          else
+            TAG="dev"
+          fi
           # --split-per-abi 时 gradle 会把各 ABI APK 的 versionCode 改写为
           # 「ABI偏移×1000+pubspec基础值」(如 arm64-v8a=2001),flutter_patcher 按
           # versionCode 严格绑定,manifest/补丁必须写 APK 的**真实值**(用 aapt 读),
@@ -487,7 +522,15 @@ jobs:
           else
             # 分支触发（push to main / workflow_dispatch）统一用 dev tag 滚动 prerelease
             BRANCH="${GITHUB_REF#refs/heads/}"
-            echo "tag=dev" >> "$GITHUB_OUTPUT"
+            # WebF 实验分支（songloft-org/songloft#341）刻意发到独立 tag：
+            # 共享的 dev 预发布是 dev 渠道客户端热更新检查的目标，若把实验构建
+            # 推到那里，所有 dev 用户都会被自动升到这个 beta 渲染引擎上。
+            # 本分支合并回 main 前必须删掉这段。
+            if [[ "$BRANCH" == feat/webf-plugin-render ]]; then
+              echo "tag=dev-webf" >> "$GITHUB_OUTPUT"
+            else
+              echo "tag=dev" >> "$GITHUB_OUTPUT"
+            fi
             echo "name=Dev Build ($BRANCH)" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "make_latest=false" >> "$GITHUB_OUTPUT"
@@ -549,6 +592,111 @@ jobs:
           fi
           echo "=== Release Assets ==="
           ls -lh final-assets/ || echo "(no assets)"
+
+      # GPLv3 合规（songloft-org/songloft#341）：原生平台构建链接 WebF（GPL-3.0-only，
+      # 无链接例外），所以我们分发的每个原生二进制整体受 GPL-3.0 约束。GPLv3 要求
+      # 随程序一并给出许可证全文（§4/§5）与完整对应源码的获取方式（§6）。
+      # 这两个文件因此必须挂在**每一个** release 上，dev 预发布也算分发。
+      - name: Attach GPL-3.0 license text + corresponding source notice
+        run: |
+          # 与父仓库 release.yml 的同名 step 对称：本次一个产物都没有（所有构建 job
+          # 全失败）时不挂许可证文件。否则会发出一个「只有两份许可证文本、没有任何
+          # 二进制」的 release，比空 release 更让人误以为有东西可下。
+          if ! compgen -G "final-assets/*" > /dev/null 2>&1; then
+            echo "本次 release 没有任何构建产物，跳过 GPL 附件"
+            exit 0
+          fi
+
+          mkdir -p final-assets
+          cp LICENSES/GPL-3.0.txt final-assets/LICENSE-GPL-3.0.txt
+
+          TAG="${{ steps.release_info.outputs.tag }}"
+          COMMIT="${GITHUB_SHA}"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          # WebF 的版本有两个来源，语义完全不同，GPL §6 的对应源码声明里必须让接收者
+          # 分得清他拿到的是哪一种：
+          #   - pubspec.lock 的 `version:` 是本次构建**真正链接**的解析版本
+          #   - pubspec.yaml 的 `webf: ^X.Y.Z` 只是版本**约束**（一个范围，不是版本）
+          # pubspec.lock 被 .gitignore 忽略、不入库，而本 job 是独立的全新 checkout
+          # 且不跑 flutter pub get，所以 CI 里它**必然不存在**。因此以入库的
+          # pubspec.yaml 为主来源，lock 恰好存在时（本地跑、或将来 lock 入库）才升级
+          # 成精确的解析版本。
+          #
+          # 铁律：`run:` 的默认 shell 是 `bash -e`，`VAR=$(失败命令)` 会让赋值语句
+          # 本身以非零退出 → 整步立刻中止，紧跟其后的兜底行**永远执行不到**。
+          # songloft-org/songloft#341 的 player release run 就是这么炸的：awk 读不到
+          # pubspec.lock → fatal → 8 个构建 job 全绿但 Create Release 整个失败。
+          # 所以下面每个命令替换都带 `|| true`，文件存在性一律先用 `[ -f ]` 守卫。
+          WEBF_RESOLVED=""
+          if [ -f pubspec.lock ]; then
+            WEBF_RESOLVED=$(awk '/^  webf:/{f=1} f&&/^    version:/{gsub(/"/,"",$2); print $2; exit}' pubspec.lock || true)
+          fi
+          WEBF_CONSTRAINT=""
+          if [ -f pubspec.yaml ]; then
+            WEBF_CONSTRAINT=$(awk '$1=="webf:"{print $2; exit}' pubspec.yaml || true)
+          fi
+
+          if [ -n "$WEBF_RESOLVED" ]; then
+            WEBF_VERSION_LINE="version     : ${WEBF_RESOLVED}"
+            WEBF_VERSION_NOTE="(the exact version linked into this build, as resolved in pubspec.lock)"
+          elif [ -n "$WEBF_CONSTRAINT" ]; then
+            WEBF_VERSION_LINE="constraint  : ${WEBF_CONSTRAINT}"
+            WEBF_VERSION_NOTE="(this is the version CONSTRAINT declared in pubspec.yaml, NOT the
+              resolved version -- pubspec.lock is not committed to this
+              repository. The exact version linked into this build is in the
+              \"flutter pub get\" output of the build log linked below.)"
+          else
+            WEBF_VERSION_LINE="version     : see the \"flutter pub get\" output of the build log"
+            WEBF_VERSION_NOTE="(neither pubspec.lock nor pubspec.yaml could be read in the release
+              job; the build log linked below is authoritative.)"
+          fi
+
+          cat > final-assets/CORRESPONDING-SOURCE.txt <<EOF
+          Songloft client -- COMPLETE CORRESPONDING SOURCE
+          =================================================
+
+          The native platform builds in this release (Android .apk, iOS .ipa,
+          Windows .zip/.msix, macOS .zip/.dmg, Linux .tar.gz/.deb/.rpm/.AppImage)
+          link against WebF, which is licensed GPL-3.0-only with no linking
+          exception. Each of those binaries is therefore governed AS A WHOLE by
+          the GNU General Public License, version 3 -- a verbatim copy of which
+          is attached to this release as LICENSE-GPL-3.0.txt.
+
+          You are entitled to the complete corresponding source code of that
+          combined work. This is exactly what it was built from:
+
+            Client (this repository)
+              https://github.com/${GITHUB_REPOSITORY}
+              release tag : ${TAG}
+              commit      : ${COMMIT}
+              (git clone https://github.com/${GITHUB_REPOSITORY}.git && git checkout ${COMMIT})
+
+            WebF (rendering engine, GPL-3.0-only)
+              https://github.com/openwebf/webf
+              ${WEBF_VERSION_LINE}
+              ${WEBF_VERSION_NOTE}
+              build log   : ${RUN_URL}
+
+            Songloft server (Apache-2.0, separate program)
+              https://github.com/songloft-org/songloft
+
+          Build instructions live in docs/build_guide.md in the client
+          repository; the exact toolchain versions and build commands used for
+          this release are in .github/workflows/build-and-release.yml at the
+          commit above, and the full build logs are retained on the workflow
+          run for this release.
+
+          The Web bundle (songloft-web-*.tar.gz) does NOT contain WebF -- WebF
+          does not support Flutter Web -- and remains under Apache-2.0 alone,
+          as does the client source code itself (see LICENSE and NOTICE).
+
+          Third-party component list and license notices: NOTICE.
+          EOF
+
+          echo "=== GPL compliance assets ==="
+          ls -l final-assets/LICENSE-GPL-3.0.txt final-assets/CORRESPONDING-SOURCE.txt
+          cat final-assets/CORRESPONDING-SOURCE.txt
 
       - name: Delete existing release (for branch builds)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}

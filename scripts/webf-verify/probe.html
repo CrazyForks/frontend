@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<!--
+  WebF 图标连字生死闸探针（songloft-org/songloft#341）
+
+  这个页面刻意加载**真实的** common.css 与真实字体文件（由 entrypoint.sh 组合的
+  docroot 提供），不复刻简化版 —— 否则测不到真实条件。
+
+  怎么读截图（每一行都是自解释的判据）：
+    1. CONTROL      纯文本，证明页面真的加载并渲染了。这行都没有 → 别看后面几行
+    2. LIGATURE     插件里 ~350 处的真实写法。出现图标字形 = 闸通过；
+                    出现英文单词 "download settings play_arrow" = 闸失败
+                    （Material Symbols 刻意保留了拉丁字母轮廓做降级，所以
+                     连字失效时会显示可读单词而不是豆腐块）
+    3. CODEPOINT    闸失败时的补救路径能否走通。码点由 entrypoint.sh 用
+                    fontTools 从真实 woff2 的 cmap 里查出来后注入，不靠猜
+    4. FLEX GAP     覆盖面最广的单一 CSS 特性（common.css 7 处 + 插件 348 处）。
+                    三个方块之间有间距 = 支持
+    13. RING        自定义元素 <songloft-progress-ring>，判据见右列该行上方注释
+    14~16 SLIDER    input[type=range] 的能力事实、自定义元素 <songloft-slider>、
+                    以及 common.js 的 range 垫片，判据见右列各行上方注释
+    17. SAFE AREA   安全区变量 --sl-safe-*（宿主注入替代 env(safe-area-inset-*)），
+                    顺带把 max() / clamp() / var() fallback 的可用性钉成回归行
+    18. STEP6       三项经宿主桥下沉的能力事实：data: URL 的两个消费点（<img src>
+                    与 CSS background-image）、btoa/Blob.arrayBuffer/FileReader
+                    的存在性、input[type=file] 的原生表现与垫片端到端链路、
+                    <table> 的警告垫片。判据全在右列该组上方的注释里，
+                    而**读数通道是 flutter.log 里的 `[probe] step6` 那一行**
+                    （截图里 18b 只够看个大概；base64 三项的完整详情在
+                     `[probe] step6-b64` 那行）。
+                    ⚠️ 那四个 16px 方块的判据**不在**这行文字里，而在
+                    **out/pixels.txt** —— 它是抓屏后按页面报的坐标逐点取色的
+                    PASS/FAIL。原因：`imgSet=ok` / `bgRect=16x16` / `naturalWidth`
+                    只证明「盒子有尺寸、赋值没抛异常」，**不证明像素被画出来了**
+
+  版面：WebF 窗口实测只有 1280x717（Xvfb 屏是 1280x900，下方黑色区域是 Flutter
+  压根没画的部分），单列纵向已经被 12 组占满，所以从第 13 组起改成**两列**：
+  左列 1~12b（原样不动），右列 13 起。加新检查行前先确认它落在 717px 以内 ——
+  被截掉的行看起来和「脚本没跑」一模一样。
+  （右列到 17b 为止实测落在 ~610px，还有余量；再加就要考虑第三列或缩行距。）
+
+  合成拖动（DRAG_PROBE）：本页面没有交互驱动能力，「滑块真的能拖」只能由 Dart 侧
+  用 WidgetsBinding.handlePointerEvent 合成 Pointer 事件来验（走的是真实 hit-test →
+  Flutter 手势路径）。坐标由本页把 getBoundingClientRect() 经 WebF methodChannel
+  报给 Dart，拖完 Dart 再回调 window.__slDragDone() 让本页把结果打进 console。
+  **默认关**（--dart-define=DRAG_PROBE=true 才开），免得给既有 13 组的截图基线
+  引入不确定性。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>WebF probe</title>
+  <link rel="stylesheet" href="./common.css">
+  <!-- 顺序刻意在 common.css 之后，模拟插件自己的 style.css，见 probe-after.css -->
+  <link rel="stylesheet" href="./probe-after.css">
+  <!-- 加载真实的 common.js：第 11 行的空 src 兜底就在它里面，不加载就测不到 -->
+  <script src="./common.js"></script>
+  <style>
+    body { margin: 0; padding: 16px; background: #fff; color: #000;
+           font-family: Roboto, sans-serif; }
+    /* 12px 而不是更宽松的间距：WebF 的窗口在容器里实测只有 1280x717（Xvfb 屏幕是
+       1280x900，下方黑色区域是 Flutter 压根没画的部分），12 组检查必须全部挤进
+       717px 才不会被截掉 —— 被截掉的行看起来就像「脚本没跑」。 */
+    .row { display: flex; align-items: center; margin-bottom: 12px; }
+    .tag { width: 190px; font-size: 13px; font-weight: 700; color: #666; }
+    .gapbox { display: flex; gap: 24px; }
+    .gapbox i { width: 40px; height: 40px; background: #3f51b5; display: block; }
+    /* 两列版面，见文件头「版面」说明。宽度写死而不用 flex:1：
+       flex-grow 若在 WebF 下表现异常，右列会被挤到 0 宽而整组静默消失。 */
+    .cols { display: flex; gap: 24px; align-items: flex-start; }
+    .colL { width: 762px; }
+    .colR { width: 462px; }
+    .colR .tag { width: 118px; }
+    /* 右列 12 组行距压到 8px：加第 18 组后 12px 会把 18b 挤出 717px 的可见区，
+       而被截掉的行看起来和「脚本没跑」一模一样（文件头「版面」那段的警告）。
+       只影响纵向位置，各组判据不变。 */
+    .colR .row { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+<div class="cols">
+<div class="col colL">
+  <div class="row">
+    <span class="tag">1 CONTROL</span>
+    <span style="font-size:20px">plain text renders</span>
+  </div>
+
+  <div class="row">
+    <span class="tag">2 LIGATURE</span>
+    <span class="material-symbols-outlined" style="font-size:40px">download</span>
+    <span class="material-symbols-outlined" style="font-size:40px">settings</span>
+    <span class="material-symbols-outlined" style="font-size:40px">play_arrow</span>
+  </div>
+
+  <div class="row">
+    <span class="tag">3 CODEPOINT</span>
+    <span class="material-symbols-outlined" style="font-size:40px">__CODEPOINT_DOWNLOAD__</span>
+    <span class="material-symbols-outlined" style="font-size:40px">__CODEPOINT_SETTINGS__</span>
+    <span class="material-symbols-outlined" style="font-size:40px">__CODEPOINT_PLAY_ARROW__</span>
+  </div>
+
+  <div class="row">
+    <span class="tag">4 FLEX GAP</span>
+    <span class="gapbox"><i></i><i></i><i></i></span>
+  </div>
+
+  <!--
+    5/6 分离「主题不生效」的两个可能原因（songloft-org/songloft#341）。
+    common.js 用 documentElement.dataset.theme 写属性，common.css 用
+    html[data-theme="dark"] 选择 —— 任一环断掉主题都不生效，而现象一样。
+      5 显示 getAttribute('data-theme') 的真实值：null = dataset setter 没写进属性
+      6 方块变绿 = 属性选择器匹配成功；仍是红 = 选择器没匹配
+  -->
+  <div class="row">
+    <span class="tag">5 DATASET ATTR</span>
+    <span id="attrval" style="font-size:20px">(script did not run)</span>
+  </div>
+
+  <div class="row">
+    <span class="tag">6 ATTR SELECTOR</span>
+    <span id="selbox"></span>
+  </div>
+
+  <!--
+    7 common.js 靠 window.location.search 读 ?theme= 与 ?embed=。若 WebF 不把
+    query 暴露到 location，主题与嵌入模式会**同时**静默失效，而现象只是「页面
+    看起来是亮色」，极易误判成 CSS 问题。用 run.sh 传带 query 的 PROBE_URL 观察。
+  -->
+  <div class="row">
+    <span class="tag">7 LOCATION QUERY</span>
+    <span id="loc" style="font-size:18px">(script did not run)</span>
+  </div>
+
+  <!--
+    8 common.css 的暗色主题不是靠直接属性，而是在 html[data-theme="dark"] 里
+    **重定义 CSS 变量**（约 40 个 --md-*），元素侧用 var() 引用。所以第 6 行通过
+    不代表主题能用 —— 必须单独验「更具体的选择器重定义变量后，var() 是否重解析」。
+    绿 = 变量覆盖生效；红 = 只认 :root 的初值，暗色主题整体失效。
+  -->
+  <div class="row">
+    <span class="tag">8 VAR OVERRIDE</span>
+    <span id="varbox"></span>
+  </div>
+
+  <!--
+    9 第 8 行区分不出「按优先级」与「按源码顺序取最后」—— 它把 :root 写在
+    html[data-theme] 之前，两种实现都会变绿。这里把顺序反过来：
+      html[data-theme="dark"] 优先级 (0,1,1) 高于 :root (0,1,0)，
+      所以按 CSS 规范**无论源码顺序**都应取绿。
+    绿 = 按优先级裁决（正确）；红 = 按源码顺序取最后（bug）。
+    这正是真实插件页的处境：插件自己的 style.css 在 common.css 之后加载，
+    并在 :root 里用亮色重定义同名 --md-* 变量。
+  -->
+  <div class="row">
+    <span class="tag">9 VAR SPECIFICITY</span>
+    <span id="varbox2"></span>
+  </div>
+
+  <!--
+    10 跨样式表的变量优先级 —— 最接近真实插件页的处境。
+    common.css 在 html[data-theme="dark"] 里给 --md-surface 定了暗色 #1C1B1F，
+    随后加载的 probe-after.css 在 :root 里用亮色 #FFFBFE 覆盖同名变量。
+    按规范优先级仍应取暗色。
+      深色方块 = 跨表也按优先级裁决（正确）
+      浅色方块 = 只按样式表顺序裁决 → 这就是插件页暗色主题失效的根因
+  -->
+  <div class="row">
+    <span class="tag">10 CROSS-SHEET VAR</span>
+    <span id="crossbox"></span>
+  </div>
+
+  <!--
+    11 空 img src。按规范 src="" 是无效值、浏览器不发请求；WebF 会把它解析成
+    当前文档 URL，把这个 HTML 抓回来当图片解码，报 Failed to decode image
+    (mime=text/html)。common.js 里有 WebF-only 的兜底（属性扫描 + 访问器拦截），
+    这两个元素就是它的回归用例：日志里不该再出现 decode image 报错。
+      左：HTML 里写死的 src=""（解析器设的是属性）
+      右：运行时 img.src = ''（走属性访问器）
+  -->
+  <div class="row">
+    <span class="tag">11 EMPTY IMG SRC</span>
+    <img id="emptystatic" src="" alt="static" style="width:40px;height:40px;background:#ddd">
+    <img id="emptyruntime" alt="runtime" style="width:40px;height:40px;background:#ddd;margin-left:12px">
+  </div>
+
+  <!--
+    12 <details>/<summary> 垫片。WebF 的两份标签注册表里都没有 details/summary，
+    它们降级为 _UnknownHTMLElement（display:block）：子内容照常摊开显示、点击毫无
+    反应、没有三角标记。common.js 的 WebF-only 垫片（applyOnReady 时机）负责补上
+    折叠交互，这一组就是它的回归用例。
+
+    判据 —— 折叠/展开是否可交互（第三个由脚本代点，不需要人动手）：
+      A 默认       只看到「▸ A closed」一行，A-BODY **不可见**  ← 折叠生效
+      B open 属性  看到「▾ B open」+ B-BODY                     ← 尊重初始 open
+      C 脚本点击   看到「▾ C clicked」+ C-BODY                   ← 点击真能展开
+      三角标记     ▸/▾ 字形（连字失效时会退成 arrow_right 等单词，不影响折叠判定）
+    12b 是同一件事的文字化断言，避免只靠肉眼看方块：
+      期望 A.open=false/wrap=none  B.open=true/wrap=block  C.open=true/wrap=block
+      wrap=native → 垫片没跑（DOM 里没有 .sl-details-content 容器）
+      三个 open 全 false + BODY 全可见 → 垫片抛异常了，去 flutter.log 搜 shim failed
+  -->
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">12 DETAILS</span>
+    <div class="dtrow">
+      <details id="dtA" class="probe-details"><summary>A closed</summary><div class="probe-dbody">A-BODY</div></details>
+      <details id="dtB" class="probe-details" open><summary>B open</summary><div class="probe-dbody">B-BODY</div></details>
+      <details id="dtC" class="probe-details"><summary>C clicked</summary><div class="probe-dbody">C-BODY</div></details>
+    </div>
+  </div>
+
+  <div class="row">
+    <span class="tag">12b DETAILS STATE</span>
+    <span id="dtstate" style="font-size:16px">(script did not run)</span>
+  </div>
+</div><!-- /colL -->
+
+<div class="col colR">
+  <!--
+    13 自定义元素 <songloft-progress-ring>（songloft-org/songloft#341）。
+    这一组测的是**产品实现本身**：entrypoint.sh 每次运行把
+    lib/features/home/presentation/render/elements/ 拷进探针 lib/ 再编译，
+    probe_main.dart 调的是产品的 SongloftCustomElements.ensureRegistered()。
+
+    五个 40x40 虚线盒，尺寸一律走 inline style（也就是同时验了「CSS width/height
+    是否真的到得了 renderStyle」—— 到不了就会退成 36px 默认边长，一眼看得出）。
+
+      A 属性驱动重绘   HTML 里 value="0"（只有轨道），脚本在 +600ms 改成 25
+                       → 应出现 **1/4 圈**深绿弧。仍是纯轨道 = attributeDidUpdate
+                       那条链没触发重绘
+      B 越界夹紧       value="500" max="100" → 应是**整圈**（不是空、也不是绕多圈）
+      C 非法值不崩     value="oops" max="0"（退化区间）stroke-width="-3"
+                       → 应只画轨道且**页面其余部分照常**；整页白/该盒空白 = 崩了。
+                       `color="var(--probe-blue)"` 也归这一类：**属性里的 var()
+                       在 WebF 下解析不出来**（CSSColor.parseColor 只在样式系统
+                       预先展开过 var 的场景下工作，拿原始 `var(...)` 字符串返回
+                       null），元素按「无效颜色」处理 → 退回继承来的黑色。
+                       故轨道应是**淡黑色细圈**，不是淡红也不是淡蓝。
+                       哪天它变蓝了 = WebF 支持了，可以回头放宽文档的说法。
+                       flutter.log 里应有两条 `不是有效数字/不是有效颜色` 警告
+      D 主题跟随       不写 color 属性，靠 CSS `#ringD { color: var(--probe-ring) }`
+                       （currentColor 语义）。脚本在 +600ms 把该变量由红改绿。
+                       绿 3/4 圈 = CSS 变量驱动的重绘也走通了；红 = 只有首帧对，
+                       运行时改主题不重绘（此时应改用 color 属性驱动）
+      E 负向对照       <songloft-not-registered>，同样的属性与尺寸但**没注册**。
+                       必须是**空的虚线盒**。它里面也画出环 = 说明弧不是我们的
+                       Dart 元素画的（例如某个 CSS/垫片副作用），整组结论作废
+    13b 是同一件事的文字化断言（截图糊掉时的兜底），期望：
+      A.rect=40x40  A.value="25"  E.rect=40x40  ring=""  static=""
+      rect=0x0 → WidgetElement 压根没拿到盒模型（不是没画，是没有盒子）。
+      两个 var 读回都是 ""：**WebF 的 getComputedStyle 不暴露自定义属性**
+      （实测结论；static 那个是从未被改过的 :root 变量，作对照用），所以
+      「读回是空」不能用来判断 setProperty 有没有生效 —— 那个只能看 D 的颜色。
+      若哪天 ring="" 而 static 有值，才说明是 setProperty 真的没写进去。
+  -->
+  <div class="row">
+    <span class="tag">13 RING</span>
+    <span class="ringrow">
+      <songloft-progress-ring id="ringA" class="ringbox" value="0" max="100"
+        color="#2e7d32" style="width:40px;height:40px"></songloft-progress-ring>
+      <songloft-progress-ring id="ringB" class="ringbox" value="500" min="0" max="100"
+        color="#3f51b5" stroke-width="6" style="width:40px;height:40px"></songloft-progress-ring>
+      <songloft-progress-ring id="ringC" class="ringbox" value="oops" max="0"
+        stroke-width="-3" color="var(--probe-blue)" style="width:40px;height:40px"></songloft-progress-ring>
+      <songloft-progress-ring id="ringD" class="ringbox" value="75" max="100"
+        line-cap="round" stroke-width="5" style="width:40px;height:40px"></songloft-progress-ring>
+      <songloft-not-registered id="ringE" class="ringbox" value="75" max="100"
+        color="#2e7d32" style="width:40px;height:40px"></songloft-not-registered>
+    </span>
+  </div>
+
+  <div class="row">
+    <span class="tag">13b RING STATE</span>
+    <span id="ringstate" style="font-size:12px">(script did not run)</span>
+  </div>
+
+  <!--
+    14 `input[type=range]` 在 WebF 里的**能力事实**（songloft-org/songloft#341 Step 3）。
+    纯 JS，不涉及任何自定义元素 —— 它回答的是「垫片能怎么写」这个前置问题，
+    每一项的结论都直接决定 common.js 里 rangeSliderShim 的架构，所以固化成回归行。
+
+      qsa      document.querySelectorAll('input[type=range]') 的命中数。
+               0 → 属性选择器在 WebF 下不可用，垫片只能 getElementsByTagName + 逐个判 type
+      val      HTML 里 value="42" 是否到得了 .value 属性。WebF 把 value= 映射到
+               defaultValue（input.dart:200-202），再由 defaultValue setter 在
+               「当前 live 值为空」时灌进 _value（input.dart:61-81），所以应为 "42"
+      min      el.min。实测是**空串**（HTML 里写的是 min="0"，反射的话应得 "0"）——
+               min/max/step 在 WebF 里完全没有实现，只是普通 DOM 属性。
+               垫片必须自己 getAttribute 读。哪天这里出现 "0" 了 = 上游实现了反射
+      ownDesc/protoDesc  .value 的属性描述符落在哪一层。实测两层都有 accessor
+               且 configurable=true（own 那层优先），这决定下面 shadowV 有没有戏
+      shadowV  **本任务最关键的一项**：能否用 Object.defineProperty 在实例上遮蔽
+               .value 的 get/set。判据是**哨兵往返**而不是「defineProperty 没抛异常」——
+               QuickJS 的 exotic get_own_property 处理器优先级高于普通 own property，
+               所以「描述符装上了」不等于「读写真的走我们的访问器」。
+               ok   → 垫片可以事件驱动地拦到 JS 对 .value 的写入（零轮询）
+               FAIL → 只能轮询 diff .value
+      shadowM  同理测 el.matches。miot 用 el.matches(':active') 判断「用户正在拖，
+               别用轮询结果覆盖」，而隐藏后的 input 永远进不了 :active
+               （element.dart:245 的 isActive 只由落在它自己身上的指针事件置位）
+      active   遮蔽之前 el.matches(':active') 的真实返回值（应为 false）
+      evt      JS 侧 el.dispatchEvent(new Event('input')) 能否被同元素上的
+               addEventListener('input') 收到。这是「事件通道本身通不通」的对照项，
+               真正要验的 Dart→JS 那一跳在 15b
+  -->
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">14 RANGE CAPS</span>
+    <span id="rangecaps" class="caps">(script did not run)</span>
+  </div>
+
+  <!--
+    14b WebF 下 input[type=range] 的**原始渲染**。带 data-sl-no-slider，垫片会跳过它
+    （那个属性同时也是给插件的正式退出开关），所以这一格永远显示 WebF 的原生表现：
+      一个可编辑**文本框**（里面是 "42"）= 交接文档记载的表现
+      一个滑块                          = WebF 上游修了 range，本 Step 可以考虑退役
+      **整行连 tag 文字一起消失**        = 实测就是这个（见下）
+
+    实测结论（比交接文档记的「静默渲染成一个可编辑文本框」更严重）：这一整行
+    在 WebF 下**一个像素都不画** —— 没有文本框、没有 "14b RAW RANGE" 那几个字，
+    连这个 div 自己的 `background:#ffe082` 都不出现（这就是把行染成黄色的用意：
+    黄的都看不到，说明不是「input 画得不像滑块」，而是整行的绘制没了）。
+    而 14 组里 tagRect=118x40 / rawRect=120x24 说明**盒模型完全正常**，
+    所以这是绘制层的问题，不是布局塌了。
+
+    没有进一步区分「input 的 widget 盖了一层不透明白」还是「整行 paint 被整体跳过」
+    —— 两者在白底上表现一样，而对本 Step 的结论无影响：垫片把 input 隐藏之后
+    第 16 组那一行（同样染了黄）就正常显示了，行背景、tag、滑块全都在。
+  -->
+  <div class="row" style="background:#ffe082">
+    <span class="tag">14b RAW RANGE</span>
+    <input type="range" id="rawRange" min="0" max="100" value="42"
+      data-sl-no-slider style="width:120px">
+  </div>
+
+  <!--
+    15 自定义元素 `<songloft-slider>` 本身（不经垫片，直接写标签）。
+    与第 13 组同理，测的是**产品实现**：entrypoint.sh 每次把
+    lib/features/home/presentation/render/elements/ 拷进探针再编译。
+
+      H  横向，value=30 max=100 step=10，`color` 属性给深绿。
+         应看到左侧 30% 深绿 + 右侧淡绿轨道 + 一个圆把手
+      V  竖向（orientation="vertical"），value=70。**min 在下、max 在上**，
+         所以填充段应在**下方 70%**、把手在偏上位置。这是音量条的普遍预期，
+         也与 miot 原本用 rotate(-90deg) 转出来的方向一致
+      D  disabled，value=50。整体应明显变淡（×0.38）且**拖不动**
+         （build 在 disabled 时压根不套 GestureDetector）
+      N  负向对照 <songloft-slider-nope>，同样属性但**没注册**：必须是空虚线盒。
+         它里面也画出滑块 = 弧不是我们的 Dart 元素画的，整组结论作废
+
+    DRAG_PROBE 开启时，H 与 V 会被 Dart 侧合成的 Pointer 事件各拖一次，结果进 15b。
+  -->
+  <div class="row">
+    <span class="tag">15 SLIDER</span>
+    <span class="sldrow">
+      <songloft-slider id="sldH" class="sldbox" value="30" min="0" max="100"
+        step="10" color="#2e7d32" style="width:140px;height:28px"></songloft-slider>
+      <songloft-slider id="sldV" class="sldbox" orientation="vertical" value="70"
+        min="0" max="100" color="#3f51b5" style="width:28px;height:90px"></songloft-slider>
+      <songloft-slider id="sldD" class="sldbox" value="50" disabled
+        color="#2e7d32" style="width:80px;height:28px"></songloft-slider>
+      <songloft-slider-nope id="sldN" class="sldbox" value="70"
+        style="width:40px;height:28px"></songloft-slider-nope>
+    </span>
+  </div>
+
+  <!--
+    15b 15 组的文字化断言 + **Dart→JS 事件通道**的判据（本项目第一次真用
+    Element.dispatchEvent 从 Dart 侧派事件给页面 JS，不能假定它通）：
+      H.rect / V.rect / N.rect  都应是 HTML 里写的尺寸；0x0 → WidgetElement 没拿到盒模型
+      Hin/Hch                   H 上收到的 input / change 次数
+      Vin/Vch                   V 上收到的 input / change 次数
+      Hdata/Vdata               最后一次 input 事件的 event.data（Dart 侧塞进去的新值）
+    DRAG_PROBE 关时四个计数都应是 0（页面自己不动它们）；
+    DRAG_PROBE 开时 in>0 且 ch>0 且 data 是个变了的数 = 整条链通。
+    in=0 而截图里把手确实动了 = 渲染通、事件没通（那插件就收不到通知）。
+  -->
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">15b SLIDER STATE</span>
+    <span id="sldstate" class="caps">(script did not run)</span>
+  </div>
+
+  <!--
+    16 common.js 的 range 垫片（rangeSliderShim）端到端。
+    这里**只写一个普通 `<input type=range>`**，别的什么都不写 —— 剩下的全归垫片：
+    隐藏原 input、插入 <songloft-slider>、双向同步、转写 disabled、
+    把滑块事件重新派回 input。这一格里如果只看到一个文本框，就是垫片没跑。
+
+    左边这个是垫片管的；它旁边不额外画对照（14b 已经是对照了）。
+
+    inline style 刻意写成 **width:100%** 而不是固定 px：垫片会把 inline style 原样
+    拷到滑块上，而 miot #scheduleVolume 用的就是 `style="width:100%"`。这一格顺便验
+    「百分比宽度能不能到得了 WidgetElement 的 renderStyle」—— 到不了就会退成本元素的
+    160px 兜底，16b 的 sldRect 会显示 160xNN 而不是外层容器的 150xNN。
+  -->
+  <div class="row" style="background:#ffe082">
+    <span class="tag">16 SHIM</span>
+    <span style="display:block;width:150px">
+      <input type="range" id="shimRange" min="0" max="100" value="20"
+        data-sl-orientation="horizontal" style="width:100%">
+    </span>
+  </div>
+
+  <!--
+    16b 垫片的文字化断言。全部读的是**原 input**，也就是插件真正会读的那个对象：
+      made      垫片有没有造出滑块（none = 垫片没跑 / 抛异常，去 flutter.log 搜 shim failed）
+      sldRect   滑块的盒子。应是外层容器的 150xNN（说明拷过去的 width:100% 生效了）；
+                160xNN = 百分比没解析出来、退到了元素兜底宽度
+      inRect    原 input 的盒子。应是 **0x0**（display:none 真的生效了）
+      hidden    原 input 的隐藏方式（垫片给它加的 class + inline display 生效了没）
+      v0        垫片跑完时 input.value（应仍是 "20"，垫片不许改初值）
+      push      JS 写 input.value=65 之后，垫片有没有把它推给滑块
+                （读滑块的 value 属性；这是 JS→滑块方向，miot 有 5 处这么写）
+      dis       JS 写 input.disabled=true 之后滑块的 disabled 属性（utils.js:96 的路径）
+      在 DRAG_PROBE 开时还有：
+      drag      拖完之后 input.value
+      in/ch     原 input 上收到的 input / change 次数（miot 的两个监听器就挂在这）
+      act       拖动中 input.matches(':active') 的值 —— true 说明连
+                「插件靠 :active 判断别覆盖」这条也复原了；false 则要靠垫片自己抑制
+  -->
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">16b SHIM STATE</span>
+    <span id="shimstate" class="caps">(script did not run)</span>
+  </div>
+
+  <!--
+    17 安全区变量 --sl-safe-*（songloft-org/songloft#341 Step 5）。
+    WebF 不实现 env(safe-area-inset-*)，改为「宿主注入 CSS 变量 + 插件写 var()」。
+
+    八个盒子都是 `width:20px; height:0; box-sizing:content-box`，所以
+    **getBoundingClientRect().height 就等于它的 padding-bottom 求值结果** ——
+    数字化断言不依赖任何 getComputedStyle（13b 已实测 WebF 的 getComputedStyle
+    不暴露自定义属性，读回永远是空串，用它判不了任何事）。
+
+    注入走**真实生产路径**：页面自己
+    `window.postMessage({type:'songloft-safe-area',insets:{...}},'*')`，
+    与 Dart 侧 `_pushToPage()` 发出的字面量完全一致 —— 测的是 common.js 里
+    那个 handler，不是探针自己 setProperty 抄近路。
+    容器里 MediaQuery.padding 基本是 0（Xvfb 无刘海），所以注入的是**人为的
+    非零值** top=11/right=12/bottom=30/left=14，这样「变量真的到了、CSS 真的
+    重算了」才有可观测的证据。
+
+      S  padding-bottom:13px                   **对照组，不含任何变量**。它唯一的
+                                               用途是给 pre 那一轮读数定性：S=13 说明
+                                               「布局已经算过了」，此时 A/H 的读数才
+                                               有意义；S=0 说明整组量早了（首帧未落定），
+                                               pre 全 0 是伪失败，只能看 post
+      A  calc(10px + var(--sl-safe-bottom))    注入前应 10（默认 0px）；注入后应 40
+      B  var(--sl-safe-bottom)                 裸 var 当长度用：注入后应 30
+      H  calc(1px + var(--sl-safe-top))        top 也到了：注入后应 12
+      C  max(24px, var(--sl-safe-bottom))      **WebF 没实现 max()** → 应 0（不是 30）
+      D  clamp(24px, var(--sl-safe-bottom), 96px)  clamp 里能不能塞 var。
+                                               源码读起来不该行（clamp 分支对每个参数
+                                               直接 CSSLength.parseLength，而它不认
+                                               `var(...)`），但**实测是 30，能行** ——
+                                               推测值里含 `var` 时样式系统先做了整值
+                                               替换。这一行就是把这个反直觉的事实钉住
+      J  clamp(24px, var(--sl-safe-top), 96px) 夹紧真的发生了吗：top=11 < 24 → 应 **24**
+                                               （不是 11）。这正是 miot `.fp-controls`
+                                               要的「至少留 24px」语义
+      E  clamp(24px, 41px, 96px)               对照：clamp 本身可用 → 应 41。
+                                               数字刻意与注入值都不同，免得与 D 撞成
+                                               同一个读数而看不出是谁在起作用
+      F  var(--sl-nope, 17px)                  对照：裸 var 的 fallback 通不通 → 应 17
+      G  var(--sl-nope2, env(safe-area-inset-bottom, 19px))
+                                               **本组最关键的一项**：文档要不要推荐
+                                               `var(--x, env(...))` 这种「一份 CSS
+                                               通吃三种环境」的写法，取决于 WebF 会
+                                               把它算成什么。19 = 连 env 的内层
+                                               fallback 都取到了；0 = fallback 链
+                                               在 env() 处断掉 → 文档必须禁止这种写法
+                                               （实测就是 0）
+    17b 是同一件事的文字化断言（截图必然糊掉 —— 这些盒子只有几十像素高）。
+  -->
+  <div class="row" style="align-items:flex-end">
+    <span class="tag">17 SAFE AREA</span>
+    <span class="sarow">
+      <span id="saS" class="sabox" style="padding-bottom:13px;background:#9e9e9e"></span>
+      <span id="saA" class="sabox" style="padding-bottom:calc(10px + var(--sl-safe-bottom))"></span>
+      <span id="saB" class="sabox" style="padding-bottom:var(--sl-safe-bottom)"></span>
+      <span id="saH" class="sabox" style="padding-bottom:calc(1px + var(--sl-safe-top))"></span>
+      <span id="saC" class="sabox" style="padding-bottom:max(24px, var(--sl-safe-bottom))"></span>
+      <span id="saD" class="sabox" style="padding-bottom:clamp(24px, var(--sl-safe-bottom), 96px)"></span>
+      <span id="saJ" class="sabox" style="padding-bottom:clamp(24px, var(--sl-safe-top), 96px)"></span>
+      <span id="saE" class="sabox" style="padding-bottom:clamp(24px, 41px, 96px)"></span>
+      <span id="saF" class="sabox" style="padding-bottom:var(--sl-nope, 17px)"></span>
+      <span id="saG" class="sabox" style="padding-bottom:var(--sl-nope2, env(safe-area-inset-bottom, 19px))"></span>
+    </span>
+  </div>
+
+  <div class="row" style="align-items:flex-start">
+    <span class="tag">17b SAFE AREA STATE</span>
+    <span id="sastate" class="caps">(script did not run)</span>
+  </div>
+
+  <!--
+    18 STEP6 — 三项经宿主桥下沉的能力事实（songloft-org/songloft#341 Step 6）。
+
+    这一组问的全是「WebF 的 C++/QuickJS 侧到底有没有这个东西」，而 C++ 源码不随
+    pub 包发布（webf-0.24.27 顶层只有 android/ example/ include/ lib/ … ，
+    include/ 里只有 webf_bridge.h），**只能实测**。所以本组刻意做得很密：
+    一次运行同时钉住 6 件事，省掉 6 轮容器往返。
+
+    视觉行（18）是三个 16px 方块，判据全在 18b 的文字、out/pixels.txt 与 flutter.log 里：
+
+      IMG  <img src="data:image/png;base64,…">        → 应画出**青色** #1B878F。
+                                                        data: URL 走 img.dart 的
+                                                        WebFBundle.fromUrl 分支
+      BG   background-image: url(data:image/png;…)     → 应画出**洋红** #FF00FF
+                                                        （刻意与 IMG 不同色，这样一个
+                                                        像素就能分辨是哪条路成了）。
+                                                        CSS 背景图走 css/background.dart
+                                                        而不是 img.dart，那条链路没追完；
+                                                        且 data: URL 里含逗号与分号，
+                                                        CSS url() 的词法解析可能切错。
+                                                        出现洋红 = miot 全屏播放器的
+                                                        bgImage 能沿用同一个 data: URL；
+                                                        不是洋红 = 那一处必须另找出路
+      CTL  background-color: #0000FF（纯 CSS，无图）   → **抓屏取色的阳性对照**，
+                                                        必须是蓝的。连它都不蓝就说明
+                                                        坐标/取色环节自己坏了，
+                                                        而不是 data: URL 画不出图
+
+    ⚠️⚠️ **两个 data-URL 方块的判据必须落在「截图里真的出现那个颜色」上，
+    不能用 `imgSet=ok` / `bgSet=ok` / `bgRect=16x16` / `naturalWidth`。**
+    本组旧版就是那么写的，结果结构上漏掉了绘制层：实测一个硬编码 1×1 红点 PNG
+    虽然 `naturalWidth` 报 1/1、盒子尺寸也正常，**截图里那个方块却是灰的**。
+    `imgSet` 只证明「赋值没抛异常」、`bgRect` 只证明「元素盒子有尺寸」，
+    **都不证明像素被画出来了**。
+    所以页面把三个方块的中心坐标 + 期望颜色写进 flutter.log 的一行
+    `[probe] step6-px img=x,y,HEX bg=… ctl=…`，抓屏后由 entrypoint.sh 用
+    ImageMagick 逐点取色比对，结论落在 out/pixels.txt（PASS/FAIL 逐行）。
+    坐标由页面自己量（getBoundingClientRect），不写死 —— 版面一改死坐标就废。
+
+    18b 报的文字项：
+
+      open=            typeof window.open。'function' 只说明**绑定存在**，不代表
+                       C++ 会把调用转发到 Dart。真正的判据在 flutter.log：
+                       没有 delegate 时应出现上游那句
+                       `Attempting to navigate WebF to an external WebF page`；
+                       装了 delegate 时应出现探针自己那句 `[probe] nav decision`。
+                       两个 URL 刻意不同（sl-open-1 / sl-open-2），用来区分
+                       「单参」与「带 target 的双参」两种调用形态 —— miot
+                       js/auth.js:95 是双参，而 WebF 的 Dart 绑定
+                       (`dom/window.dart:43`) 只声明了 args[0]
+      btoa / atob      base64 编解码。缺了就必须自己写编码表
+      FileReader       缺了就不能垫 FileList/File（Step 4 设计文档 §2.3 的前提）
+      Blob / arrBuf    Blob.prototype.arrayBuffer —— blob→base64 的唯一同步可得路径
+      blobText         `new Blob(['..']).text()` 真的能 await 出内容吗（有没有绑定
+                       ≠ 能不能用）
+      btoaHi           `btoa` 的**二进制安全性**单点判据：`btoa('\x89PNG')` 必须是
+                       `iVBORw==`。实测 WebF 给的是 `wolQTg==` —— 它把 > 0x7F 的
+                       码点当字符先做了一次 UTF-8 编码（`0xC2 0x89` 正是 U+0089 的
+                       UTF-8），已登记为上游缺陷。**这一项预期是 FAIL**，
+                       它在这里是为了守住「宿主为什么要自带编码表」这个前提：
+                       哪天它变成 ok 了，才可以考虑退回 btoa
+      b64rt            **256 种字节值全覆盖**的往返：Blob(Uint8Array 0..255) →
+                       arrayBuffer → btoa → 与预期 base64 逐字符比对。
+                       旧版这里用的是 `new Blob(['hi'])` —— 纯 ASCII，**全程没有
+                       一个字节 > 0x7F**，结构上抓不到 btoa 的二进制不安全，
+                       于是那个真缺陷从判据的缝里溜过去了。二进制路径的用例
+                       **必须含高位字节**，这是这一版最重要的加固
+      dataUrl          同一个 256 字节 blob 走**产品自己那条路**
+                       （`SongloftPlugin.blobToDataURL`，内部是 common.js 的
+                       `bytesToBase64` 自带编码表，不用 btoa），与预期 data: URL
+                       逐字符比对。b64rt 测的是「上游坏在哪」，这一项测的是
+                       「我们的绕法到底对不对」—— 后者才是回归判据
+      mismatch@N       上面两项失败时的形态：N = 第一个不相等的字符下标，
+                       后面跟 got/exp 各一个字符。**刻意不打完整 344 字符**：
+                       18b 那行读数已经是全组最长，塞进去会把别的行挤出截图
+      fileVisHidden    `<input type=file hidden>` 的盒子尺寸。非 0 = WebF **不认**
+                       HTML hidden 属性 → 连插件刻意隐藏的那个 input 都会在页面上
+                       占掉一行（Step 4 设计文档 §2.3 的待测项 15）
+      fileVisRaw       同样的 input，但带 `data-sl-no-file-picker` 退出开关
+                       （垫片不碰它）→ 它永远反映 WebF 的**原生**表现：
+                       非 0 即证实「file input 静默变成一个占位文本框」。
+                       这一行是垫片落地**之后**唯一还能测到原生行为的对照组
+      fileVis+shimmed  垫片接管的那个 input：装上后尺寸应变 0 且 shimmed=yes。
+                       **两项必须一起看** —— 单看尺寸 0 会与「WebF 认了 hidden
+                       属性」撞成同一个读数
+      progClick        `el.click()`（程序化调用）会不会派发 DOM click 到监听器。
+                       决定 file 垫片是「拦 click 事件」还是「必须覆写实例 click
+                       方法」（Step 4 设计文档 §2.4 的待测项 14）。
+                       实测就算是 true 也两条都做 —— 见 common.js 里的理由
+      picked           file 垫片端到端：`click()` → 垫片 → 宿主桥 → Dart 的 canned
+                       应答 → change 事件。`probe.m3u/8` = 整条链路真的通了。
+                       `viaLast:` 前缀说明 `event.data` 挂不上、走的是主通道
+                       `SongloftPlugin.lastPickedFiles`（那是设计里的预期兜底）
+      tableMark        tableWarnShim 有没有给 <table> 打上
+                       `data-sl-table-unsupported`。配合 flutter.log 里那条
+                       `[songloft] WebF 不支持原生 <table>` 的 warn 一起看。
+                       页面里那个 <table> 刻意 `display:none` —— 本组只验「警告
+                       与标记」，表格退化成什么样子是源码层面已经定死的事
+                       （_UnknownHTMLElement + display:block），不需要占版面复现
+  -->
+  <div class="row" style="align-items:center;margin-bottom:6px">
+    <span class="tag">18 STEP6</span>
+    <span class="s6row">
+      <img id="s6img" class="s6box" alt="data-url img">
+      <span id="s6bg" class="s6box"></span>
+      <!-- 抓屏取色的阳性对照：纯 CSS 背景色，不经任何图片解码路径。 -->
+      <span id="s6ctl" class="s6box" style="background-color:#0000ff"></span>
+      <!-- 1×1 PNG 被 CSS 放大到 16×16：区分「data: URL 画不出图」与「1×1 放大画不出」。 -->
+      <img id="s6img1" class="s6box" alt="1x1 data-url img">
+      <input type="file" id="s6fileH" hidden>
+      <input type="file" id="s6fileRaw" data-sl-no-file-picker>
+      <input type="file" id="s6fileV">
+      <table id="s6table" style="display:none"><tbody><tr><td>t</td></tr></tbody></table>
+    </span>
+  </div>
+
+  <div class="row" style="align-items:flex-start;margin-bottom:0">
+    <span class="tag">18b STEP6 STATE</span>
+    <span id="s6state" class="caps">(script did not run)</span>
+  </div>
+</div><!-- /colR -->
+</div><!-- /cols -->
+
+  <style>
+    .dtrow { display: flex; gap: 20px; font-size: 14px; }
+    .probe-details { border: 1px solid #999; padding: 4px 8px; min-width: 130px; }
+    .probe-dbody { color: #b71c1c; font-weight: 700; }
+
+    #selbox { width: 40px; height: 40px; display: block; background: #c62828; }
+    html[data-theme="dark"] #selbox { background: #2e7d32; }
+
+    :root { --probe-c: #c62828; }
+    html[data-theme="dark"] { --probe-c: #2e7d32; }
+    #varbox {
+      width: 40px; height: 40px; display: block;
+      background: var(--probe-c);
+    }
+
+    /* 顺序刻意与上面相反：低优先级的 :root 写在后面 */
+    html[data-theme="dark"] { --probe-d: #2e7d32; }
+    :root { --probe-d: #c62828; }
+    #varbox2 {
+      width: 40px; height: 40px; display: block;
+      background: var(--probe-d);
+    }
+
+    /* 多行文字断言块。写死 width 而不用 flex:1：右列已经写死 462px，
+       flex-grow 若在 WebF 下表现异常会把这块挤成 0 宽而整段静默消失。 */
+    .caps { font-size: 11px; line-height: 14px; width: 330px; color: #111; }
+    /* 18b 的读数比别人长得多（一次钉住 20 来项），所以单独放宽到整列宽 + 缩字号，
+       让它落在 717px 的可见区里。判据通道仍然是 flutter.log。 */
+    #s6state { width: 336px; font-size: 10px; line-height: 12px; }
+    .sldrow { display: flex; gap: 10px; align-items: center; }
+    /* 虚线框由 WebF 的盒模型绘制，滑块由我们的 CustomPaint 绘制 —— 两者分离，
+       所以「有框无滑块」（N）与「有框有滑块」（H/V/D）一眼可辨。 */
+    .sldbox { border: 1px dashed #bbb; }
+
+    /* 17 组：盒子高度 == padding-bottom 求值结果，所以必须 content-box
+       （common.css 的 reset 把全局设成了 border-box，那样 height:0 与 padding
+       的关系要多绕一层推理）。宽 20px 只为看得见，判据全在 height 上。 */
+    /* 18 组：两个 16px 方块并排。写死 width/height 而不靠图片固有尺寸 ——
+       固有尺寸拿不到时盒子会塌成 0，那与「data: URL 没解码」看起来一样。
+       所以盒子一定有，判据是**里面有没有青色**。 */
+    .s6row { display: flex; gap: 8px; align-items: center; }
+    .s6box {
+      display: block; width: 16px; height: 16px;
+      border: 1px solid #bbb; box-sizing: content-box;
+      background-repeat: no-repeat; background-size: 16px 16px;
+    }
+
+    .sarow { display: flex; gap: 6px; align-items: flex-end; }
+    .sabox {
+      display: inline-block; box-sizing: content-box;
+      width: 20px; height: 0; background: #3f51b5;
+    }
+
+    .ringrow { display: flex; gap: 10px; align-items: center; }
+    /* 虚线边框由 WebF 自己的盒模型绘制，环由我们的 CustomPaint 绘制 ——
+       两者分离，所以「有框无环」（E）与「有框有环」（A~D）一眼可辨。 */
+    .ringbox { border: 1px dashed #bbb; }
+    :root { --probe-ring: #c62828; --probe-blue: #3f51b5; }
+    /* 刻意不给 color 属性，验 currentColor 那条链 */
+    #ringD { color: var(--probe-ring); }
+  </style>
+  <script>
+    // 用 setAttribute 而不是 dataset：实测 WebF 里 documentElement.dataset 时机
+    // 不可靠（会是 null 并抛 TypeError），common.js 也因此改掉了。探针要跟产品
+    // 代码用同一种写法，否则测的是探针自己的 bug。
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.getElementById('attrval').textContent =
+      JSON.stringify(document.documentElement.getAttribute('data-theme'));
+
+    // 运行时把 src 置空 —— 未打补丁时这一行会触发一次 decode image 报错
+    document.getElementById('emptyruntime').src = '';
+
+    var sp = new URLSearchParams(window.location.search);
+    document.getElementById('loc').textContent =
+      'search=' + JSON.stringify(window.location.search) +
+      '  theme=' + JSON.stringify(sp.get('theme')) +
+      '  hasEmbed=' + sp.has('embed');
+
+    // details 垫片在 DOMContentLoaded 里改 DOM，而这段内联脚本跑在 DOMContentLoaded
+    // **之前**，所以读状态必须同样挂到该事件上。common.js 在 <head> 里先注册，
+    // 同一事件按注册顺序回调 → 这里一定后跑，读到的是垫片之后的 DOM。
+    document.addEventListener('DOMContentLoaded', function () {
+      var c = document.getElementById('dtC');
+      // 代替人手点击：垫片把 click 挂在 summary 上。
+      // 刻意只用 HTMLElement.click()（最接近真实交互的一条路），**不再补
+      // dispatchEvent 兜底** —— 实测 WebF 的 click() 是**异步**投递的：先 click()
+      // 再看 open 仍是旧值，于是兜底又派一次事件，两次 toggle 抵消，截图里 C 是
+      // 折叠的、而同步读到的 readout 却说 open=true，自相矛盾。
+      var s = c.getElementsByTagName('summary')[0];
+      if (s) { try { s.click(); } catch (e) { console.log('[probe] summary.click() threw: ' + e); } }
+
+      // 同理，状态必须**延迟**读，否则读到的是 click 投递前的旧值。
+      setTimeout(function () {
+        // 读 wrapper 的 **inline style** 而不是 getComputedStyle：垫片就是用内联
+        // display 折叠的，这样不依赖 WebF 的 computed style 实现。
+        // 浏览器原生 details 下压根没有这个 wrapper → 打印 native。
+        function wrap(id) {
+          var w = document.getElementById(id).getElementsByClassName('sl-details-content')[0];
+          return w ? (w.style.display || '(empty)') : 'native';
+        }
+        var text =
+          'A.open=' + document.getElementById('dtA').open + '/wrap=' + wrap('dtA') +
+          '  B.open=' + document.getElementById('dtB').open + '/wrap=' + wrap('dtB') +
+          '  C.open=' + c.open + '/wrap=' + wrap('dtC');
+        document.getElementById('dtstate').textContent = text;
+        // 同时回传到 flutter.log（截图糊掉时还有文字证据）
+        console.log('[probe] details ' + text);
+      }, 800);
+    });
+
+    // ── 13 自定义元素：运行时更新 + 读回 ──────────────────────────────
+    // 单独一个 DOMContentLoaded 回调，不与 details 那段混在一起：任一段抛异常
+    // 都不该让另一段的 readout 停在 "(script did not run)"，否则会误判成
+    // 「整个内联脚本没跑」。
+    document.addEventListener('DOMContentLoaded', function () {
+      function rectOf(id) {
+        var el = document.getElementById(id);
+        if (!el) return 'missing';
+        try {
+          var r = el.getBoundingClientRect();
+          return Math.round(r.width) + 'x' + Math.round(r.height);
+        } catch (e) { return 'rect-threw'; }
+      }
+      // 刻意延后到首帧之后再改，模拟真实插件「先渲染、再拿到数据更新进度」的时序；
+      // 首帧就写死的话测不出「变更能否触发重绘」。
+      setTimeout(function () {
+        try {
+          // ① 属性驱动（保证重绘的那条路）
+          document.getElementById('ringA').setAttribute('value', '25');
+          // ② CSS 变量驱动（ringD 靠 color: var(--probe-ring) 取色）
+          document.documentElement.style.setProperty('--probe-ring', '#2e7d32');
+        } catch (e) {
+          console.log('[probe] ring update threw: ' + e);
+        }
+        // 两个变量都读：--probe-ring 是刚被 setProperty 改过的，--probe-c 是
+        // :root 里从未动过的。两个都空 = getComputedStyle 不暴露自定义属性
+        // （WebF 实测如此），而不是 setProperty 没生效 —— 这两种原因看起来一样，
+        // 但结论完全相反，必须靠对照区分。
+        function varOf(name) {
+          try {
+            return (getComputedStyle(document.documentElement)
+              .getPropertyValue(name) || '').trim();
+          } catch (e) { return '(threw)'; }
+        }
+        setTimeout(function () {
+          var text =
+            'A.rect=' + rectOf('ringA') +
+            ' A.value=' + JSON.stringify(
+              document.getElementById('ringA').getAttribute('value')) +
+            ' E.rect=' + rectOf('ringE') +
+            ' ring=' + JSON.stringify(varOf('--probe-ring')) +
+            ' static=' + JSON.stringify(varOf('--probe-c'));
+          document.getElementById('ringstate').textContent = text;
+          console.log('[probe] ring ' + text);
+        }, 400);
+      }, 600);
+    });
+
+    // ── 17 安全区变量 --sl-safe-* ─────────────────────────────────────
+    // 又是单独一个 DOMContentLoaded 回调（与 details / ring / 滑块三段并列）：
+    // 任一段抛异常都不该让别人的 readout 停在 "(script did not run)"。
+    document.addEventListener('DOMContentLoaded', function () {
+      function h(id) {
+        var el = document.getElementById(id);
+        if (!el) return 'missing';
+        try {
+          return String(Math.round(el.getBoundingClientRect().height));
+        } catch (e) { return 'threw'; }
+      }
+      function inlineVar(name) {
+        try {
+          return JSON.stringify(
+            document.documentElement.style.getPropertyValue(name));
+        } catch (e) { return '(threw)'; }
+      }
+
+      // 注入**前**先量一遍，证明默认值那一档（common.css 的
+      // `html.webf-engine { --sl-safe-*: 0px }`）真的生效。
+      // 不能等注入后再回推 0 来测：那时内联样式已经写上，量到的是内联那一档。
+      //
+      // ⚠️ **必须等第 14~16 组全部读完再动手**，不能用固定延时。
+      //
+      // 本组注入 4 个 CSS 变量会让整棵树重算，而第 16 组采集滑块屏幕坐标那一刻
+      // （见下面那段 1800ms 的注释）若正撞上重排在飞，`getBoundingClientRect()`
+      // 会返回 0x0，于是滑块被静默地从拖动目标里漏掉，16b 显示 in=0/ch=0 ——
+      // 看起来跟「Dart→JS 事件没通」一模一样。实测这么撞过一次。
+      //
+      // 所以改成握手：滑块那段的 finalize() 跑完会置 window.__slFinalized，
+      // 本组轮询到它再开始。轮询有上限，那一段抛异常时本组也不会永远不出读数。
+      var slWaitMs = 0;
+      (function waitForSliderGroup() {
+        if (!window.__slFinalized && slWaitMs < 8000) {
+          slWaitMs += 200;
+          setTimeout(waitForSliderGroup, 200);
+          return;
+        }
+        startSafeAreaProbe(slWaitMs >= 8000 ? 'timeout' : 'handshake');
+      })();
+
+      // 首帧布局未必已经落定，量早了拿到的 0 会与「默认值 0px 生效」撞成同一个
+      // 读数（A 期望 10），分不清是「默认值对」还是「压根还没布局」。
+      // **实测 DOMContentLoaded +300ms 时确实全 0**，所以 S 那个不含变量的对照盒
+      // 是必须的：S=13 才说明这一轮读数可信。走到这里时早过了那个窗口。
+      function startSafeAreaProbe(how) {
+        var pre = 'S=' + h('saS') + ' A=' + h('saA') + ' B=' + h('saB') +
+          ' H=' + h('saH');
+
+        // 走真实生产路径：与 Dart 侧 `_pushToPage()` 发出的字面量一字不差 ——
+        // 测的是 common.js 的消息 handler，不是探针自己 setProperty 抄近路。
+        var injected = 'skipped';
+        try {
+          window.postMessage({
+            type: 'songloft-safe-area',
+            insets: { top: 11, right: 12, bottom: 30, left: 14 }
+          }, '*');
+          injected = 'sent';
+        } catch (e) {
+          injected = 'threw:' + ((e && e.message) || e);
+        }
+
+        // 变量变更 → 重排的通知链路是异步的，量早了会拿到旧高度。
+        setTimeout(function () {
+          var text =
+            'pre[' + pre + ']' +
+            ' post[S=' + h('saS') + ' A=' + h('saA') + ' B=' + h('saB') +
+            ' H=' + h('saH') +
+            ' C(max)=' + h('saC') + ' D(clamp+var)=' + h('saD') +
+            ' J(clamp-min)=' + h('saJ') + ' E(clamp)=' + h('saE') +
+            ' F(var-fb)=' + h('saF') + ' G(var-fb-env)=' + h('saG') + ']' +
+            ' msg=' + injected + '/' + how +
+            ' inline[bottom=' + inlineVar('--sl-safe-bottom') +
+            ' top=' + inlineVar('--sl-safe-top') + ']' +
+            ' htmlClass=' + JSON.stringify(document.documentElement.className);
+          document.getElementById('sastate').textContent = text;
+          // 截图里这些盒子只有几十像素高，flutter.log 才是断言通道
+          console.log('[probe] safearea ' + text);
+
+          // 页面这一轮读完了，才请 Dart 侧推它那一轮（见 __saReport 的注释）。
+          // 与第 16 组的 slDrag 同一个套路：由页面在**确定的时点**把控制权交给
+          // Dart，而不是两边各拍一个固定延时去赌谁先谁后。
+          try {
+            var mc = window.webf && window.webf.methodChannel;
+            if (mc && typeof mc.invokeMethod === 'function') {
+              mc.invokeMethod('slSafeArea', '');
+            } else {
+              console.log('[probe] no methodChannel, dart safe-area push skipped');
+            }
+          } catch (e) {
+            console.log('[probe] slSafeArea invoke threw: ' + e);
+          }
+        }, 1000);
+      }
+
+      // Dart→JS 那一跳的断言入口。
+      //
+      // 上面那一轮是**页面自己** postMessage，验的是 common.js 的 handler；
+      // 产品里真正的发起方是 Dart 的 `_pushToPage()`（`evaluateJavaScripts`
+      // 拼一条 `window.postMessage({...},"*")`）。那一跳的字面量拼接、数字格式
+      // （`toStringAsFixed(2)` 产出 `22.00` 这种形态，JS 侧要当数字用）都只能由
+      // Dart 侧真跑一遍才算验过，所以留这个函数给 probe_main.dart 调。
+      // 值刻意与页面那轮不同（bottom 22 而不是 30），否则读数一样就分不清是谁写的。
+      window.__saReport = function () {
+        try {
+          var text = 'A=' + h('saA') + ' B=' + h('saB') + ' H=' + h('saH') +
+            ' J(clamp-min)=' + h('saJ') +
+            ' inline[bottom=' + inlineVar('--sl-safe-bottom') +
+            ' top=' + inlineVar('--sl-safe-top') +
+            ' right=' + inlineVar('--sl-safe-right') +
+            ' left=' + inlineVar('--sl-safe-left') + ']';
+          var el = document.getElementById('sastate');
+          // 追加而不是覆盖：17b 那一行同时留着两轮读数，截图与文字才自洽
+          // （截图是最终态，也就是 Dart 注入的那一轮）。
+          if (el) el.textContent = el.textContent + '  ||  dart[' + text + ']';
+          console.log('[probe] safearea-dart ' + text);
+        } catch (e) {
+          console.log('[probe] safearea-dart threw: ' + e);
+        }
+      };
+    });
+
+    // ── 14/15/16 滑块 ────────────────────────────────────────────────
+    // 又是单独一个 DOMContentLoaded 回调（与 details / ring 两段并列）：任一段抛
+    // 异常都不该让别人的 readout 停在 "(script did not run)"。
+    //
+    // common.js 在 <head> 里就把它的 applyOnReady 注册到了 DOMContentLoaded 上，
+    // 同一事件按注册顺序回调 → 垫片一定先跑，本段读到的是垫片之后的 DOM。
+    document.addEventListener('DOMContentLoaded', function () {
+      function put(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
+        // 截图会糊，flutter.log 才是断言通道
+        console.log('[probe] ' + id + ' ' + text);
+      }
+      function rectOf(el) {
+        if (!el) return 'missing';
+        try {
+          var r = el.getBoundingClientRect();
+          return Math.round(r.width) + 'x' + Math.round(r.height);
+        } catch (e) { return 'rect-threw'; }
+      }
+      function box(el) {
+        if (!el) return null;
+        try {
+          var r = el.getBoundingClientRect();
+          if (!r || !(r.width > 0) || !(r.height > 0)) return null;
+          return { x: r.left, y: r.top, w: r.width, h: r.height };
+        } catch (e) { return null; }
+      }
+      // 不用 querySelector('songloft-slider')：WebF 对自定义标签的类型选择器
+      // 支持面不敢假定（collectByTag 在 common.js 里就是为此退回
+      // getElementsByTagName 的）。这里直接扫兄弟节点，垫片把滑块插在原 input 之后。
+      function siblingSlider(input) {
+        var p = input && input.parentNode;
+        if (!p) return null;
+        for (var i = 0; i < p.childNodes.length; i++) {
+          var n = p.childNodes[i];
+          if (n.nodeType === 1 && n.tagName &&
+              n.tagName.toLowerCase() === 'songloft-slider') return n;
+        }
+        return null;
+      }
+
+      // ── 14 能力事实（纯 JS，全在 rawRange 上做；它带 data-sl-no-slider，
+      //    所以垫片不会碰它，测的是 WebF 的原生行为）────────────────────
+      var raw = document.getElementById('rawRange');
+      var caps = [];
+      function cap(name, fn) {
+        try { caps.push(name + '=' + fn()); }
+        catch (e) { caps.push(name + '=threw:' + ((e && e.message) || e)); }
+      }
+      var rawEvents = 0;
+      cap('qsa', function () {
+        return document.querySelectorAll('input[type=range]').length;
+      });
+      cap('val', function () { return JSON.stringify(raw.value); });
+      cap('min', function () { return String(raw.min); });
+      cap('ownDesc', function () {
+        var d = Object.getOwnPropertyDescriptor(raw, 'value');
+        return d ? (typeof d.get) + '/cfg=' + d.configurable : 'none';
+      });
+      cap('protoDesc', function () {
+        var p = Object.getPrototypeOf(raw), depth = 0;
+        while (p) {
+          var d = Object.getOwnPropertyDescriptor(p, 'value');
+          if (d) return 'd' + depth + '/' + (typeof d.get) + '/cfg=' + d.configurable;
+          p = Object.getPrototypeOf(p); depth++;
+        }
+        return 'none';
+      });
+      cap('active', function () { return String(raw.matches(':active')); });
+      // **判据是哨兵往返，不是「defineProperty 没抛异常」**：QuickJS 的 exotic
+      // get_own_property 处理器优先级高于普通 own property，描述符装上了也可能
+      // 读写照旧走原生。
+      cap('shadowV', function () {
+        var store = raw.value;
+        Object.defineProperty(raw, 'value', {
+          configurable: true,
+          get: function () { return store; },
+          set: function (v) { store = String(v); }
+        });
+        raw.value = '77';
+        var got = raw.value;
+        raw.value = '42'; // 复原（访问器装上了就写我们的 store，没装上就写原生，都对）
+        return got === '77' ? 'ok' : 'FAIL(read=' + JSON.stringify(got) + ')';
+      });
+      cap('shadowM', function () {
+        var orig = raw.matches;
+        Object.defineProperty(raw, 'matches', {
+          configurable: true, writable: true,
+          value: function (sel) {
+            if (sel === ':active') return true;
+            return orig.call(raw, sel);
+          }
+        });
+        return String(raw.matches(':active')) + '/' + String(raw.matches('#rawRange'));
+      });
+      cap('rawRect', function () { return rectOf(raw); });
+      // 与 rawRect 一起构成「14b 整行变白」的数字侧证据：这两个盒子都正常，
+      // 说明是绘制被 input 的 widget 盖住，不是布局塌了。
+      cap('tagRect', function () {
+        return rectOf(raw.parentNode.getElementsByClassName('tag')[0]);
+      });
+      try {
+        raw.addEventListener('input', function () { rawEvents++; });
+        raw.dispatchEvent(new Event('input'));
+      } catch (e) {
+        caps.push('evtThrew=' + ((e && e.message) || e));
+      }
+
+      // ── 15 自定义元素直接用 ───────────────────────────────────────
+      var sldH = document.getElementById('sldH');
+      var sldV = document.getElementById('sldV');
+      var st = { hIn: 0, hCh: 0, vIn: 0, vCh: 0, hData: null, vData: null };
+      function watch(el, inKey, chKey, dataKey) {
+        if (!el) return;
+        el.addEventListener('input', function (e) {
+          st[inKey]++;
+          st[dataKey] = e && e.data !== undefined ? e.data : '(no .data)';
+        });
+        el.addEventListener('change', function () { st[chKey]++; });
+      }
+      watch(sldH, 'hIn', 'hCh', 'hData');
+      watch(sldV, 'vIn', 'vCh', 'vData');
+
+      // ── 16 垫片端到端（全部读**原 input**，也就是插件真正会读的那个对象）──
+      var shim = document.getElementById('shimRange');
+      var made = siblingSlider(shim);
+      var sh = { in: 0, ch: 0, act: null, pushed: null, dis: null, dragged: null };
+      if (shim) {
+        shim.addEventListener('input', function () {
+          sh.in++;
+          // 拖动**中**读 :active —— 这是 miot js/playback.js:403 的判据，
+          // 隐藏后的 input 本来永远进不了 :active，能为 true 说明垫片补回来了
+          try { sh.act = shim.matches(':active'); } catch (e) { sh.act = 'threw'; }
+        });
+        shim.addEventListener('change', function () { sh.ch++; });
+      }
+      var shimV0 = shim ? JSON.stringify(shim.value) : 'missing';
+      var shimHidden = 'n/a';
+      try {
+        shimHidden = made
+          ? ('cls=' + JSON.stringify(shim.className) +
+             '/disp=' + JSON.stringify(shim.style.display || ''))
+          : 'no-slider';
+      } catch (e) { shimHidden = 'threw'; }
+
+      var finalized = false;
+      function finalize() {
+        if (finalized) return;
+        finalized = true;
+        // disabled 转写放最后测：它会让滑块拖不动，早测会打断上面的拖动断言。
+        // 读完立刻恢复，免得截图里第 16 组停在「变淡的禁用态」让人误判成渲染坏了。
+        try {
+          if (shim) shim.disabled = true;
+          sh.dis = made ? JSON.stringify(made.getAttribute('disabled')) : 'n/a';
+          if (shim) shim.disabled = false;
+        } catch (e) { sh.dis = 'threw'; }
+
+        put('rangecaps', caps.join('  ') + '  evt=' + rawEvents);
+        put('sldstate',
+          'H.rect=' + rectOf(sldH) + ' V.rect=' + rectOf(sldV) +
+          ' N.rect=' + rectOf(document.getElementById('sldN')) +
+          '  Hin=' + st.hIn + '/Hch=' + st.hCh + '/Hdata=' + JSON.stringify(st.hData) +
+          '  Vin=' + st.vIn + '/Vch=' + st.vCh + '/Vdata=' + JSON.stringify(st.vData));
+        // 第 17 组要等这一段读完才敢动 CSS 变量（它会触发整棵树重排，撞上本组
+        // 采坐标那一刻就会拿到 0x0）。见 17 组那边的握手注释。
+        window.__slFinalized = true;
+        put('shimstate',
+          'made=' + (made ? made.tagName.toLowerCase() : 'none') +
+          ' sldRect=' + rectOf(made) + ' inRect=' + rectOf(shim) +
+          ' hidden=' + shimHidden + ' v0=' + shimV0 +
+          '  push=' + sh.pushed + ' dis=' + sh.dis +
+          '  drag=' + JSON.stringify(sh.dragged) +
+          ' in=' + sh.in + '/ch=' + sh.ch + ' act=' + String(sh.act));
+      }
+      // Dart 侧合成拖动跑完会回调这里；DRAG_PROBE 关的时候它永远不来，
+      // 所以下面还挂了一个兜底定时器，两条路都收敛到同一个 finalize（有 once 闸）。
+      window.__slDragDone = function () {
+        try { sh.dragged = shim ? shim.value : null; } catch (e) { sh.dragged = 'threw'; }
+        finalize();
+      };
+
+      // JS→滑块方向（miot 有 5 处这么写 input.value）：写完给垫片一拍时间再读
+      setTimeout(function () {
+        try {
+          if (shim) shim.value = 65;
+          sh.pushed = made ? JSON.stringify(made.getAttribute('value')) : 'n/a';
+        } catch (e) { sh.pushed = 'threw'; }
+      }, 400);
+
+      // 采坐标**单独一拍、而且要够晚**（1800ms），两个理由都是实测踩出来的：
+      //   ① 紧跟在 setAttribute 之后同步读 getBoundingClientRect()，垫片造出来的
+      //      滑块会返回 0x0（那次 setAttribute 触发了 requestUpdateState，布局还没
+      //      落定），于是它悄悄从拖动目标里漏掉，16b 显示 in=0/ch=0 ——
+      //      看起来跟「事件没通」一模一样，极易误判。
+      //   ② 本页其它几组的 readout 会在 800ms / 1000ms 把 span 从一行文字撑成两行，
+      //      **把下面的行整体往下推 14px**。坐标采早了，合成指针就打在滑块上边缘外，
+      //      同样表现为「拖了但没反应」。必须等所有 DOM 文字写完再采。
+      //      （15b / 14 的 readout 在 finalize 里才写，那已经晚于拖动，不影响。）
+      setTimeout(function () {
+        // 把坐标报给 Dart 侧（合成 Pointer 事件需要真实屏幕坐标）。
+        // WebF 是整屏 Scaffold body，devicePixelRatio 在容器里是 1，
+        // 所以页面坐标 == Flutter 的逻辑坐标，可以直接用。
+        try {
+          var mc = window.webf && window.webf.methodChannel;
+          if (mc && typeof mc.invokeMethod === 'function') {
+            var targets = [];
+            function push(id, axis, from, to) {
+              var b = box(document.getElementById(id));
+              if (!b) return;
+              targets.push({ id: id, axis: axis, from: from, to: to,
+                             x: b.x, y: b.y, w: b.w, h: b.h });
+            }
+            push('sldH', 'h', 0.15, 0.85);
+            push('sldV', 'v', 0.75, 0.15);
+            if (made) {
+              var b = box(made);
+              if (b) targets.push({ id: 'shimSlider', axis: 'h', from: 0.1, to: 0.9,
+                                    x: b.x, y: b.y, w: b.w, h: b.h });
+              // 拿不到盒子就把原因喊出来 —— 静默漏掉这个目标会让 16b 的
+              // in=0/ch=0 被误读成「Dart→JS 事件没通」
+              else console.log('[probe] shim slider has no box: ' + rectOf(made));
+            }
+            console.log('[probe] dragTargets ' + JSON.stringify(targets));
+            mc.invokeMethod('slDrag', JSON.stringify(targets));
+          } else {
+            console.log('[probe] no methodChannel, drag probe skipped');
+          }
+        } catch (e) {
+          console.log('[probe] slDrag invoke threw: ' + e);
+        }
+      }, 1800);
+
+      // 兜底：DRAG_PROBE 关（或 Dart 侧没回调）时也要出 readout。
+      // 6.5s = 1800ms 起拖 + 3 段合成拖动各约 0.5s 的余量，仍远小于 SETTLE(12s)。
+      setTimeout(finalize, 6500);
+    });
+
+    // ── 18 Step 6：三项经宿主桥下沉的能力事实 ──────────────────────────
+    //
+    // 又是单独一个 DOMContentLoaded 回调（与 details / ring / 滑块 / 安全区四段并列）：
+    // 任一段抛异常都不该让别人的 readout 停在 "(script did not run)"。
+    //
+    // 本组问的全是「C++/QuickJS 侧到底有没有这个东西」——那一层不随 pub 包发布，
+    // **只能实测**。判据全写在上面 18 组那段 HTML 注释里。
+    document.addEventListener('DOMContentLoaded', function () {
+      // 两张 16x16 纯色 PNG（各 79 字节），用 zlib+struct 现造的，不引外部资源：
+      // 探针容器里没有网络，且这一项要测的正是「不发请求也能出图」。
+      //
+      // **两张刻意不同色**：<img> 用青色、CSS background-image 用洋红。
+      // 同色时抓屏取到一个方块是那个颜色，分不清是哪条路成了 —— 而这两条路在
+      // WebF 里是两套完全不同的实现（img.dart vs css/background.dart）。
+      var PNG_CYAN = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mOQ' +
+        'bu8nCTGMahjVMHw1AACyXjEQBmoK9AAAAABJRU5ErkJggg==';    // #1B878F
+      var PNG_MAGENTA = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4' +
+        'z/CfJMQwqmFUw/DVAAAg0/4QFUWCjwAAAABJRU5ErkJggg==';    // #FF00FF
+      // **1×1** 纯绿 PNG（69 字节），由 CSS 的 16px 盒子放大显示。
+      // 存在的理由：交接文档里记着「一个硬编码 1×1 红点 PNG 虽然 naturalWidth 报 1/1，
+      // 截图里那个方块却是灰的」。若 16×16 的两张画得出来、这张画不出来，
+      // 那个观察的真因就是「1×1 放大」而不是「data: URL 不可用」——
+      // 两者对插件作者的含义完全不同（后者要另找出路，前者只要别用 1×1 占位图）。
+      var PNG_1PX_GREEN = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mNg' +
+        '+M8AAAICAQBF9FLUAAAAAElFTkSuQmCC';                    // #00FF00
+      var DATA_URL = 'data:image/png;base64,' + PNG_CYAN;
+      var BG_DATA_URL = 'data:image/png;base64,' + PNG_MAGENTA;
+      var PX1_DATA_URL = 'data:image/png;base64,' + PNG_1PX_GREEN;
+      var parts = [];
+      function put(k, v) { parts.push(k + '=' + v); }
+      function ty(v) { try { return typeof v; } catch (e) { return 'threw'; } }
+      function rect(id) {
+        var el = document.getElementById(id);
+        if (!el) return 'missing';
+        try {
+          var r = el.getBoundingClientRect();
+          return Math.round(r.width) + 'x' + Math.round(r.height);
+        } catch (e) { return 'threw'; }
+      }
+      function flush() {
+        var text = parts.join(' ');
+        var el = document.getElementById('s6state');
+        if (el) el.textContent = text;
+        console.log('[probe] step6 ' + text);
+        // base64 三项的完整详情单独一行：18b 那行装不下（见 shortB64 的注释）
+        if (b64detail.length) console.log('[probe] step6-b64 ' + b64detail.join(' '));
+      }
+
+      /**
+       * 绘制层判据：把三个方块的**中心坐标 + 期望颜色**写进 console，
+       * entrypoint.sh 抓屏后用 ImageMagick 逐点取色比对，结论落 out/pixels.txt。
+       *
+       * 为什么必须这么绕（而不是在页面里判）：页面**没有任何办法**知道自己有没有被
+       * 真的画出来 —— `naturalWidth` / `getBoundingClientRect` / computed style
+       * 全都只反映「解码/布局阶段的记账」。实测一个 1×1 红点 PNG 三项全正常、
+       * 截图里方块却是灰的。唯一可信的证据在**帧缓冲**里，只能抓屏取色。
+       *
+       * 为什么坐标由页面报、不写死在 shell 里：版面一改死坐标就静默失效
+       * （取到的是白底 → 报 FAIL → 看起来像 WebF 坏了）。
+       * 容器里 devicePixelRatio 是 1、探针 Scaffold 无 AppBar/padding，
+       * 所以页面坐标 == 屏幕坐标（与第 16 组合成拖动同一个前提）。
+       *
+       * ⚠️ **必须排在所有异步读数之后**（见调用点的 9s 定时器）：上面几组
+       * （尤其 17b 安全区、16 滑块）的读数是异步落 DOM 的，文字一变行数就变，
+       * 会把下面的行**整体推下去**。第一版把它跟 flush() 排在一起（≈3.8s），
+       * 结果三个方块明明都画出来了，报的 y 却比抓屏时的真实位置小 96px，
+       * 点取色全 FAIL，差一点被误判成「WebF 画不出 data: URL 图」。
+       * 这也是为什么 shell 侧的**主判据是「该颜色在整页出现了多少像素」**
+       * （与坐标无关），点取色只作附注。
+       */
+      function reportPixels() {
+        var want = [
+          ['img', 's6img', '1B878F'],
+          ['bg', 's6bg', 'FF00FF'],
+          ['ctl', 's6ctl', '0000FF'],
+          ['img1px', 's6img1', '00FF00']
+        ];
+        var toks = [];
+        for (var i = 0; i < want.length; i++) {
+          var el = document.getElementById(want[i][1]);
+          if (!el) { toks.push(want[i][0] + '=missing'); continue; }
+          try {
+            var r = el.getBoundingClientRect();
+            // 取中心：16x16 内容盒 + 1px 边框，中心离边框足够远，
+            // 不会被边框色或抗锯齿污染。
+            toks.push(want[i][0] + '=' + Math.round(r.left + r.width / 2) + ',' +
+              Math.round(r.top + r.height / 2) + ',' + want[i][2]);
+          } catch (e) { toks.push(want[i][0] + '=threw'); }
+        }
+        console.log('[probe] step6-px ' + toks.join(' '));
+      }
+
+      // 9s：所有异步读数（18 组 flush ≈3.8s、16 组 finalize 6.5s、17b 安全区往返）
+      // 都已落 DOM，版面不再变；而抓屏在 SETTLE（默认 12s）时发生，留 3s 余量。
+      // ⚠️ 把 SETTLE 调到 10s 以下时这一行会失效（entrypoint 会报「没有 step6-px」）。
+      setTimeout(reportPixels, 9000);
+
+      // ① data: URL 两个消费点。**必须由 JS 赋值而不是写在 HTML 属性里**：
+      // 静态 HTML 的图片加载发生在解析期，而 common.js 的空 src 访问器垫片
+      // 只挡运行时赋值 —— 两条路径混在一起就分不清是谁的功劳/锅。
+      try {
+        document.getElementById('s6img').src = DATA_URL;
+        put('imgSet', 'ok');
+      } catch (e) { put('imgSet', 'threw'); }
+      try {
+        document.getElementById('s6bg').style.backgroundImage = 'url(' + BG_DATA_URL + ')';
+        put('bgSet', 'ok');
+      } catch (e) { put('bgSet', 'threw'); }
+      try {
+        document.getElementById('s6img1').src = PX1_DATA_URL;
+        put('img1Set', 'ok');
+      } catch (e) { put('img1Set', 'threw'); }
+
+      // ② base64 / Blob / FileReader 存在性
+      put('btoa', ty(window.btoa));
+      put('atob', ty(window.atob));
+      put('FileReader', ty(window.FileReader));
+      put('Blob', ty(window.Blob));
+      put('File', ty(window.File));
+      put('FileList', ty(window.FileList));
+      put('arrBuf', (window.Blob && window.Blob.prototype)
+        ? ty(window.Blob.prototype.arrayBuffer) : 'n/a');
+      put('objURL', (window.URL) ? ty(window.URL.createObjectURL) : 'no-URL');
+
+      // ③ `<input type=file>` 的原生表现。
+      // shimmed 那一项是给「common.js 加了 file 垫片之后」留的回归位：
+      // 之后这两行的尺寸会变 0（垫片强制 display:none），单看尺寸会与
+      // 「WebF 认了 hidden 属性」撞成同一个读数，必须靠标记区分。
+      put('fileVisHidden', rect('s6fileH'));
+      put('fileVisRaw', rect('s6fileRaw'));
+      put('fileVis', rect('s6fileV'));
+      put('shimmed', document.getElementById('s6fileV')
+        .hasAttribute('data-sl-file-shim') ? 'yes' : 'no');
+      put('shimRespectsOptOut', document.getElementById('s6fileRaw')
+        .hasAttribute('data-sl-file-shim') ? 'BROKEN' : 'ok');
+      put('tableMark', document.getElementById('s6table')
+        .hasAttribute('data-sl-table-unsupported') ? 'yes' : 'no');
+
+      // ④ 程序化 click() 会不会派发 DOM click 事件到监听器。
+      // 用一个**新建的**元素而不是页面上现成的：现成元素可能已经被别的垫片
+      // 装过监听器，测出来的就不是「纯 click() 语义」了。
+      var probeBtn = document.createElement('span');
+      probeBtn.textContent = '.';
+      probeBtn.style.display = 'none';
+      var clicked = false;
+      probeBtn.addEventListener('click', function () { clicked = true; });
+      document.body.appendChild(probeBtn);
+      try {
+        probeBtn.click();
+        put('clickCalled', 'ok');
+      } catch (e) { put('clickCalled', 'threw'); }
+
+      // ⑤ blob → base64 端到端往返。**这才是「能拼出 data: URL」的判据** ——
+      // 上面那些 typeof 只证明绑定存在，不证明能用（WebF 里
+      // ImageType.blob 就是个从 Kraken 继承来的死枚举值）。
+      //
+      // ⚠️ 用例是**全部 256 种字节值**，不是旧版那个 `new Blob(['hi'])`。
+      // 'hi' 是纯 ASCII、全程没有一个字节 > 0x7F，于是那个用例**结构上**不可能
+      // 抓到「btoa 不是二进制安全的」这个真缺陷（它只在 >0x7F 时把码点当字符
+      // 做一次 UTF-8 编码），而所有图片都含高位字节。二进制路径的判据必须含高位字节。
+      var B256_EXPECT =
+        'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4v' +
+        'MDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5f' +
+        'YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6P' +
+        'kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/' +
+        'wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v' +
+        '8PHy8/T19vf4+fr7/P3+/w==';
+      var B256_MIME = 'application/octet-stream';
+
+      // 失败时只报「第一个不相等的字符下标 + got/exp 各一字符」。
+      // 344 字符的完整串塞进 18b 会把别的检查行挤出截图。
+      // 详细版：给 flutter.log 看。
+      function cmpB64(got, exp) {
+        if (got === exp) return 'ok';
+        if (typeof got !== 'string') return 'type:' + (typeof got);
+        // 短用例（如 btoaHi 的 8 字符）直接打全串，最好读
+        if (exp.length <= 16) return 'got:' + got + '(exp:' + exp + ')';
+        for (var i = 0; i < Math.max(got.length, exp.length); i++) {
+          if (got.charAt(i) !== exp.charAt(i)) {
+            // 打 8 字符窗口而不是单字符：单字符看不出是「整体错位」还是「个别位错」，
+            // 而这两者指向完全不同的根因（长度/编码 vs 字节值）。
+            return 'mismatch@' + i + ':g[' + got.substr(i, 8) + ']e[' +
+              exp.substr(i, 8) + ']/len' + got.length + 'v' + exp.length;
+          }
+        }
+        return 'ok';
+      }
+
+      // 精简版：给 18b 那一行截图看。**必须精简** —— 18b 的读数已经是全组最长，
+      // 塞进三条 base64 详情会把它自己的尾巴挤出截图（实测就发生过）。
+      // 完整详情在 flutter.log 的 `[probe] step6-b64` 那行，两级冗余度各管一处。
+      function shortB64(detail) {
+        if (detail === 'ok') return 'ok';
+        var m = /mismatch@(\d+)/.exec(detail);
+        return m ? 'BAD@' + m[1] : 'BAD';
+      }
+      var b64detail = [];
+      function putB64(key, detail) {
+        b64detail.push(key + '=' + detail);
+        put(key, shortB64(detail));
+      }
+
+      // ⑤a `btoa` 的二进制安全性单点判据（不依赖 Blob，独立成立）。
+      // 期望 `iVBORw==`；WebF 实测给 `wolQTg==`（已登记上游缺陷），**这一项预期 FAIL**。
+      // 留着它是为了守住「宿主为什么自带编码表」这个前提 —— 它哪天变 ok 才可以退回 btoa。
+      try {
+        putB64('btoaHi', typeof window.btoa === 'function'
+          ? cmpB64(window.btoa('\x89PNG'), 'iVBORw==')
+          : 'n/a');
+      } catch (e) { put('btoaHi', 'threw'); }
+
+      var bytes256 = null;
+      try {
+        bytes256 = new Uint8Array(256);
+        for (var bi = 0; bi < 256; bi++) bytes256[bi] = bi;
+      } catch (e) { bytes256 = null; }
+      var blob = null;
+      try {
+        blob = new Blob([bytes256], { type: B256_MIME });
+      } catch (e) { blob = null; }
+      put('blobMade', blob ? 'ok' : 'no');
+      put('blobSize', blob ? String(blob.size) : 'n/a');
+      // blobText 换回一个小 ASCII blob：这一项问的是「Blob.text() 有没有真绑上」，
+      // 与二进制安全无关，用 256 字节反而读数不可打印。
+      var txtBlob = null;
+      try { txtBlob = new Blob(['hi'], { type: 'text/plain' }); } catch (e) { txtBlob = null; }
+      if (txtBlob && typeof txtBlob.text === 'function') {
+        txtBlob.text().then(function (s) {
+          put('blobText', JSON.stringify(s));
+        }, function (err) {
+          put('blobText', 'rej:' + ((err && err.message) || err));
+        });
+      } else {
+        put('blobText', 'n/a');
+      }
+      // ⑤b 上游路径：Blob → arrayBuffer → btoa
+      if (blob && typeof blob.arrayBuffer === 'function' &&
+          typeof window.btoa === 'function') {
+        blob.arrayBuffer().then(function (buf) {
+          try {
+            var bs = new Uint8Array(buf);
+            var s = '';
+            for (var i = 0; i < bs.length; i++) s += String.fromCharCode(bs[i]);
+            putB64('b64rt', cmpB64(window.btoa(s), B256_EXPECT));
+          } catch (e) {
+            put('b64rt', 'threw:' + ((e && e.message) || e));
+          }
+        }, function (err) {
+          put('b64rt', 'rej:' + ((err && err.message) || err));
+        });
+      } else {
+        put('b64rt', 'n/a');
+      }
+      // ⑤c **产品路径**：SongloftPlugin.blobToDataURL（内部走 common.js 自带的
+      // bytesToBase64 编码表，不用 btoa）。这一项才是回归判据 —— 它挂了就意味着
+      // 所有「带鉴权头拉图 → data: URL」的绕法在 WebF 下全坏。
+      var SP = window.SongloftPlugin;
+      if (blob && SP && typeof SP.blobToDataURL === 'function') {
+        try {
+          SP.blobToDataURL(blob).then(function (url) {
+            var prefix = 'data:' + B256_MIME + ';base64,';
+            if (typeof url !== 'string' || url.indexOf(prefix) !== 0) {
+              put('dataUrl', 'badprefix:' + String(url).slice(0, 40));
+            } else {
+              putB64('dataUrl', cmpB64(url.slice(prefix.length), B256_EXPECT));
+            }
+          }, function (err) {
+            put('dataUrl', 'rej:' + ((err && err.message) || err));
+          });
+        } catch (e) { put('dataUrl', 'threw:' + ((e && e.message) || e)); }
+      } else {
+        put('dataUrl', SP ? 'no-fn' : 'no-SP');
+      }
+
+      // ⑥ file 垫片端到端：click() → 垫片 → 宿主桥 → Dart 的 canned 应答 →
+      // change 事件。probe_main.dart 侧收 songloftHost/files.pickFile 后返回
+      // 一个固定文件，所以「picked=…」出现就意味着整条链路真的走通了
+      // （不是「垫片装上了」而已）。
+      var picked = 'none';
+      var fileEl = document.getElementById('s6fileV');
+      if (fileEl) {
+        fileEl.addEventListener('change', function (ev) {
+          var f = (ev && ev.data && ev.data.files && ev.data.files[0]) || null;
+          if (!f) {
+            var lp = window.SongloftPlugin && window.SongloftPlugin.lastPickedFiles;
+            f = (lp && lp[0]) || null;
+            picked = f ? 'viaLast:' + f.name + '/' + (f.text || '').length : 'change-nodata';
+          } else {
+            picked = f.name + '/' + (f.text || '').length;
+          }
+        });
+      }
+
+      // ⑦ window.open。**放在最后、且延后到别的读数都取完**：万一将来某个
+      // delegate 返回 allow，整页会被替换掉，那之前的读数就全丢了。
+      // 两次调用刻意用不同 URL 与不同参数个数：miot js/auth.js:95 是双参
+      // （`window.open(url, '_blank')`），而 WebF 的 Dart 绑定只声明 args[0]。
+      setTimeout(function () {
+        put('open', ty(window.open));
+        try {
+          window.open('https://example.com/sl-open-1');
+          put('open1', 'called');
+        } catch (e) { put('open1', 'threw:' + ((e && e.message) || e)); }
+        try {
+          window.open('https://example.com/sl-open-2', '_blank');
+          put('open2', 'called');
+        } catch (e) { put('open2', 'threw:' + ((e && e.message) || e)); }
+
+        // 触发 file 垫片（若已安装）。放在 open 之后：它是异步的，且会弹
+        // 一个 Dart 侧的选择器（探针里是 canned 应答，不会真弹 UI）。
+        try {
+          if (fileEl) fileEl.click();
+          put('fileClick', 'called');
+        } catch (e) { put('fileClick', 'threw:' + ((e && e.message) || e)); }
+
+        setTimeout(function () {
+          put('progClick', clicked ? 'dispatched' : 'no-dispatch');
+          put('picked', picked);
+          // rect 只证明「盒子有尺寸」，**不证明像素被画出来**（见 18 组注释里的
+          // 红点 PNG 教训）。绘制层判据靠下面那行 step6-px + 抓屏取色。
+          put('imgRect', rect('s6img'));
+          put('bgRect', rect('s6bg'));
+          flush();
+        }, 1200);
+      }, 2600);
+    });
+  </script>
+</body>
+</html>

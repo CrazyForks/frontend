@@ -12,6 +12,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   share_plus
   tray_manager
   url_launcher_windows
+  webf
   window_manager
   windows_single_instance
 )

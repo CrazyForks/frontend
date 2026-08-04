@@ -235,6 +235,18 @@ Bundle 版预编译安装包在 [songloft 主仓库 Releases](https://github.com
 
 ## 许可证 / 第三方组件
 
-本项目基于 [Apache-2.0 license](LICENSE) 开源。
+本项目**源代码**基于 [Apache-2.0 license](LICENSE) 开源。
+
+> **⚠️ 二进制发布按 GPL-3.0 分发（请先读这条）**
+>
+> 原生平台构建（Android / iOS / Windows / macOS / Linux）链接了 [WebF](https://github.com/openwebf/webf) 用于渲染 JS 插件页，而 WebF 是 **GPL-3.0-only 且没有链接例外**。Apache-2.0 单向兼容 GPLv3，所以这种组合是允许的 —— 但**组合后的产物（即我们分发的每个二进制）整体受 GPL-3.0 约束**：
+>
+> - 你拿到的二进制**按 GPL-3.0 而非 Apache-2.0** 授予你；
+> - 你有权获取完整对应源码 —— [本仓库](https://github.com/songloft-org/songloft-player)、[服务端仓库](https://github.com/songloft-org/songloft)、[WebF](https://github.com/openwebf/webf)，每个 release 随附一份说明其构建所用的确切 tag/commit；
+> - 你可以自行修改并按 GPL-3.0 的条件再分发。
+>
+> GPL-3.0 全文见 [LICENSES/GPL-3.0.txt](LICENSES/GPL-3.0.txt)，并随每个 release 一同发布。**Web 端构建不含 WebF**（WebF 不支持 Flutter Web），仍只受 Apache-2.0 约束；把 WebF 依赖去掉后自行编译的产物同理。详见 [NOTICE](NOTICE) 的「DISTRIBUTION LICENSE」段。
+>
+> 许可全文也**内置在安装包里**（Flutter asset），无需联网即可在 App 内「设置 → 关于与更新 → 开源许可」查看：GPL-3.0 全文、NOTICE 第三方组件声明、以及 Flutter 汇总的逐个依赖包许可。Linux/Windows 便携包与 macOS zip 另外在解包后的根目录直接放了一份 `LICENSE-GPL-3.0.txt`。
 
 > **LGPL 合规提示**：本客户端在 Windows / Linux 上通过 `just_audio_media_kit` 调用 libmpv（LGPL-2.1+）作为音频后端。Windows 端打包的是 **audio-only LGPL 构建**（不含 GPL 编码器如 libx264 / libx265），Linux 端动态链接系统的 libmpv。完整的第三方组件清单、许可证类型与源码获取途径见 [NOTICE](NOTICE)。
