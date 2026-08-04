@@ -177,7 +177,10 @@ class _DesktopFullPlayerState extends ConsumerState<DesktopFullPlayer>
               ),
             ),
           // 主题包自定义渐变层
-          if (Theme.of(context).extension<SongloftThemeExtension>()?.playerGradientColors != null)
+          if (Theme.of(
+                context,
+              ).extension<SongloftThemeExtension>()?.playerGradientColors !=
+              null)
             Positioned.fill(
               child: IgnorePointer(
                 child: DecoratedBox(
@@ -185,11 +188,12 @@ class _DesktopFullPlayerState extends ConsumerState<DesktopFullPlayer>
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: Theme.of(context)
-                          .extension<SongloftThemeExtension>()!
-                          .playerGradientColors!
-                          .map((c) => c.withValues(alpha: 0.4))
-                          .toList(),
+                      colors:
+                          Theme.of(context)
+                              .extension<SongloftThemeExtension>()!
+                              .playerGradientColors!
+                              .map((c) => c.withValues(alpha: 0.4))
+                              .toList(),
                     ),
                   ),
                 ),

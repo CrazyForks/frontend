@@ -92,11 +92,7 @@ class _FacetGridViewState extends ConsumerState<FacetGridView> {
     }
     ref
         .read(playerStateProvider.notifier)
-        .playPlaylist(
-          songs,
-          startIndex: startIndex,
-          context: ctx,
-        );
+        .playPlaylist(songs, startIndex: startIndex, context: ctx);
     if (!mounted) return;
     ResponsiveSnackBar.show(
       context,

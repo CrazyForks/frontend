@@ -40,9 +40,8 @@ class SongloftThemeExtension extends ThemeExtension<SongloftThemeExtension> {
   ) {
     if (other is! SongloftThemeExtension) return this;
     return SongloftThemeExtension(
-      playerGradientColors: t < 0.5
-          ? playerGradientColors
-          : other.playerGradientColors,
+      playerGradientColors:
+          t < 0.5 ? playerGradientColors : other.playerGradientColors,
       cardRadius: lerpDouble(cardRadius, other.cardRadius, t) ?? cardRadius,
       controlRadius:
           lerpDouble(controlRadius, other.controlRadius, t) ?? controlRadius,
@@ -154,28 +153,32 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
-        insetPadding: isDesktop
-            ? const EdgeInsets.symmetric(horizontal: 24, vertical: 12)
-            : null,
+        insetPadding:
+            isDesktop
+                ? const EdgeInsets.symmetric(horizontal: 24, vertical: 12)
+                : null,
         width: isDesktop ? 480 : null,
       ),
-      filledButtonTheme: isDesktop
-          ? FilledButtonThemeData(
-              style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
-            )
-          : null,
-      outlinedButtonTheme: isDesktop
-          ? OutlinedButtonThemeData(
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(88, 44),
-              ),
-            )
-          : null,
-      textButtonTheme: isDesktop
-          ? TextButtonThemeData(
-              style: TextButton.styleFrom(minimumSize: const Size(88, 44)),
-            )
-          : null,
+      filledButtonTheme:
+          isDesktop
+              ? FilledButtonThemeData(
+                style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+              )
+              : null,
+      outlinedButtonTheme:
+          isDesktop
+              ? OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(88, 44),
+                ),
+              )
+              : null,
+      textButtonTheme:
+          isDesktop
+              ? TextButtonThemeData(
+                style: TextButton.styleFrom(minimumSize: const Size(88, 44)),
+              )
+              : null,
     );
   }
 }

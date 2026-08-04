@@ -20,9 +20,7 @@ class _ThemeCatalogState extends ConsumerState<ThemeCatalog> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(themeCatalogProvider.notifier).refresh(),
-    );
+    Future.microtask(() => ref.read(themeCatalogProvider.notifier).refresh());
   }
 
   @override
@@ -46,10 +44,12 @@ class _ThemeCatalogState extends ConsumerState<ThemeCatalog> {
               IconButton(
                 icon: const Icon(Icons.refresh, size: 20),
                 tooltip: l10n.themeCatalogRefresh,
-                onPressed: catalog.isLoading
-                    ? null
-                    : () =>
-                        ref.read(themeCatalogProvider.notifier).refresh(force: true),
+                onPressed:
+                    catalog.isLoading
+                        ? null
+                        : () => ref
+                            .read(themeCatalogProvider.notifier)
+                            .refresh(force: true),
               ),
             ],
           ),
@@ -66,36 +66,41 @@ class _ThemeCatalogState extends ConsumerState<ThemeCatalog> {
               );
             }
             return Column(
-              children: entries.map((entry) {
-                return _CatalogEntryTile(
-                  entry: entry,
-                  installing: _installing.contains(entry.id),
-                  onInstall: () => _installTheme(entry),
-                );
-              }).toList(),
+              children:
+                  entries.map((entry) {
+                    return _CatalogEntryTile(
+                      entry: entry,
+                      installing: _installing.contains(entry.id),
+                      onInstall: () => _installTheme(entry),
+                    );
+                  }).toList(),
             );
           },
-          loading: () => const Padding(
-            padding: EdgeInsets.all(AppSpacing.md),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              children: [
-                Text(
-                  l10n.themeCatalogLoadError,
-                  style: TextStyle(color: colorScheme.error),
+          loading:
+              () => const Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+          error:
+              (e, _) => Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  children: [
+                    Text(
+                      l10n.themeCatalogLoadError,
+                      style: TextStyle(color: colorScheme.error),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    OutlinedButton(
+                      onPressed:
+                          () => ref
+                              .read(themeCatalogProvider.notifier)
+                              .refresh(force: true),
+                      child: Text(l10n.themeCatalogRefresh),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                OutlinedButton(
-                  onPressed: () =>
-                      ref.read(themeCatalogProvider.notifier).refresh(force: true),
-                  child: Text(l10n.themeCatalogRefresh),
-                ),
-              ],
-            ),
-          ),
+              ),
         ),
       ],
     );
@@ -108,14 +113,15 @@ class _ThemeCatalogState extends ConsumerState<ThemeCatalog> {
       if (!mounted) return;
       ResponsiveSnackBar.showSuccess(
         context,
-        message: AppLocalizations.of(context).themeCatalogInstallSuccess(entry.name),
+        message: AppLocalizations.of(
+          context,
+        ).themeCatalogInstallSuccess(entry.name),
       );
     } catch (e) {
       if (!mounted) return;
       ResponsiveSnackBar.showError(
         context,
-        message:
-            '${AppLocalizations.of(context).themeCatalogInstallError}: $e',
+        message: '${AppLocalizations.of(context).themeCatalogInstallError}: $e',
       );
     } finally {
       if (mounted) setState(() => _installing.remove(entry.id));
@@ -146,18 +152,18 @@ class _CatalogEntryTile extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: isInstalled
-              ? colorScheme.primaryContainer
-              : colorScheme.surfaceContainerHighest,
+          color:
+              isInstalled
+                  ? colorScheme.primaryContainer
+                  : colorScheme.surfaceContainerHighest,
           borderRadius: AppRadius.smAll,
         ),
         child: Icon(
-          isInstalled
-              ? Icons.check_circle_outline
-              : Icons.palette_outlined,
-          color: isInstalled
-              ? colorScheme.onPrimaryContainer
-              : colorScheme.onSurfaceVariant,
+          isInstalled ? Icons.check_circle_outline : Icons.palette_outlined,
+          color:
+              isInstalled
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurfaceVariant,
           size: 20,
         ),
       ),
@@ -172,28 +178,29 @@ class _CatalogEntryTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
       ),
-      trailing: installing
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : isInstalled
+      trailing:
+          installing
+              ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+              : isInstalled
               ? Text(
-                  l10n.themeCatalogInstalled,
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                )
-              : FilledButton.tonal(
-                  onPressed: onInstall,
-                  child: Text(
-                    hasUpdate
-                        ? l10n.themeCatalogUpdate
-                        : l10n.themeCatalogInstall,
-                  ),
+                l10n.themeCatalogInstalled,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 12,
                 ),
+              )
+              : FilledButton.tonal(
+                onPressed: onInstall,
+                child: Text(
+                  hasUpdate
+                      ? l10n.themeCatalogUpdate
+                      : l10n.themeCatalogInstall,
+                ),
+              ),
     );
   }
 }

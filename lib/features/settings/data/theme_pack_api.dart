@@ -20,12 +20,14 @@ class ThemePackColors {
   factory ThemePackColors.fromJson(Map<String, dynamic> json) {
     return ThemePackColors(
       seedColor: _parseColor(json['seedColor'] as String),
-      backgroundColor: json['backgroundColor'] != null
-          ? _parseColor(json['backgroundColor'] as String)
-          : null,
-      surfaceColor: json['surfaceColor'] != null
-          ? _parseColor(json['surfaceColor'] as String)
-          : null,
+      backgroundColor:
+          json['backgroundColor'] != null
+              ? _parseColor(json['backgroundColor'] as String)
+              : null,
+      surfaceColor:
+          json['surfaceColor'] != null
+              ? _parseColor(json['surfaceColor'] as String)
+              : null,
     );
   }
 }
@@ -71,9 +73,10 @@ class ThemePack {
 
     List<Color>? playerGradient;
     if (data?['playerGradient'] != null) {
-      playerGradient = (data!['playerGradient'] as List)
-          .map((e) => _parseColor(e as String))
-          .toList();
+      playerGradient =
+          (data!['playerGradient'] as List)
+              .map((e) => _parseColor(e as String))
+              .toList();
     }
 
     return ThemePack(
@@ -84,12 +87,14 @@ class ThemePack {
       author: json['author'] as String? ?? '',
       description: json['description'] as String? ?? '',
       schemaVersion: json['schema_version'] as int? ?? 1,
-      light: data?['light'] != null
-          ? ThemePackColors.fromJson(data!['light'] as Map<String, dynamic>)
-          : null,
-      dark: data?['dark'] != null
-          ? ThemePackColors.fromJson(data!['dark'] as Map<String, dynamic>)
-          : null,
+      light:
+          data?['light'] != null
+              ? ThemePackColors.fromJson(data!['light'] as Map<String, dynamic>)
+              : null,
+      dark:
+          data?['dark'] != null
+              ? ThemePackColors.fromJson(data!['dark'] as Map<String, dynamic>)
+              : null,
       playerGradient: playerGradient,
       cardRadius: (data?['cardRadius'] as num?)?.toDouble(),
       controlRadius: (data?['controlRadius'] as num?)?.toDouble(),
@@ -193,9 +198,10 @@ class ThemeCatalogResponse {
   factory ThemeCatalogResponse.fromJson(Map<String, dynamic> json) {
     final list = json['themes'] as List<dynamic>? ?? [];
     return ThemeCatalogResponse(
-      themes: list
-          .map((e) => ThemeCatalogEntry.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      themes:
+          list
+              .map((e) => ThemeCatalogEntry.fromJson(e as Map<String, dynamic>))
+              .toList(),
       total: json['total'] as int? ?? 0,
     );
   }
@@ -210,9 +216,7 @@ class ThemePackApi {
   /// 列出所有主题包
   Future<List<ThemePackListItem>> listThemePacks() async {
     try {
-      final response = await dio.get(
-        '${AppConfig.apiPrefix}/theme-packs',
-      );
+      final response = await dio.get('${AppConfig.apiPrefix}/theme-packs');
       final list = response.data as List<dynamic>;
       return list
           .map((e) => ThemePackListItem.fromJson(e as Map<String, dynamic>))
@@ -310,7 +314,8 @@ class ThemePackApi {
         },
       );
       return ThemeCatalogResponse.fromJson(
-          response.data as Map<String, dynamic>);
+        response.data as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }

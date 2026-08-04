@@ -185,7 +185,10 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
               ),
             ),
           // 主题包自定义渐变层
-          if (Theme.of(context).extension<SongloftThemeExtension>()?.playerGradientColors != null)
+          if (Theme.of(
+                context,
+              ).extension<SongloftThemeExtension>()?.playerGradientColors !=
+              null)
             Positioned.fill(
               child: IgnorePointer(
                 child: DecoratedBox(
@@ -193,11 +196,12 @@ class _MobilePlayerState extends ConsumerState<MobilePlayer>
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: Theme.of(context)
-                          .extension<SongloftThemeExtension>()!
-                          .playerGradientColors!
-                          .map((c) => c.withValues(alpha: 0.4))
-                          .toList(),
+                      colors:
+                          Theme.of(context)
+                              .extension<SongloftThemeExtension>()!
+                              .playerGradientColors!
+                              .map((c) => c.withValues(alpha: 0.4))
+                              .toList(),
                     ),
                   ),
                 ),

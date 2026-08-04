@@ -13,8 +13,8 @@ final themePackApiProvider = Provider<ThemePackApi>((ref) {
 /// 已安装主题包列表
 final themePackListProvider =
     AsyncNotifierProvider<ThemePackListNotifier, List<ThemePackListItem>>(
-  ThemePackListNotifier.new,
-);
+      ThemePackListNotifier.new,
+    );
 
 class ThemePackListNotifier extends AsyncNotifier<List<ThemePackListItem>> {
   @override
@@ -51,8 +51,8 @@ class ThemePackListNotifier extends AsyncNotifier<List<ThemePackListItem>> {
 /// 当前激活的主题包（null 表示使用默认主题）
 final activeThemePackProvider =
     AsyncNotifierProvider<ActiveThemePackNotifier, ThemePack?>(
-  ActiveThemePackNotifier.new,
-);
+      ActiveThemePackNotifier.new,
+    );
 
 class ActiveThemePackNotifier extends AsyncNotifier<ThemePack?> {
   @override
@@ -82,8 +82,8 @@ class ActiveThemePackNotifier extends AsyncNotifier<ThemePack?> {
 /// 在线主题目录
 final themeCatalogProvider =
     AsyncNotifierProvider<ThemeCatalogNotifier, List<ThemeCatalogEntry>>(
-  ThemeCatalogNotifier.new,
-);
+      ThemeCatalogNotifier.new,
+    );
 
 class ThemeCatalogNotifier extends AsyncNotifier<List<ThemeCatalogEntry>> {
   @override

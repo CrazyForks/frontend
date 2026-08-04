@@ -211,18 +211,18 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
     // 插件版本更新、状态刷新等会 invalidate jsPluginsProvider，但不应导致
     // ShellLayout 重建——否则 CanvasKit 平台视图嵌入器可能因合成层序变化
     // 把 iframe DOM 摘挂一次，触发浏览器重载插件页面（#278, #344）。
-    ref.watch(jsPluginsProvider.select((v) {
-      final list = v.value ?? const <JSPlugin>[];
-      return list
-          .where(
-            (p) =>
-                p.isActive &&
-                p.entryPath != null &&
-                p.entryPath!.isNotEmpty,
-          )
-          .map((p) => '${p.entryPath}\t${p.displayName}\t${p.iconUrl ?? ""}')
-          .join('\n');
-    }));
+    ref.watch(
+      jsPluginsProvider.select((v) {
+        final list = v.value ?? const <JSPlugin>[];
+        return list
+            .where(
+              (p) =>
+                  p.isActive && p.entryPath != null && p.entryPath!.isNotEmpty,
+            )
+            .map((p) => '${p.entryPath}\t${p.displayName}\t${p.iconUrl ?? ""}')
+            .join('\n');
+      }),
+    );
     final plugins = ref.read(jsPluginsProvider).value ?? <JSPlugin>[];
     final activeDest = ActiveDestinations.compute(
       tabConfig,

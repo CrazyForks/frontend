@@ -56,29 +56,38 @@ class ThemePackManager extends ConsumerWidget {
               );
             }
             return Column(
-              children: items.map((item) {
-                final isActive = item.themeId == activeThemeId;
-                return _ThemePackTile(
-                  item: item,
-                  isActive: isActive,
-                  onTap: () => _activateThemePack(context, ref, item.themeId),
-                  onDelete: () =>
-                      _deleteThemePack(context, ref, item.themeId, item.name),
-                );
-              }).toList(),
+              children:
+                  items.map((item) {
+                    final isActive = item.themeId == activeThemeId;
+                    return _ThemePackTile(
+                      item: item,
+                      isActive: isActive,
+                      onTap:
+                          () => _activateThemePack(context, ref, item.themeId),
+                      onDelete:
+                          () => _deleteThemePack(
+                            context,
+                            ref,
+                            item.themeId,
+                            item.name,
+                          ),
+                    );
+                  }).toList(),
             );
           },
-          loading: () => const Padding(
-            padding: EdgeInsets.all(AppSpacing.md),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (_, _) => Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Text(
-              l10n.themePackLoadError,
-              style: TextStyle(color: colorScheme.error),
-            ),
-          ),
+          loading:
+              () => const Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+          error:
+              (_, _) => Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  l10n.themePackLoadError,
+                  style: TextStyle(color: colorScheme.error),
+                ),
+              ),
         ),
         const Divider(height: 1),
         const SizedBox(height: AppSpacing.sm),
@@ -105,12 +114,18 @@ class ThemePackManager extends ConsumerWidget {
       await ref.read(themePackListProvider.notifier).importThemePack(content);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).themePackImportSuccess)),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).themePackImportSuccess),
+        ),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context).themePackImportError}: $e')),
+        SnackBar(
+          content: Text(
+            '${AppLocalizations.of(context).themePackImportError}: $e',
+          ),
+        ),
       );
     }
   }
@@ -124,9 +139,7 @@ class ThemePackManager extends ConsumerWidget {
       await ref.read(activeThemePackProvider.notifier).setActive(themeId);
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -143,20 +156,21 @@ class ThemePackManager extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.themePackDeleteConfirmTitle),
-        content: Text(l10n.themePackDeleteConfirmContent(name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.commonCancel),
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(l10n.themePackDeleteConfirmTitle),
+            content: Text(l10n.themePackDeleteConfirmContent(name)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.commonCancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(l10n.commonDelete),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.commonDelete),
-          ),
-        ],
-      ),
     );
     if (confirmed != true) return;
 
@@ -164,9 +178,7 @@ class ThemePackManager extends ConsumerWidget {
       await ref.read(themePackListProvider.notifier).deleteThemePack(themeId);
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 }
@@ -193,16 +205,18 @@ class _ThemePackTile extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: isActive
-              ? colorScheme.primaryContainer
-              : colorScheme.surfaceContainerHighest,
+          color:
+              isActive
+                  ? colorScheme.primaryContainer
+                  : colorScheme.surfaceContainerHighest,
           borderRadius: AppRadius.smAll,
         ),
         child: Icon(
           isActive ? Icons.check_rounded : Icons.palette_outlined,
-          color: isActive
-              ? colorScheme.onPrimaryContainer
-              : colorScheme.onSurfaceVariant,
+          color:
+              isActive
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurfaceVariant,
           size: 20,
         ),
       ),

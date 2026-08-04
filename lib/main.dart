@@ -503,8 +503,14 @@ class SongloftApp extends ConsumerWidget {
         final themed = Theme(
           data:
               isDark
-                  ? AppTheme.darkTheme(screenType: screenType, themePack: activeThemePack)
-                  : AppTheme.lightTheme(screenType: screenType, themePack: activeThemePack),
+                  ? AppTheme.darkTheme(
+                    screenType: screenType,
+                    themePack: activeThemePack,
+                  )
+                  : AppTheme.lightTheme(
+                    screenType: screenType,
+                    themePack: activeThemePack,
+                  ),
           child: child!,
         );
         // Web 端启动时检测缓存是否过期（原生端 build 直返 child，零开销）。
