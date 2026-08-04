@@ -30,7 +30,21 @@ mixin PluginHostBridgeMixin<T extends ConsumerStatefulWidget>
   PluginHostDispatcher? _dispatcher;
 
   PluginHostDispatcher get _hostDispatcher =>
-      _dispatcher ??= PluginHostDispatcher(ref, platformName: _platformName());
+      _dispatcher ??= PluginHostDispatcher(
+        ref,
+        platformName: _platformName(),
+        cookieProvider: _getCookiesForOrigin,
+      );
+
+  Future<Map<String, String>> _getCookiesForOrigin(String origin) async {
+    final cookieManager = CookieManager.instance();
+    final cookies = await cookieManager.getCookies(url: WebUri(origin));
+    final result = <String, String>{};
+    for (final cookie in cookies) {
+      result[cookie.name] = cookie.value;
+    }
+    return result;
+  }
 
   /// 在 `onWebViewCreated` 里调用，注册 JS→Dart handler。
   void registerHostBridge(InAppWebViewController controller) {
