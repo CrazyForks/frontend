@@ -68,6 +68,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   int _loadGeneration = 0; // 后台加载代次，用于取消过期的异步加载任务
   final QueueLoader _queueLoader = QueueLoader();
   int _playGeneration = 0; // 播放协程代次：用户快速切歌时，旧协程在 await 后发现 gen 变化即退出
+  int _playGenerationAtSource = 0; // 当前音频源对应的代次，position stream 据此忽略切歌过渡期的旧位置
 
   // 播放失败重试 & 歌曲完成路由（domain use-cases）
   final PlaybackRetryPolicy _retryPolicy = PlaybackRetryPolicy();
@@ -314,6 +315,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
     // 监听播放位置
     _positionSubscription = _audioHandler.positionStream.listen((position) {
+      if (_playGeneration != _playGenerationAtSource) return;
       state = state.copyWith(currentTime: position);
       // 剩余≤30s 时保险再触发一次预拉取（防止首次触发太早使转码未完成）
       _maybeFireLateStagePrefetch(position);
@@ -982,8 +984,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
   }
 
   /// 从播放列表删除
-  void removeFromPlaylist(int index) {
+  Future<void> removeFromPlaylist(int index) async {
     if (index < 0 || index >= state.playlist.length) return;
+
+    final wasCurrentIndex = state.currentIndex;
 
     final result = PlayQueue(
       songs: state.playlist,
@@ -1005,6 +1009,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
       _syncHomeWidgetSong(null);
     }
     _savePlaybackState();
+
+    if (index == wasCurrentIndex && result.currentSong != null) {
+      await _playAtIndex(result.queue.currentIndex);
+    }
   }
 
   /// 拖拽排序播放列表
@@ -1816,6 +1824,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         final quality = prefs.getAudioQuality();
         await _audioHandler.playSong(song, quality: quality);
         if (_isSuperseded(gen, 'after-playSong')) return;
+        _playGenerationAtSource = gen;
         // 移动平台：音量由系统控制，just_audio 固定最大
         // 桌面/Web：使用 just_audio 播放器音量
         if (_useSystemVolume) {

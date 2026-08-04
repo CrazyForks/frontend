@@ -34,11 +34,7 @@ Future<bool> deleteCurrentSongFromPlayer(
         .read(songsApiProvider)
         .deleteSong(song.id, deleteFiles: result.deleteFiles);
     final notifier = ref.read(playerStateProvider.notifier);
-    notifier.removeFromPlaylist(state.currentIndex);
-    final newState = ref.read(playerStateProvider);
-    if (newState.currentSong != null) {
-      await notifier.playSong(newState.currentSong!);
-    }
+    await notifier.removeFromPlaylist(state.currentIndex);
     ref.invalidate(songsListProvider);
     if (context.mounted) {
       ResponsiveSnackBar.showSuccess(context, message: l10n.playerSongDeleted);
