@@ -75,6 +75,18 @@ dependencies:
   # ⚠️ `<webf-list-view>` **不在这个包里**，是 webf 包内建的（`src/html/listview.dart`），
   # 所以只用列表的插件不需要这个依赖。
   webf_cupertino_ui: ^0.4.1
+  # `<flutter-cupertino-icon>` 的字体。**必须在这里显式声明** ——
+  # `webf_cupertino_ui` 自己没有依赖它（它的 pubspec 只有 flutter/webf/logger/
+  # collection），这是那个包的打包遗漏。因果链：它的
+  # `cupertino_icons_map_generated.dart` 取值全是 `CupertinoIcons.xxx`，而那些常量是
+  # `IconData(0xf43c, fontFamily: 'CupertinoIcons', fontPackage: 'cupertino_icons')`
+  # —— 字体文件由 `cupertino_icons` 包的 pubspec 声明，不列进依赖，
+  # `CupertinoIcons.ttf` 就不进 assets。
+  # 症状**不是「图标不显示」而是画成一个 `?` 方框**：那些码点在私用区，缺字体时由
+  # 系统兜底字体（macOS 是 LastResort）渲染成「未知字符」占位符，不报错、不打日志。
+  # 别把它误判成「图标名写错」—— `icon.dart` 对查不到的 type 返回
+  # `SizedBox.shrink()`，名字写错是**看不见**，不是问号（songloft-org/songloft#341 实测）。
+  cupertino_icons: ^1.0.8
   web: ^1.1.1
   json_annotation: ^4.9.0
   # 系统音量控制

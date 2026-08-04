@@ -15,6 +15,10 @@ dependencies:
   # webf-ui 的 Cupertino 原生元素。**必须与产品 pubspec.yaml 里的约束保持一致**，
   # 否则探针验的不是产品那一份实现。
   webf_cupertino_ui: ^0.4.1
+  # `<flutter-cupertino-icon>` 的字体。同样必须与产品 pubspec 一致 ——
+  # `webf_cupertino_ui` 没有依赖它，漏了这条探针里所有 cupertino 图标都会画成
+  # `?` 方框，而那正是要靠探针发现的那类问题。理由详见产品 pubspec.yaml 的注释。
+  cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
