@@ -194,7 +194,16 @@ class _PluginRenderViewState extends State<PluginRenderView>
         if (_errorMessage != null)
           _buildErrorView(colorScheme)
         else if (surfaceMounted)
-          Offstage(offstage: !_appVisible, child: _buildSurface())
+          // SizedBox.expand 把渲染面收成 tight 约束：Stack 默认给非定位子节点
+          // loose 约束（min 0 / max=栈尺寸），WebF 在 loose 宽度下按内容收缩，
+          // 插件页里 flex:1 的布局会解析出无界宽度，触发 WebF flex 的
+          // `Infinity or NaN toInt` 崩溃（miot 设置页因含 <select>/<input> 内嵌
+          // Flutter widget 最先炸）。收成 tight 后 WebF 根拿到确定宽度即可。
+          // songloft-org/songloft#341
+          Offstage(
+            offstage: !_appVisible,
+            child: SizedBox.expand(child: _buildSurface()),
+          )
         else
           // 窗口不可见：不挂载渲染面，销毁原生 HWND（#293）。
           const SizedBox.expand(),
