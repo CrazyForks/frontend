@@ -110,6 +110,26 @@ class _PluginRenderSurfaceWebFState
   String? _lastPushedStateSig;
   bool _pageReady = false;
 
+  /// 缓存住 WebF 子树的 **widget 实例**，让本渲染面的 rebuild 不再穿透进去。
+  ///
+  /// 本 widget 会随**任何祖先 rebuild** 一起重建 —— 播放中迷你播放器的进度更新
+  /// 就足以让它每秒重建好几次。而 `AutoManagedWebFState.build()` 里的
+  /// `FutureBuilder(future: _getOrCreateController())` 把 future **在 build 里现造**，
+  /// widget 实例一换就重新订阅、多跑一次异步 controller 查找，并打一行
+  /// `WebF: loading with controller: ...` —— 用户日志里刷屏的正是它。
+  ///
+  /// 返回**同一个 widget 实例**时 `Element.updateChild` 会直接短路整棵子树
+  /// （`if (child.widget == newWidget) return child;`），既省掉那次查找也不再刷日志。
+  ///
+  /// 子树本身**不会**因此拿到过期数据：它只依赖 `url`（→ bundle 与
+  /// `_controllerName`），而 `url` 变化时 `didUpdateWidget` 会把这里置空重建；
+  /// 其余回调都是闭包捕获 `this`，State 不变即恒为最新。
+  ///
+  /// 顺带说明：`FutureBuilder` 换 future 时用的是 `_snapshot.inState(waiting)`，
+  /// **data 会被保留**，所以旧实例被替换时并不会闪回 `loadingWidget`、也不会把
+  /// 已挂载的 WebF 子树拆掉。这里省的是重复的异步查找与日志，不是修拆树。
+  Widget? _webfChild;
+
   /// 最近一次从 `MediaQuery` 读到的安全区，与最近一次**已推给页面**的签名。
   ///
   /// 分成两个字段而不是一个：build() 每次都会更新前者（此时页面可能还没 ready，
@@ -119,11 +139,66 @@ class _PluginRenderSurfaceWebFState
 
   /// controller 缓存键。用**去掉 query 的 URL**：`?theme=` 会随主题变化，
   /// 带上它会让切主题变成「换了一个插件」从而整页重载。
-  late final String _controllerName =
-      'plugin:${Uri.parse(widget.url).replace(query: '').toString()}';
+  static String _controllerNameFor(String url) =>
+      'plugin:${Uri.parse(url).replace(query: '').toString()}';
+
+  late final String _controllerName = _controllerNameFor(widget.url);
 
   PluginHostDispatcher get _hostDispatcher =>
       _dispatcher ??= PluginHostDispatcher(ref, platformName: _platformName());
+
+  @override
+  void initState() {
+    super.initState();
+    _adoptPreloadedController();
+  }
+
+  /// 认领**已经在进程内缓存里**的 controller。
+  ///
+  /// `WebF.fromControllerName` 的 `onControllerCreated` **只在新建分支里回调**：
+  /// webf 0.24.27 的 `AutoManagedWebFState._getOrCreateController()` 里那句
+  /// `widget.onControllerCreated!(newController)` 位于
+  /// `if (bundle != null && (controller == null || forceLoad))` 之内。命中缓存时
+  /// 它、`createController`、`onLoad` **一个都不跑**（日志上的表征是
+  /// `evaluated: true, status: PreloadingStatus.done`）。于是二次进入插件页时：
+  ///
+  ///   ① `onLoadStop` 永远不被调用 → `PluginRenderView` 的 20s 超时定时器必然烧到，
+  ///      把**已经画好的页面**整个换成「页面加载失败 · 页面加载超时」。这不是偶发，
+  ///      是同一进程内第二次进入必然复现（songloft-org/songloft#341 实测）；
+  ///   ② `_controller` 恒为 null → 安全区与播放器状态推不下去、返回键问不到页面；
+  ///   ③ `onControllerReady` 不回调 → 宿主拿不到本渲染面引用。
+  ///
+  /// 所以这三件在这里自己补上。注意**不能**改用 `forceLoad: true` 绕开：那等于
+  /// 每次进页面都重新取 bundle 并重放整个页面，进程内缓存的意义就没了，
+  /// 页面内 JS 状态也会归零。
+  void _adoptPreloadedController() {
+    final cached = WebFControllerManager.instance.getControllerSync(
+      _controllerName,
+    );
+    // 只认已经 evaluate 完的那份。还在 preloading 的交给正常路径的 `onLoad` 收尾 ——
+    // 提前报「加载完成」会把 spinner 早收掉、露出还没画完的页面。
+    if (cached == null || cached.disposed || !cached.evaluated) return;
+    _controller = cached;
+    // 桥与 delegate 挂在 controller 实例上，缓存命中拿到的是同一个实例、原本的
+    // 赋值仍在。这里重设是因为**本 State 是新的**：闭包必须指向新 State 的方法，
+    // 否则回调打到已 dispose 的旧 State 上。
+    cached.javascriptChannel.onMethodCall = _onMethodCall;
+    _installNavigationDelegate(cached);
+    // onLoadStop 会 setState 父级，不能在 initState 里同步调。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _pageReady = true;
+      // 主题必须补推一次：页面没有重载，而离开这段时间里用户可能换过主题，
+      // URL 的 ?theme= 只在真正加载时起作用，`didUpdateWidget` 也不会为
+      // 「新 State 的首帧」触发。
+      _pushToPage("{type:'songloft-theme',theme:'${widget.theme}'}");
+      // 清签名而不是直接推，让 `_syncSafeArea` 内部那条去重判断照常生效。
+      _lastPushedInsetsSig = null;
+      _syncSafeArea(_safeAreaInsets);
+      widget.onControllerReady(this);
+      widget.onLoadStop();
+    });
+  }
 
   @override
   void didUpdateWidget(covariant PluginRenderSurfaceWebF oldWidget) {
@@ -132,6 +207,17 @@ class _PluginRenderSurfaceWebFState
     if (oldWidget.theme != widget.theme && _pageReady) {
       _pushToPage("{type:'songloft-theme',theme:'${widget.theme}'}");
     }
+    // 换插件才需要换整棵 WebF 子树（缓存理由见 `_webfChild`）。
+    //
+    // 判据刻意是**去掉 query 的 URL**，不是 `widget.url` 整串：`?theme=` 与
+    // `access_token` 都会在原地变（切一次主题就变一次），而它们既不影响
+    // `_controllerName`、也不影响已缓存的 controller —— `bundle` 只在**新建**
+    // controller 时才被读取。按整串判会让每次切主题都白白重建一次子树，
+    // 正好抵消掉缓存的意义。
+    //
+    // 真的换了插件时其实走不到这里（`_controllerName` 是 late final，宿主是靠
+    // `ValueKey(_reloadSeq)` 或换页面来重建整个 State 的），这条只是自愈兜底。
+    if (_controllerNameFor(widget.url) != _controllerName) _webfChild = null;
   }
 
   // ── PluginRenderController ──────────────────────────────────────────
@@ -466,10 +552,13 @@ class _PluginRenderSurfaceWebFState
         if (snapshot.connectionState != ConnectionState.done) {
           return const SizedBox.expand();
         }
-        return WebF.fromControllerName(
+        // 复用同一个 widget 实例，理由见 `_webfChild` 的注释。
+        return _webfChild ??= WebF.fromControllerName(
           controllerName: _controllerName,
           bundle: WebFBundle.fromUrl(widget.url),
           createController: _createController,
+          // ⚠️ 只在**新建** controller 时回调，命中进程内缓存时不会跑。
+          // 缓存命中那条路由 `_adoptPreloadedController()` 处理，两边要一起改。
           onControllerCreated: (controller) {
             // 被淘汰后重建时 createController 不一定再跑，这里兜住引用与桥。
             _controller = controller;
