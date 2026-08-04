@@ -32,10 +32,8 @@ Dio createDio({
     ),
   );
 
-  // 忽略 SSL 证书校验（用户显式开启时；web 上为 no-op）
-  if (insecureTls) {
-    applyInsecureTls(dio);
-  }
+  // 配置 HttpClient：短 idleTimeout + 可选的忽略 SSL 证书校验
+  applyHttpClientConfig(dio, insecureTls: insecureTls);
 
   // 添加认证拦截器
   dio.interceptors.add(
@@ -78,10 +76,8 @@ Dio createPublicDio({String? customBaseUrl, bool insecureTls = false}) {
     ),
   );
 
-  // 忽略 SSL 证书校验（用户显式开启时；web 上为 no-op）
-  if (insecureTls) {
-    applyInsecureTls(dio);
-  }
+  // 配置 HttpClient：短 idleTimeout + 可选的忽略 SSL 证书校验
+  applyHttpClientConfig(dio, insecureTls: insecureTls);
 
   // 添加日志拦截器（仅在调试模式下）
   assert(() {

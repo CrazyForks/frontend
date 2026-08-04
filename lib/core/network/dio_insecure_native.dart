@@ -30,3 +30,21 @@ class _InsecureHttpOverrides extends HttpOverrides {
 void applyGlobalInsecureHttpOverrides(bool insecure) {
   HttpOverrides.global = insecure ? _InsecureHttpOverrides() : null;
 }
+
+/// 给 Dio 配置短空闲超时的 HttpClient，可选忽略 SSL 证书。
+///
+/// Windows 冷启动时连接池中的空闲连接可能在休眠/网络切换后变为半开状态。
+/// 将 idleTimeout 缩短到 5 秒可让 dart:io 更积极地丢弃空闲连接，减少复用到
+/// 死连接的概率（songloft-org/songloft#314）。
+void applyHttpClientConfig(Dio dio, {bool insecureTls = false}) {
+  dio.httpClientAdapter = IOHttpClientAdapter(
+    createHttpClient: () {
+      final client = HttpClient();
+      client.idleTimeout = const Duration(seconds: 5);
+      if (insecureTls) {
+        client.badCertificateCallback = (cert, host, port) => true;
+      }
+      return client;
+    },
+  );
+}

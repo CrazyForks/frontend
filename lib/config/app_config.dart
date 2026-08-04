@@ -35,8 +35,8 @@ class AppConfig {
   /// 供非 Riverpod 上下文（如 [ServerProbe.probeOne]）同步读取。
   /// 同时影响 Dart 层 HTTP（Dio / HttpClient）和原生音频播放器（libmpv）的 TLS 证书校验。
   static bool insecureTls = false;
-  static const Duration connectTimeout = Duration(seconds: 30);
-  static const Duration receiveTimeout = Duration(seconds: 30);
+  static const Duration connectTimeout = Duration(seconds: 10);
+  static const Duration receiveTimeout = Duration(seconds: 15);
 
   static String get apiBaseUrl => '$baseUrl$apiPrefix';
 

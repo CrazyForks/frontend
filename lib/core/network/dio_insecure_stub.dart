@@ -5,3 +5,6 @@ void applyInsecureTls(Dio dio) {}
 
 /// Web 平台 no-op。
 void applyGlobalInsecureHttpOverrides(bool insecure) {}
+
+/// Web 平台 no-op：浏览器管理连接池。
+void applyHttpClientConfig(Dio dio, {bool insecureTls = false}) {}
