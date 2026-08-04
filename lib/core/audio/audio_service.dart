@@ -766,13 +766,11 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       // 提前更新 mediaItem，确保通知栏在 Service 重建时能读取到正确的元数据。
       _updateNowPlaying(song);
 
-      // Web 平台需要 stop() 释放 HTML5 Audio 元素；
-      // 原生平台不调用 stop()，setAudioSource() 会自动替换当前源。
-      // 在 iOS 后台场景下，stop() 会使音频会话变为空闲，
-      // 导致系统限制后台网络访问，使下一首歌曲无法加载。
-      if (kIsWeb) {
-        await _player.stop();
-      }
+      // 所有平台（含 Web）均不调用 stop()，setAudioSource() 会自动替换当前源。
+      // Web: stop() 会 removeAttribute('src') 重置 <audio> 元素，破坏浏览器的
+      // autoplay 授权链——后台标签页中自动切歌时 play() 被拒绝导致无声（#351）。
+      // iOS: stop() 会使音频会话变为空闲，系统限制后台网络访问，下一首无法加载。
+      // setAudioSource 内部的 load() 已处理 HLS 清理和旧源释放，无需预先 stop。
 
       // 主动通知后端：本会话已切到 song.id，让其他 songID 的 prefetch/transcode/reassign 退场。
       // 必须在 setAudioSource 之前发起，让后端 plugin worker 尽早释放给本次播放使用。
