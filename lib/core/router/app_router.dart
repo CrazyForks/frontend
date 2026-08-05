@@ -20,11 +20,22 @@ import '../../features/settings/presentation/shortcut_settings_page.dart';
 import '../../features/settings/presentation/client_download_page.dart';
 import '../../features/settings/presentation/licenses_page.dart';
 import '../../features/settings/presentation/widgets/settings_category_content.dart';
+import '../../features/settings/presentation/providers/settings_provider.dart';
 import '../../features/player/presentation/widgets/mobile_player.dart';
 import '../../features/player/presentation/widgets/desktop_full_player.dart';
 import '../../shared/layouts/shell_layout.dart';
 import '../theme/responsive.dart';
 import '../../l10n/app_localizations.dart';
+
+/// 从插件页 URL 里取 `entryPath`：`.../api/v1/jsplugin/<entryPath>[/...]`。
+///
+/// 用正则而不是按路径段索引：调用方传进来的 url 形态不统一（有的带尾斜杠、有的带
+/// query、子路径部署时前缀还会多一段），按段数取会错位。
+String? _pluginEntryPathFromUrl(String url) {
+  final match = RegExp(r'/jsplugin/([^/?#]+)').firstMatch(url);
+  final entryPath = match?.group(1);
+  return (entryPath == null || entryPath.isEmpty) ? null : entryPath;
+}
 
 /// 路由路径常量
 class AppRoutes {
@@ -110,6 +121,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 插件 WebView 页面（独立路由，全屏显示，不显示底部导航）
       GoRoute(
         path: AppRoutes.plugin,
+        // ⚠️ **已注册为 Tab 的插件转到 Tab 页，不再开这条独立路由。**
+        // 两者给 PluginRenderView 传的 url 相同，而 WebF 的 controller 缓存键是
+        // 「去掉 query 的 URL」（`plugin_render_surface_webf.dart` 的
+        // `_controllerNameFor`），于是**两条入口指向同一个 WebFController**。
+        // 让同一插件只有一个入口，既避免两个渲染面同时持有一个 controller，
+        // 也避免「独立页 push/pop 一次 = Tab 页的渲染面被销毁再重建」这种
+        // 白白丢掉页面状态的抖动（songloft-org/songloft#341）。
+        //
+        // 注意 Tab 页**并非所有平台都保活**：Web 与移动端用 Offstage 保活，
+        // 桌面端（Windows/macOS/Linux）切走即销毁（见 `shell_layout.dart`，
+        // 规避 #246 的 WebView2 残留灰块）。所以桌面端上这条 redirect 省掉的是
+        // 一次真实的 dispose + 重新挂载，收益比 Web/移动端更大。
+        redirect: (context, state) {
+          final entryPath = _pluginEntryPathFromUrl(
+            state.uri.queryParameters['url'] ?? '',
+          );
+          if (entryPath == null) return null;
+          // 配置还没到就别拦：宁可放过（顶多白屏一次）也不要把导航卡住。
+          final tabs = ref.read(tabConfigProvider).asData?.value.pluginTabs;
+          if (tabs == null) return null;
+          if (tabs.any((t) => t.entryPath == entryPath)) {
+            return '/plugin-tab/$entryPath';
+          }
+          return null;
+        },
         builder: (context, state) {
           final url = state.uri.queryParameters['url'] ?? '';
           final name = state.uri.queryParameters['name'] ?? '';

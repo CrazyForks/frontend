@@ -147,10 +147,66 @@ class _PluginRenderSurfaceWebFState
   PluginHostDispatcher get _hostDispatcher =>
       _dispatcher ??= PluginHostDispatcher(ref, platformName: _platformName());
 
+  /// controllerName → 当前**归属**该 controller 的渲染面。
+  ///
+  /// 这张表决定「谁有权在 dispose 时把缓存里的 controller 一起销毁」，
+  /// 不只是诊断用。见 `dispose()`。
+  ///
+  /// 之所以需要它：同一 URL 的新旧渲染面在**同一帧内交接**时，新面的
+  /// `initState` 早于旧面的 `dispose` —— Flutter 先在 build 阶段 inflate 新子树，
+  /// 到帧末 `BuildOwner.finalizeTree()` 才拆掉 inactive 元素。若旧面无条件销毁
+  /// controller，销毁掉的正是新面刚在 `_adoptPreloadedController()` 里认领的那个。
+  /// 新面 `initState` 时会把这里改写成自己，旧面据此让权。
+  static final Map<String, State> _liveSurfacesByController = {};
+
   @override
   void initState() {
     super.initState();
+    _liveSurfacesByController[_controllerName] = this;
     _adoptPreloadedController();
+  }
+
+  @override
+  void dispose() {
+    // 只在「登记的还是自己」时才处理：同帧交接场景下后来者已把值改成它自己，
+    // 此时既不能移除记录、更不能销毁 controller（那是新面正在用的）。
+    if (_liveSurfacesByController[_controllerName] == this) {
+      _liveSurfacesByController.remove(_controllerName);
+      _dropCachedController(_controllerName);
+    }
+    super.dispose();
+  }
+
+  /// 渲染面销毁时**连带销毁**进程内缓存的 controller，即「不跨渲染面生命周期复用」。
+  ///
+  /// 起因：桌面端（Windows/macOS/Linux）插件 Tab **切走即销毁**
+  /// （`shared/layouts/shell_layout.dart`，规避 #246 的 WebView2 残留灰块），
+  /// 所以每次离开再回来都是一次完整的 dispose + 重新挂载。而重新挂载时 controller
+  /// 命中缓存（`evaluated: true`），于是 `createController` / `onLoad` /
+  /// `onLoadError` / `onJSLog` **一个都不跑**，`_adoptPreloadedController()` 又
+  /// 无条件上报「加载完成」—— 这条路径上**任何**失败都必然表现为
+  /// 「整页白屏 + 日志里一个字都没有」。实测正是如此：日志里白屏总是紧随第二条
+  /// `WebF: start for loading ...(evaluated: true)`，且该次会话零异常
+  /// （songloft-org/songloft#341）。
+  ///
+  /// 主动丢掉缓存后，每次挂载都退回**正常路径**：有 loading、有 20s 超时、有错误
+  /// UI、有 console 转发。代价是页面 JS 状态（筛选项、滚动位置）会归零、bundle 要
+  /// 重取 —— 这与 webview 分支在桌面端的行为**一致**（原生 WebView 被销毁后同样
+  /// 重载），所以两条渲染路径不会再出现「行为不对称」这种更难排查的情况。
+  ///
+  /// 附带修掉两条长期拖慢排查的坑：重装插件后不必再完全退出客户端才能看到新 bundle；
+  /// `[plugin][console]` 转发不再因命中缓存而静默失效。
+  ///
+  /// **不要**改成 `forceLoad: true` 来达到同样效果：那只是每次重新取 bundle，
+  /// 缓存里那个 controller 仍然留着不放，内存与 `maxAliveInstances` 配额照旧被占。
+  static void _dropCachedController(String name) {
+    // 异步且无需等待：本方法从 dispose() 调用，不能 await。
+    // 失败只吞掉——此时页面已经在拆了，抛出去只会盖掉真正的错误。
+    WebFControllerManager.instance.removeAndDisposeController(name).catchError((
+      Object e,
+    ) {
+      debugPrint('[plugin][webf] dispose cached controller "$name" failed: $e');
+    });
   }
 
   /// 认领**已经在进程内缓存里**的 controller。
@@ -168,9 +224,13 @@ class _PluginRenderSurfaceWebFState
   ///   ② `_controller` 恒为 null → 安全区与播放器状态推不下去、返回键问不到页面；
   ///   ③ `onControllerReady` 不回调 → 宿主拿不到本渲染面引用。
   ///
-  /// 所以这三件在这里自己补上。注意**不能**改用 `forceLoad: true` 绕开：那等于
-  /// 每次进页面都重新取 bundle 并重放整个页面，进程内缓存的意义就没了，
-  /// 页面内 JS 状态也会归零。
+  /// 所以这三件在这里自己补上。
+  ///
+  /// ⚠️ **这条路径已降级为兜底。** `dispose()` 现在会连带销毁缓存里的 controller
+  /// （见 `_dropCachedController`），因为「渲染面重新挂载 + controller 命中缓存」
+  /// 会把任何失败都变成静默白屏。正常情况下这里查不到缓存、直接 return；
+  /// 仍保留它是为了两种残留情形：同一 URL 的新旧渲染面在同一帧内交接（旧面让权、
+  /// 不销毁），以及 Web/移动端 Offstage 保活下同插件出现第二个渲染面。
   void _adoptPreloadedController() {
     final cached = WebFControllerManager.instance.getControllerSync(
       _controllerName,
@@ -187,17 +247,35 @@ class _PluginRenderSurfaceWebFState
     // onLoadStop 会 setState 父级，不能在 initState 里同步调。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _pageReady = true;
       // 主题必须补推一次：页面没有重载，而离开这段时间里用户可能换过主题，
       // URL 的 ?theme= 只在真正加载时起作用，`didUpdateWidget` 也不会为
       // 「新 State 的首帧」触发。
       _pushToPage("{type:'songloft-theme',theme:'${widget.theme}'}");
-      // 清签名而不是直接推，让 `_syncSafeArea` 内部那条去重判断照常生效。
-      _lastPushedInsetsSig = null;
-      _syncSafeArea(_safeAreaInsets);
       widget.onControllerReady(this);
-      widget.onLoadStop();
+      _markPageReady();
     });
+  }
+
+  /// 把「页面已就绪」这件事落地：推安全区 + 通知宿主收掉 loading。
+  ///
+  /// **必须幂等**，有两个原因：
+  ///   ① 三个调用点（`onBuildSuccess` / `onLoad` / `_adoptPreloadedController`）
+  ///      谁先到都算数；
+  ///   ② `onBuildSuccess` 每次 `buildRootView()` 都回调，而 `widget.onLoadStop()`
+  ///      会 setState 祖先（`PluginRenderView`）→ 重建 → WebF 重建 → 又一次
+  ///      `buildRootView` → 又一次回调。**不守卫就是无限重建循环。**
+  ///
+  /// `onLoadError` 会把 `_pageReady` 打回 false，所以出错后再成功仍能重新上报。
+  void _markPageReady() {
+    if (!mounted || _pageReady) return;
+    _pageReady = true;
+    // 安全区必须在这里补推一次，两个理由：
+    //   ① 首屏 —— build() 早于就绪回调，那时 `_pageReady` 还是 false 推不出去；
+    //   ② 重挂 —— 页面 JS 状态归零，「注入过一次就不管」会让重挂后永久丢掉安全区。
+    // 清签名而不是直接推：让 `_syncSafeArea` 里那条去重判断照常生效。
+    _lastPushedInsetsSig = null;
+    _syncSafeArea(_safeAreaInsets);
+    widget.onLoadStop();
   }
 
   @override
@@ -499,17 +577,10 @@ class _PluginRenderSurfaceWebFState
       // 代价极小：插件静态资源本来就是内容哈希文件名（app.bundle.<hash>.js），
       // 缓存命中率的收益有限，而缓存损坏的代价是整页不可用。
       networkOptions: const WebFNetworkOptions(enableHttpCache: false),
-      onLoad: (_) {
-        _pageReady = true;
-        // 安全区必须在这里补推一次，两个理由：
-        //   ① 首屏 —— build() 早于 onLoad，那时 `_pageReady` 还是 false 推不出去；
-        //   ② 重挂 —— 超 `maxAliveInstances` 被 dispose 后重建时页面 JS 状态归零，
-        //      「注入过一次就不管」会让重挂后的页面永久丢掉安全区。
-        // 清签名而不是直接推：让 `_syncSafeArea` 里那条去重判断照常生效。
-        _lastPushedInsetsSig = null;
-        _syncSafeArea(_safeAreaInsets);
-        widget.onLoadStop();
-      },
+      // 就绪的**次要**信号。主信号是 `onBuildSuccess`（见 build() 里的注释）——
+      // `onLoad` 在「同一页面第二次挂载」时会不来。两条都指向幂等的 `_markPageReady`，
+      // 谁先到算谁。
+      onLoad: (_) => _markPageReady(),
       onLoadError: (error, stack) {
         _pageReady = false;
         _lastPushedInsetsSig = null;
@@ -569,6 +640,24 @@ class _PluginRenderSurfaceWebFState
             _installNavigationDelegate(controller);
             widget.onControllerReady(this);
           },
+          // 「页面已就绪」的**主信号**，不要只依赖 `onLoad`。
+          //
+          // `onLoad` 由 `checkCompleted()` → `dispatchWindowLoadEvent()` 触发，而
+          // `checkCompleted()`（webf `controller.dart:1718`）有四道 early-return：
+          // `document.parsing` / `isDelayingDOMContentLoadedEvent` /
+          // `hasPendingRequest` / `isDelayingLoadEvent`。任一条命中就直接 return，
+          // 之后**没有任何东西保证它会被再调一次** —— 实测同一个页面首次挂载
+          // `onLoad` 正常、第二次挂载（响应从 ~279ms 变成 ~6ms）就再也不来，
+          // 表现是页面其实画好了、JS 也跑完了，却被 20s 超时定时器换成
+          // 「页面加载失败」（songloft-org/songloft#341）。
+          //
+          // `onBuildSuccess` 相反：它在 `buildRootView()` 真的把根视图建出来之后
+          // post-frame 回调，且**只在成功分支**调（webf `widget/webf.dart:673 / :723`，
+          // 各种 error 分支都不调）。这正是我们要表达的语义 —— 「页面画出来了」。
+          //
+          // 会重复回调（每次 `buildRootView` 都调），`onLoadStop` 与
+          // `_markPageReady` 都是幂等的。
+          onBuildSuccess: _markPageReady,
           loadingWidget: const SizedBox.expand(),
           errorBuilder: (context, error) {
             // 交给 PluginRenderView 统一的错误 UI，这里不自绘。
