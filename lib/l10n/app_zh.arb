@@ -2470,6 +2470,43 @@
   "settingsUpgradeLater": "稍后",
   "settingsUpgradeGoDownload": "前往下载",
   "settingsUpgradeUpgradeNow": "立即升级",
+  "settingsUpgradeUploadButton": "上传升级",
+  "settingsUpgradeUploading": "正在上传...",
+  "settingsUpgradeUploadFailed": "上传失败: {error}",
+  "@settingsUpgradeUploadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsUpgradeUploadConfirmChannel": "通道切换确认",
+  "settingsUpgradeUploadConfirmChannelContent": "当前为{currentChannel}，上传的文件为{uploadChannel} ({version})，确认切换通道并升级？\n\n升级后服务将自动重启。",
+  "@settingsUpgradeUploadConfirmChannelContent": {
+    "placeholders": {
+      "currentChannel": {
+        "type": "String"
+      },
+      "uploadChannel": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsUpgradeUploadConfirmNormal": "确认升级到 {version} ({channel})？\n\n升级后服务将自动重启。",
+  "@settingsUpgradeUploadConfirmNormal": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsUpgradeUploadConfirm": "确认升级",
   "settingsFrontendUpgradeCheckTimeout": "检查更新超时，请尝试切换代理后重试",
   "settingsFrontendUpgradeTitle": "客户端更新",
   "settingsFrontendUpgradeChecking": "正在检查更新...",

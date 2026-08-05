@@ -2365,6 +2365,43 @@
   "settingsUpgradeLater": "Later",
   "settingsUpgradeGoDownload": "Go to download",
   "settingsUpgradeUpgradeNow": "Upgrade now",
+  "settingsUpgradeUploadButton": "Upload upgrade",
+  "settingsUpgradeUploading": "Uploading...",
+  "settingsUpgradeUploadFailed": "Upload failed: {error}",
+  "@settingsUpgradeUploadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsUpgradeUploadConfirmChannel": "Channel switch confirmation",
+  "settingsUpgradeUploadConfirmChannelContent": "Current channel is {currentChannel}, uploaded file is {uploadChannel} ({version}). Confirm switching channel and upgrade?\n\nThe service will restart automatically.",
+  "@settingsUpgradeUploadConfirmChannelContent": {
+    "placeholders": {
+      "currentChannel": {
+        "type": "String"
+      },
+      "uploadChannel": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsUpgradeUploadConfirmNormal": "Confirm upgrade to {version} ({channel})?\n\nThe service will restart automatically.",
+  "@settingsUpgradeUploadConfirmNormal": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsUpgradeUploadConfirm": "Confirm upgrade",
   "settingsFrontendUpgradeCheckTimeout": "Update check timed out. Try switching the proxy and retry.",
   "settingsFrontendUpgradeTitle": "Client update",
   "settingsFrontendUpgradeChecking": "Checking for updates...",

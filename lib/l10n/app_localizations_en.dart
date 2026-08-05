@@ -3915,6 +3915,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsUpgradeUpgradeNow => 'Upgrade now';
 
   @override
+  String get settingsUpgradeUploadButton => 'Upload upgrade';
+
+  @override
+  String get settingsUpgradeUploading => 'Uploading...';
+
+  @override
+  String settingsUpgradeUploadFailed(String error) {
+    return 'Upload failed: $error';
+  }
+
+  @override
+  String get settingsUpgradeUploadConfirmChannel =>
+      'Channel switch confirmation';
+
+  @override
+  String settingsUpgradeUploadConfirmChannelContent(
+    String currentChannel,
+    String uploadChannel,
+    String version,
+  ) {
+    return 'Current channel is $currentChannel, uploaded file is $uploadChannel ($version). Confirm switching channel and upgrade?\n\nThe service will restart automatically.';
+  }
+
+  @override
+  String settingsUpgradeUploadConfirmNormal(String version, String channel) {
+    return 'Confirm upgrade to $version ($channel)?\n\nThe service will restart automatically.';
+  }
+
+  @override
+  String get settingsUpgradeUploadConfirm => 'Confirm upgrade';
+
+  @override
   String get settingsFrontendUpgradeCheckTimeout =>
       'Update check timed out. Try switching the proxy and retry.';
 

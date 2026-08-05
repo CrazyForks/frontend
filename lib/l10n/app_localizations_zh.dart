@@ -3748,6 +3748,37 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsUpgradeUpgradeNow => '立即升级';
 
   @override
+  String get settingsUpgradeUploadButton => '上传升级';
+
+  @override
+  String get settingsUpgradeUploading => '正在上传...';
+
+  @override
+  String settingsUpgradeUploadFailed(String error) {
+    return '上传失败: $error';
+  }
+
+  @override
+  String get settingsUpgradeUploadConfirmChannel => '通道切换确认';
+
+  @override
+  String settingsUpgradeUploadConfirmChannelContent(
+    String currentChannel,
+    String uploadChannel,
+    String version,
+  ) {
+    return '当前为$currentChannel，上传的文件为$uploadChannel ($version)，确认切换通道并升级？\n\n升级后服务将自动重启。';
+  }
+
+  @override
+  String settingsUpgradeUploadConfirmNormal(String version, String channel) {
+    return '确认升级到 $version ($channel)？\n\n升级后服务将自动重启。';
+  }
+
+  @override
+  String get settingsUpgradeUploadConfirm => '确认升级';
+
+  @override
   String get settingsFrontendUpgradeCheckTimeout => '检查更新超时，请尝试切换代理后重试';
 
   @override

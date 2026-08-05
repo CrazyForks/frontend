@@ -866,6 +866,21 @@ class UpgradeProgressNotifier extends Notifier<UpgradeProgress> {
     }
   }
 
+  /// 确认执行上传升级
+  Future<void> confirmUploadUpgrade() async {
+    try {
+      await _upgradeApi.confirmUploadUpgrade();
+      _startPolling();
+    } catch (e) {
+      state = UpgradeProgress(
+        status: 'error',
+        progress: 0,
+        message: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
   /// 刷新进度
   Future<void> refreshProgress() async {
     try {

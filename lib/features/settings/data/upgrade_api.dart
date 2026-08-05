@@ -157,7 +157,10 @@ class UpgradeProgress {
 
   /// 是否正在升级
   bool get isUpgrading =>
-      status == 'downloading' || status == 'testing' || status == 'replacing';
+      status == 'downloading' ||
+      status == 'uploading' ||
+      status == 'testing' ||
+      status == 'replacing';
 
   /// 是否完成（包括 restarting 状态，因为后端升级成功后会发送 restarting 然后进程退出）
   bool get isCompleted => status == 'completed' || status == 'restarting';
@@ -193,6 +196,39 @@ class UpgradeProgress {
 
   @override
   String toString() => 'UpgradeProgress(status: $status, progress: $progress%)';
+}
+
+/// 上传二进制文件的版本信息（/upgrade/upload 返回）
+class UploadedBinaryInfo {
+  final String version;
+  final String channel;
+  final String? buildTime;
+  final String? buildType;
+  final String currentVersion;
+  final String currentChannel;
+  final bool channelMismatch;
+
+  UploadedBinaryInfo({
+    required this.version,
+    required this.channel,
+    this.buildTime,
+    this.buildType,
+    required this.currentVersion,
+    required this.currentChannel,
+    required this.channelMismatch,
+  });
+
+  factory UploadedBinaryInfo.fromJson(Map<String, dynamic> json) {
+    return UploadedBinaryInfo(
+      version: json['version'] as String? ?? '',
+      channel: json['channel'] as String? ?? '',
+      buildTime: json['build_time'] as String?,
+      buildType: json['build_type'] as String?,
+      currentVersion: json['current_version'] as String? ?? '',
+      currentChannel: json['current_channel'] as String? ?? '',
+      channelMismatch: json['channel_mismatch'] as bool? ?? false,
+    );
+  }
 }
 
 /// 升级 API 服务
@@ -248,6 +284,39 @@ class UpgradeApi {
         data['github_proxy'] = githubProxy;
       }
       await dio.post('${AppConfig.apiPrefix}/upgrade/start', data: data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 上传二进制文件升级（阶段一）
+  /// POST /api/v1/upgrade/upload
+  /// 返回上传文件的版本信息，前端据此决定是否弹出二次确认
+  Future<UploadedBinaryInfo> uploadBinary(
+    List<int> fileBytes,
+    String fileName, {
+    void Function(int, int)? onSendProgress,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(fileBytes, filename: fileName),
+      });
+      final response = await dio.post(
+        '${AppConfig.apiPrefix}/upgrade/upload',
+        data: formData,
+        onSendProgress: onSendProgress,
+      );
+      return UploadedBinaryInfo.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// 确认执行上传升级（阶段二）
+  /// POST /api/v1/upgrade/upload/confirm
+  Future<void> confirmUploadUpgrade() async {
+    try {
+      await dio.post('${AppConfig.apiPrefix}/upgrade/upload/confirm');
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }

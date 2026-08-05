@@ -6769,6 +6769,52 @@ abstract class AppLocalizations {
   /// **'立即升级'**
   String get settingsUpgradeUpgradeNow;
 
+  /// No description provided for @settingsUpgradeUploadButton.
+  ///
+  /// In zh, this message translates to:
+  /// **'上传升级'**
+  String get settingsUpgradeUploadButton;
+
+  /// No description provided for @settingsUpgradeUploading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在上传...'**
+  String get settingsUpgradeUploading;
+
+  /// No description provided for @settingsUpgradeUploadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'上传失败: {error}'**
+  String settingsUpgradeUploadFailed(String error);
+
+  /// No description provided for @settingsUpgradeUploadConfirmChannel.
+  ///
+  /// In zh, this message translates to:
+  /// **'通道切换确认'**
+  String get settingsUpgradeUploadConfirmChannel;
+
+  /// No description provided for @settingsUpgradeUploadConfirmChannelContent.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前为{currentChannel}，上传的文件为{uploadChannel} ({version})，确认切换通道并升级？\n\n升级后服务将自动重启。'**
+  String settingsUpgradeUploadConfirmChannelContent(
+    String currentChannel,
+    String uploadChannel,
+    String version,
+  );
+
+  /// No description provided for @settingsUpgradeUploadConfirmNormal.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认升级到 {version} ({channel})？\n\n升级后服务将自动重启。'**
+  String settingsUpgradeUploadConfirmNormal(String version, String channel);
+
+  /// No description provided for @settingsUpgradeUploadConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认升级'**
+  String get settingsUpgradeUploadConfirm;
+
   /// No description provided for @settingsFrontendUpgradeCheckTimeout.
   ///
   /// In zh, this message translates to:

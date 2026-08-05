@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +33,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
   bool _isChecking = true;
   bool _isStarting = false;
   bool _isResetting = false;
+  bool _isUploading = false;
   String? _error;
   UpgradeCheck? _checkResult;
 
@@ -509,6 +511,86 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     );
   }
 
+  /// 上传二进制文件升级
+  Future<void> _uploadAndUpgrade() async {
+    final l10n = AppLocalizations.of(context);
+
+    // 选择文件
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || !mounted) return;
+
+    final file = result.files.first;
+    if (file.bytes == null) return;
+
+    setState(() {
+      _isUploading = true;
+      _error = null;
+    });
+
+    try {
+      final upgradeApi = ref.read(upgradeApiProvider);
+      final info = await upgradeApi.uploadBinary(file.bytes!, file.name);
+      if (!mounted) return;
+
+      // 弹出确认对话框（跨通道或同通道都确认）
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: Text(
+                info.channelMismatch
+                    ? l10n.settingsUpgradeUploadConfirmChannel
+                    : l10n.settingsUpgradeUploadConfirm,
+              ),
+              content: Text(
+                info.channelMismatch
+                    ? l10n.settingsUpgradeUploadConfirmChannelContent(
+                      info.currentChannel == 'dev'
+                          ? l10n.settingsUpgradeChannelDev
+                          : l10n.settingsUpgradeChannelStable,
+                      info.channel == 'dev'
+                          ? l10n.settingsUpgradeChannelDev
+                          : l10n.settingsUpgradeChannelStable,
+                      info.version,
+                    )
+                    : l10n.settingsUpgradeUploadConfirmNormal(
+                      info.version,
+                      info.channel == 'dev'
+                          ? l10n.settingsUpgradeChannelDev
+                          : l10n.settingsUpgradeChannelStable,
+                    ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(l10n.commonCancel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: Text(l10n.settingsUpgradeUploadConfirm),
+                ),
+              ],
+            ),
+      );
+
+      if (confirmed != true || !mounted) return;
+
+      // 确认后执行升级
+      await ref.read(upgradeProgressProvider.notifier).confirmUploadUpgrade();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = l10n.settingsUpgradeUploadFailed('$e'));
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
   /// 打开 GitHub Release 下载页面
   Future<void> _launchReleaseUrl() async {
     final releaseUrl =
@@ -578,7 +660,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
 
     // 检查时发生错误（已捕获）
     if (_error != null) {
-      return [
+      final actions = <Widget>[
         TextButton(
           onPressed: () => Navigator.pop(context),
           style: TextButton.styleFrom(
@@ -586,6 +668,32 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           ),
           child: Text(l10n.settingsUpgradeClose),
         ),
+      ];
+      // Docker 环境检查失败时提供上传升级入口
+      if (_checkResult?.isDocker ?? true) {
+        actions.add(
+          OutlinedButton.icon(
+            onPressed: _isUploading ? null : _uploadAndUpgrade,
+            style: OutlinedButton.styleFrom(
+              minimumSize: context.responsiveButtonMinSize,
+            ),
+            icon:
+                _isUploading
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Icon(Icons.upload_file, size: 18),
+            label: Text(
+              _isUploading
+                  ? l10n.settingsUpgradeUploading
+                  : l10n.settingsUpgradeUploadButton,
+            ),
+          ),
+        );
+      }
+      actions.add(
         FilledButton(
           onPressed: _checkUpgrade,
           style: FilledButton.styleFrom(
@@ -593,7 +701,8 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
           ),
           child: Text(l10n.commonRetry),
         ),
-      ];
+      );
+      return actions;
     }
 
     // 检查结果：有更新
@@ -619,7 +728,7 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
         ];
       }
 
-      // Docker 环境：显示"立即升级"按钮
+      // Docker 环境：显示"立即升级"和"上传升级"按钮
       return [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -627,6 +736,25 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
             minimumSize: context.responsiveButtonMinSize,
           ),
           child: Text(l10n.settingsUpgradeLater),
+        ),
+        OutlinedButton.icon(
+          onPressed: _isUploading ? null : _uploadAndUpgrade,
+          style: OutlinedButton.styleFrom(
+            minimumSize: context.responsiveButtonMinSize,
+          ),
+          icon:
+              _isUploading
+                  ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Icon(Icons.upload_file, size: 18),
+          label: Text(
+            _isUploading
+                ? l10n.settingsUpgradeUploading
+                : l10n.settingsUpgradeUploadButton,
+          ),
         ),
         FilledButton(
           onPressed: _isStarting ? null : _startUpgrade,
@@ -646,6 +774,37 @@ class _UpgradeDialogState extends ConsumerState<UpgradeDialog> {
     }
 
     if (_checkResult != null) {
+      // Docker 环境无更新时仍显示上传升级按钮（用户可能无法访问 GitHub）
+      if (_checkResult!.isDocker) {
+        return [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              minimumSize: context.responsiveButtonMinSize,
+            ),
+            child: Text(l10n.settingsUpgradeClose),
+          ),
+          OutlinedButton.icon(
+            onPressed: _isUploading ? null : _uploadAndUpgrade,
+            style: OutlinedButton.styleFrom(
+              minimumSize: context.responsiveButtonMinSize,
+            ),
+            icon:
+                _isUploading
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Icon(Icons.upload_file, size: 18),
+            label: Text(
+              _isUploading
+                  ? l10n.settingsUpgradeUploading
+                  : l10n.settingsUpgradeUploadButton,
+            ),
+          ),
+        ];
+      }
       return [
         TextButton(
           onPressed: () => Navigator.pop(context),
