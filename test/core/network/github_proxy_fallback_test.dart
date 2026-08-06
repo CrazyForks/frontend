@@ -50,6 +50,29 @@ void main() {
       expect(applyGithubProxy(raw, 'https://p.example.com'), proxied);
       expect(applyGithubProxy(raw, proxy), proxied);
     });
+
+    test('非 GitHub 域名不套代理', () {
+      const gitee = 'https://gitee.com/user/repo/raw/master/plugin.json';
+      expect(applyGithubProxy(gitee, proxy), gitee);
+
+      const example = 'https://example.com/some/path';
+      expect(applyGithubProxy(example, proxy), example);
+    });
+
+    test('GitHub 相关域名都套代理', () {
+      expect(
+        applyGithubProxy('https://raw.githubusercontent.com/a/b', proxy),
+        '${proxy}https://raw.githubusercontent.com/a/b',
+      );
+      expect(
+        applyGithubProxy('https://api.github.com/repos/a/b', proxy),
+        '${proxy}https://api.github.com/repos/a/b',
+      );
+      expect(
+        applyGithubProxy('https://foo.github.io/x', proxy),
+        '${proxy}https://foo.github.io/x',
+      );
+    });
   });
 
   group('withCacheBuster', () {

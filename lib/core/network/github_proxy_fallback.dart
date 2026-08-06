@@ -7,9 +7,23 @@ import 'package:flutter/foundation.dart';
 /// 抖动，若不降级，热更 manifest / 整包检查会静默失败。凡是「后端拉取」以外
 /// 的前端直连 GitHub 请求都应走这里，代理失败时自动用原始 URL 直连重试一次。
 
-/// 给 URL 套 GitHub 加速代理前缀（空/null 则原样返回），自动补结尾 `/`。
+/// 判断 URL 是否为 GitHub 相关域名（与后端 IsGitHubURL 保持一致）。
+bool _isGitHubUrl(String rawUrl) {
+  final uri = Uri.tryParse(rawUrl);
+  if (uri == null) return false;
+  final host = uri.host.toLowerCase();
+  return host == 'github.com' ||
+      host == 'raw.githubusercontent.com' ||
+      host == 'objects.githubusercontent.com' ||
+      host == 'api.github.com' ||
+      host.endsWith('.github.io');
+}
+
+/// 给 URL 套 GitHub 加速代理前缀。仅对 GitHub 相关域名生效，非 GitHub
+/// URL（如 gitee.com）原样返回，避免错误代理导致请求失败。
 String applyGithubProxy(String rawUrl, String? proxy) {
   if (proxy == null || proxy.isEmpty) return rawUrl;
+  if (!_isGitHubUrl(rawUrl)) return rawUrl;
   final prefix = proxy.endsWith('/') ? proxy : '$proxy/';
   return '$prefix$rawUrl';
 }
