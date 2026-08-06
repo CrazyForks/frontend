@@ -3501,6 +3501,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsHlsProxyDisabled => '已关闭 HLS 代理';
 
   @override
+  String get settingsVolumeNormalizeTitle => '音量均衡';
+
+  @override
+  String get settingsVolumeNormalizeSubtitle =>
+      '启用 EBU R128 响度均衡，消除不同音源之间的音量差异。需要 ffmpeg，会增加 CPU 和首次播放延迟';
+
+  @override
+  String get settingsVolumeNormalizeEnabled => '已开启音量均衡';
+
+  @override
+  String get settingsVolumeNormalizeDisabled => '已关闭音量均衡';
+
+  @override
   String get settingsProxyAllowlistTitle => '私网代理白名单';
 
   @override

@@ -3659,6 +3659,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsHlsProxyDisabled => 'HLS proxy disabled';
 
   @override
+  String get settingsVolumeNormalizeTitle => 'Volume normalization';
+
+  @override
+  String get settingsVolumeNormalizeSubtitle =>
+      'Enable EBU R128 loudness normalization to equalize volume across different audio sources. Requires ffmpeg; increases CPU usage and first-play latency';
+
+  @override
+  String get settingsVolumeNormalizeEnabled => 'Volume normalization enabled';
+
+  @override
+  String get settingsVolumeNormalizeDisabled => 'Volume normalization disabled';
+
+  @override
   String get settingsProxyAllowlistTitle => 'Private network proxy allowlist';
 
   @override

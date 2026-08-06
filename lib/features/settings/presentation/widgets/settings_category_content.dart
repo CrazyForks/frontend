@@ -535,6 +535,8 @@ class _SettingsCategoryContentState
             },
           ),
           const Divider(height: 1),
+          _buildVolumeNormalizeTile(),
+          const Divider(height: 1),
           // 打开客户端后自动播放（纯本地设置）
           SwitchListTile(
             secondary: const Icon(Icons.play_arrow_outlined),
@@ -1263,6 +1265,43 @@ class _SettingsCategoryContentState
       onChanged:
           (value) =>
               ref.read(autoUpdateCheckProvider.notifier).setEnabled(value),
+    );
+  }
+
+  Widget _buildVolumeNormalizeTile() {
+    final l10n = AppLocalizations.of(context);
+    final enabledAsync = ref.watch(volumeNormalizeProvider);
+    final enabled = enabledAsync.value ?? false;
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.graphic_eq_outlined),
+      title: Text(l10n.settingsVolumeNormalizeTitle),
+      subtitle: Text(l10n.settingsVolumeNormalizeSubtitle),
+      value: enabled,
+      onChanged:
+          enabledAsync.isLoading
+              ? null
+              : (value) async {
+                try {
+                  await ref
+                      .read(volumeNormalizeProvider.notifier)
+                      .setValue(value);
+                  if (!mounted) return;
+                  ResponsiveSnackBar.show(
+                    context,
+                    message:
+                        value
+                            ? l10n.settingsVolumeNormalizeEnabled
+                            : l10n.settingsVolumeNormalizeDisabled,
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ResponsiveSnackBar.showError(
+                    context,
+                    message: l10n.settingsSaveFailed(e.toString()),
+                  );
+                }
+              },
     );
   }
 

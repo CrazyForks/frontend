@@ -400,6 +400,31 @@ class SettingsApi {
 
   // ---------- 私网代理白名单（/proxy 允许代理的内网地址） ----------
 
+  // ---------- 音量均衡 ----------
+
+  Future<bool> getVolumeNormalizeEnabled() async {
+    try {
+      final response = await dio.get(
+        '${AppConfig.apiPrefix}/settings/volume-normalize',
+      );
+      final data = response.data as Map<String, dynamic>;
+      return data['enabled'] as bool? ?? false;
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  Future<void> setVolumeNormalizeEnabled(bool enabled) async {
+    try {
+      await dio.put(
+        '${AppConfig.apiPrefix}/settings/volume-normalize',
+        data: {'enabled': enabled},
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   /// 获取私网代理白名单条目（单 IP 或 CIDR 网段字符串）。
   Future<List<String>> getProxyPrivateAllowlist() async {
     try {

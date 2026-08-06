@@ -604,6 +604,43 @@ final hlsProxyEnabledProvider =
     );
 
 // ============================================================================
+// 音量均衡 Provider
+// ============================================================================
+
+/// EBU R128 音量均衡开关。
+/// 启用后服务端对不含显式 normalize 参数的播放请求自动执行 loudnorm 滤镜，
+/// 消除不同音源之间的响度落差。需要 ffmpeg，会增加 CPU 和首次播放延迟。
+/// 业务端点：GET/PUT /api/v1/settings/volume-normalize
+class VolumeNormalizeNotifier extends AsyncNotifier<bool> {
+  @override
+  Future<bool> build() async {
+    final api = ref.watch(settingsApiProvider);
+    try {
+      return await api.getVolumeNormalizeEnabled();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> setValue(bool value) async {
+    state = AsyncValue.data(value);
+    try {
+      final api = ref.read(settingsApiProvider);
+      await api.setVolumeNormalizeEnabled(value);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+}
+
+/// 音量均衡开关 Provider
+final volumeNormalizeProvider =
+    AsyncNotifierProvider<VolumeNormalizeNotifier, bool>(
+      VolumeNormalizeNotifier.new,
+    );
+
+// ============================================================================
 // 私网代理白名单 Provider
 // ============================================================================
 

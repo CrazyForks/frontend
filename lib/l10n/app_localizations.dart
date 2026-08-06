@@ -6337,6 +6337,30 @@ abstract class AppLocalizations {
   /// **'已关闭 HLS 代理'**
   String get settingsHlsProxyDisabled;
 
+  /// No description provided for @settingsVolumeNormalizeTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'音量均衡'**
+  String get settingsVolumeNormalizeTitle;
+
+  /// No description provided for @settingsVolumeNormalizeSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用 EBU R128 响度均衡，消除不同音源之间的音量差异。需要 ffmpeg，会增加 CPU 和首次播放延迟'**
+  String get settingsVolumeNormalizeSubtitle;
+
+  /// No description provided for @settingsVolumeNormalizeEnabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已开启音量均衡'**
+  String get settingsVolumeNormalizeEnabled;
+
+  /// No description provided for @settingsVolumeNormalizeDisabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已关闭音量均衡'**
+  String get settingsVolumeNormalizeDisabled;
+
   /// No description provided for @settingsProxyAllowlistTitle.
   ///
   /// In zh, this message translates to:
