@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
 
@@ -14,6 +15,7 @@ import '../../settings/presentation/providers/settings_provider.dart';
 import 'plugin_host_dispatch.dart';
 import 'plugin_iframe_diagnostics.dart';
 import 'plugin_theme_utils.dart';
+import 'render/plugin_color_scheme.dart';
 
 /// JS `Object.is` —— 用于精确比较两个 JS 对象引用（判断消息是否来自本 iframe）。
 @JS('Object.is')
@@ -44,6 +46,10 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
   web.HTMLIFrameElement? _iframe;
   String? _lastTheme;
 
+  /// `build()` 里读 `Theme.of(context)` 存下来，iframe 的 `load` 回调里复用。
+  ColorScheme? _colorScheme;
+  String? _lastPushedThemeSig;
+
   // 客户端 SDK 桥接（iframe ↔ 宿主）
   StreamSubscription<web.MessageEvent>? _msgSub;
   PluginHostDispatcher? _dispatcher;
@@ -61,13 +67,26 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
     return '$baseUrl?${params.join('&')}';
   }
 
-  void _sendThemeToPlugin(String theme) {
-    final iframe = _iframe;
-    if (iframe == null) return;
-    final contentWindow = iframe.contentWindow;
+  /// 亮暗标记 + 宿主真实色板下推（见 `render/plugin_color_scheme.dart`）。
+  /// 载荷即去重签名，与原生两条链路同一手法。
+  ///
+  /// 首屏也要推：`?theme=` 只能带 light/dark 两个字，色板**没有 URL 通道**，
+  /// 不在 iframe `load` 之后补推就永久停在 `common.css` 的静态兜底色上。
+  /// iframe 还没建好时 `contentWindow` 为 null，此时直接返回且**不写签名**，
+  /// 留给 load 回调补推。
+  void _syncTheme() {
+    final contentWindow = _iframe?.contentWindow;
     if (contentWindow == null) return;
-    final msg = {'type': 'songloft-theme', 'theme': theme}.jsify();
-    contentWindow.postMessage(msg, '*'.toJS);
+    final cs = _colorScheme;
+    final payload = <String, dynamic>{
+      'type': 'songloft-theme',
+      'theme': _lastTheme ?? 'light',
+      if (cs != null) 'colors': pluginColorSchemeMap(cs),
+    };
+    final sig = jsonEncode(payload);
+    if (sig == _lastPushedThemeSig) return;
+    _lastPushedThemeSig = sig;
+    contentWindow.postMessage(payload.jsify(), '*'.toJS);
   }
 
   @override
@@ -92,6 +111,16 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
               ..style.width = '100%'
               ..style.height = '100%';
         state._iframe = iframe;
+        // 文档就绪后补推色板（没有 URL 通道，见 `_syncTheme`）。
+        // 重新查一次 `_activeStates` 而不是用闭包捕获的 `state`：本 factory 只注册
+        // 一次、重挂时会被再调用产生新 iframe，老 iframe 的这个监听器仍活着，
+        // 直接用旧 state 会打到已 dispose 的对象上。
+        iframe.onLoad.listen((_) {
+          final s = _activeStates[entryPath];
+          if (s == null || s._iframe != iframe) return;
+          s._lastPushedThemeSig = null;
+          s._syncTheme();
+        });
         // #278 抖动诊断（仅 flutter.web_debug_console=true 时生效，生产零副作用）
         attachPluginIframeDiagnostics(iframe, 'tab:$entryPath', viewId);
         return iframe;
@@ -163,12 +192,11 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
       _pushPlayerState(next);
     });
 
-    if (_lastTheme == null) {
-      _lastTheme = theme;
-    } else if (_lastTheme != theme) {
-      _lastTheme = theme;
-      _sendThemeToPlugin(theme);
-    }
+    // `_lastTheme` 必须在 iframe factory 跑之前就位 —— URL 的 ?theme= 从它取值。
+    _lastTheme = theme;
+    _colorScheme = Theme.of(context).colorScheme;
+    // 无条件调用，由 `_syncTheme` 内部去重（换主题包时 theme 不变而色板变了）。
+    _syncTheme();
 
     return HtmlElementView(viewType: _viewType);
   }

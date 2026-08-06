@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart' show CupertinoTheme, CupertinoThemeData;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import '../../../player/domain/player_state.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../plugin_host_dispatch.dart';
 import 'elements/songloft_custom_elements.dart';
+import 'plugin_color_scheme.dart';
 import 'plugin_file_bridge.dart';
 import 'plugin_render_controller.dart';
 import 'plugin_render_fonts.dart';
@@ -137,6 +139,12 @@ class _PluginRenderSurfaceWebFState
   EdgeInsets _safeAreaInsets = EdgeInsets.zero;
   String? _lastPushedInsetsSig;
 
+  /// 同上的两段式，用于「亮暗标记 + 真实色板」下推（见 `plugin_color_scheme.dart`）。
+  /// `build()` 里读 `Theme.of(context)` 存下来，`_markPageReady()` 那种拿不到
+  /// context 的地方复用。
+  ColorScheme? _colorScheme;
+  String? _lastPushedThemeSig;
+
   /// controller 缓存键。用**去掉 query 的 URL**：`?theme=` 会随主题变化，
   /// 带上它会让切主题变成「换了一个插件」从而整页重载。
   static String _controllerNameFor(String url) =>
@@ -247,10 +255,10 @@ class _PluginRenderSurfaceWebFState
     // onLoadStop 会 setState 父级，不能在 initState 里同步调。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // 主题必须补推一次：页面没有重载，而离开这段时间里用户可能换过主题，
-      // URL 的 ?theme= 只在真正加载时起作用，`didUpdateWidget` 也不会为
-      // 「新 State 的首帧」触发。
-      _pushToPage("{type:'songloft-theme',theme:'${widget.theme}'}");
+      // 主题（亮暗 + 色板）必须补推一次：页面没有重载，而离开这段时间里用户可能
+      // 换过主题，URL 的 ?theme= 只在真正加载时起作用，`didUpdateWidget` 也不会为
+      // 「新 State 的首帧」触发。补推由紧随其后的 `_markPageReady()` 完成 ——
+      // 它清签名再调 `_syncTheme()`，本 State 是新的所以必然真推一次。
       widget.onControllerReady(this);
       _markPageReady();
     });
@@ -275,16 +283,20 @@ class _PluginRenderSurfaceWebFState
     // 清签名而不是直接推：让 `_syncSafeArea` 里那条去重判断照常生效。
     _lastPushedInsetsSig = null;
     _syncSafeArea(_safeAreaInsets);
+    // 色板同理，而且比安全区更不能省：它**没有** URL 兜底通道（`?theme=` 只带
+    // light/dark），页面重挂后不补推就永久停在 common.css 的静态色上。
+    _lastPushedThemeSig = null;
+    _syncTheme();
     widget.onLoadStop();
   }
 
   @override
   void didUpdateWidget(covariant PluginRenderSurfaceWebF oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 首屏主题靠 URL 的 ?theme= 参数，这里只处理运行中的切换。
-    if (oldWidget.theme != widget.theme && _pageReady) {
-      _pushToPage("{type:'songloft-theme',theme:'${widget.theme}'}");
-    }
+    // 首屏亮暗靠 URL 的 ?theme=、首屏色板靠 common.css 兜底，这里只处理运行中的
+    // 切换。无条件调用，由 `_syncTheme` 内部去重（切主题包时 `widget.theme` 可能
+    // 不变而色板变了，按 theme 比较会漏推）。
+    _syncTheme();
     // 换插件才需要换整棵 WebF 子树（缓存理由见 `_webfChild`）。
     //
     // 判据刻意是**去掉 query 的 URL**，不是 `widget.url` 整串：`?theme=` 与
@@ -531,6 +543,28 @@ class _PluginRenderSurfaceWebFState
   /// `SafeArea(bottom: false)`），而 Flutter 的 `MediaQuery.removePadding` 会把
   /// `viewPadding` 一并按已消费的 `padding` 扣减，所以这里读到的正是**剩给页面
   /// 自己处理**的那部分 —— 上层已经让开的边不会被重复内缩。
+  /// 亮暗标记 + 宿主真实色板下推。
+  ///
+  /// 色板必须走消息而不能走 URL：`?theme=` 只带 light/dark 两个字，而
+  /// `ColorScheme` 有三十来个角色色、还会被 ThemePack 整体换掉。首帧靠
+  /// `common.css` 的静态兜底（值由同一个默认 seed 导出，所以不会闪成另一套颜色）。
+  ///
+  /// **载荷本身就是去重签名** —— 与 `_insetsSignature` 同一手法，两者不可能不一致。
+  /// 去重是必需的：`Theme` 是 InheritedWidget，祖先任何重建都会让 `build()` 再跑，
+  /// 不去重就是每帧一次 `evaluateJavaScripts`（一次还带三十几个颜色的 JSON）。
+  void _syncTheme() {
+    if (!_pageReady) return;
+    final cs = _colorScheme;
+    // cs 为 null 只可能是「ready 回调跑在首次 build 之前」这种理论情况；
+    // 此时退化成只推亮暗标记，颜色留给 common.css 的兜底值，不能因此不推主题。
+    final colors =
+        cs == null ? '' : ',colors:${jsonEncode(pluginColorSchemeMap(cs))}';
+    final payload = "{type:'songloft-theme',theme:'${widget.theme}'$colors}";
+    if (payload == _lastPushedThemeSig) return;
+    _lastPushedThemeSig = payload;
+    _pushToPage(payload);
+  }
+
   void _syncSafeArea(EdgeInsets insets) {
     _safeAreaInsets = insets;
     if (!_pageReady) return;
@@ -614,6 +648,9 @@ class _PluginRenderSurfaceWebFState
     // 在 build() 里读，是为了建立 MediaQuery 依赖：转屏 / 进退全屏 / 键盘弹出
     // 都会让本 widget 重建，从而自动重推。去重在 `_syncSafeArea` 内部做。
     _syncSafeArea(MediaQuery.viewPaddingOf(context));
+    // 同理建立 Theme 依赖：切亮暗 / 换主题包都会让本 widget 重建并自动重推。
+    _colorScheme = Theme.of(context).colorScheme;
+    _syncTheme();
 
     return FutureBuilder<void>(
       // 图标字体必须在渲染面出字之前注册好，否则首屏图标是豆腐块。
@@ -624,48 +661,83 @@ class _PluginRenderSurfaceWebFState
           return const SizedBox.expand();
         }
         // 复用同一个 widget 实例，理由见 `_webfChild` 的注释。
-        return _webfChild ??= WebF.fromControllerName(
-          controllerName: _controllerName,
-          bundle: WebFBundle.fromUrl(widget.url),
-          createController: _createController,
-          // ⚠️ 只在**新建** controller 时回调，命中进程内缓存时不会跑。
-          // 缓存命中那条路由 `_adoptPreloadedController()` 处理，两边要一起改。
-          onControllerCreated: (controller) {
-            // 被淘汰后重建时 createController 不一定再跑，这里兜住引用与桥。
-            _controller = controller;
-            controller.javascriptChannel.onMethodCall = _onMethodCall;
-            // delegate 同理要重设：没有它页面里的外链会退回上游那个「无条件
-            // cancel」的默认处理器 —— 表现是「重挂之后点外链没反应」，
-            // 而首次挂载时是好的，极难归因。
-            _installNavigationDelegate(controller);
-            widget.onControllerReady(this);
-          },
-          // 「页面已就绪」的**主信号**，不要只依赖 `onLoad`。
-          //
-          // `onLoad` 由 `checkCompleted()` → `dispatchWindowLoadEvent()` 触发，而
-          // `checkCompleted()`（webf `controller.dart:1718`）有四道 early-return：
-          // `document.parsing` / `isDelayingDOMContentLoadedEvent` /
-          // `hasPendingRequest` / `isDelayingLoadEvent`。任一条命中就直接 return，
-          // 之后**没有任何东西保证它会被再调一次** —— 实测同一个页面首次挂载
-          // `onLoad` 正常、第二次挂载（响应从 ~279ms 变成 ~6ms）就再也不来，
-          // 表现是页面其实画好了、JS 也跑完了，却被 20s 超时定时器换成
-          // 「页面加载失败」（songloft-org/songloft#341）。
-          //
-          // `onBuildSuccess` 相反：它在 `buildRootView()` 真的把根视图建出来之后
-          // post-frame 回调，且**只在成功分支**调（webf `widget/webf.dart:673 / :723`，
-          // 各种 error 分支都不调）。这正是我们要表达的语义 —— 「页面画出来了」。
-          //
-          // 会重复回调（每次 `buildRootView` 都调），`onLoadStop` 与
-          // `_markPageReady` 都是幂等的。
-          onBuildSuccess: _markPageReady,
-          loadingWidget: const SizedBox.expand(),
-          errorBuilder: (context, error) {
-            // 交给 PluginRenderView 统一的错误 UI，这里不自绘。
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) widget.onError(error?.toString() ?? 'WebF error');
-            });
-            return const SizedBox.expand();
-          },
+        final webfChild =
+            _webfChild ??= WebF.fromControllerName(
+              controllerName: _controllerName,
+              bundle: WebFBundle.fromUrl(widget.url),
+              createController: _createController,
+              // ⚠️ 只在**新建** controller 时回调，命中进程内缓存时不会跑。
+              // 缓存命中那条路由 `_adoptPreloadedController()` 处理，两边要一起改。
+              onControllerCreated: (controller) {
+                // 被淘汰后重建时 createController 不一定再跑，这里兜住引用与桥。
+                _controller = controller;
+                controller.javascriptChannel.onMethodCall = _onMethodCall;
+                // delegate 同理要重设：没有它页面里的外链会退回上游那个「无条件
+                // cancel」的默认处理器 —— 表现是「重挂之后点外链没反应」，
+                // 而首次挂载时是好的，极难归因。
+                _installNavigationDelegate(controller);
+                widget.onControllerReady(this);
+              },
+              // 「页面已就绪」的**主信号**，不要只依赖 `onLoad`。
+              //
+              // `onLoad` 由 `checkCompleted()` → `dispatchWindowLoadEvent()` 触发，而
+              // `checkCompleted()`（webf `controller.dart:1718`）有四道 early-return：
+              // `document.parsing` / `isDelayingDOMContentLoadedEvent` /
+              // `hasPendingRequest` / `isDelayingLoadEvent`。任一条命中就直接 return，
+              // 之后**没有任何东西保证它会被再调一次** —— 实测同一个页面首次挂载
+              // `onLoad` 正常、第二次挂载（响应从 ~279ms 变成 ~6ms）就再也不来，
+              // 表现是页面其实画好了、JS 也跑完了，却被 20s 超时定时器换成
+              // 「页面加载失败」（songloft-org/songloft#341）。
+              //
+              // `onBuildSuccess` 相反：它在 `buildRootView()` 真的把根视图建出来之后
+              // post-frame 回调，且**只在成功分支**调（webf `widget/webf.dart:673 / :723`，
+              // 各种 error 分支都不调）。这正是我们要表达的语义 —— 「页面画出来了」。
+              //
+              // 会重复回调（每次 `buildRootView` 都调），`onLoadStop` 与
+              // `_markPageReady` 都是幂等的。
+              onBuildSuccess: _markPageReady,
+              loadingWidget: const SizedBox.expand(),
+              errorBuilder: (context, error) {
+                // 交给 PluginRenderView 统一的错误 UI，这里不自绘。
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    widget.onError(error?.toString() ?? 'WebF error');
+                  }
+                });
+                return const SizedBox.expand();
+              },
+            );
+
+        // ── 让 webf-ui 原生控件跟随**插件页主题**，而不是操作系统外观 ──────────
+        //
+        // `<flutter-cupertino-*>` 是真正的 Cupertino widget，它们的默认色是
+        // `CupertinoColors.systemGrey6.resolveFrom(context)` 这类**动态色**
+        // （`webf_cupertino_ui/input.dart:330`：输入框无 CSS 背景时的底色）。
+        // `resolveFrom` 先读 `CupertinoTheme.maybeBrightnessOf(context)`，取不到
+        // 才回落 `MediaQuery.platformBrightness`（= 操作系统的深浅色）。
+        //
+        // 而这条渲染路径此前**没有任何 CupertinoTheme 祖先**，于是原生控件一律按
+        // **系统外观**取色：系统深色 + 应用浅色主题时，输入框是深的、页面 CSS
+        // （`--md-*`，跟随应用主题）是浅的 —— 半亮半暗；且切换应用主题时原生控件
+        // 纹丝不动（`platformBrightness` 只随系统变），只有重启客户端（重新加载、
+        // 首帧就带对的系统/主题组合）才碰巧一致（songloft-org/songloft#341）。
+        //
+        // 在此注入一个 brightness = 插件页主题 的 `CupertinoTheme`：
+        //   · `resolveFrom` 命中它 → 原生控件底色/描边跟随 `widget.theme`；
+        //   · 它是 InheritedWidget，切主题时 `widget.theme` 变 → 本 widget 重建 →
+        //     新的 CupertinoThemeData → 依赖它的原生控件收到通知重算，实时跟随；
+        //   · 包在**外层**、child 仍是缓存的 `_webfChild` 同一实例 →
+        //     `Element.updateChild` 照旧短路 WebF 子树，缓存语义不受影响
+        //     （只是多一层极轻的 InheritedWidget）。
+        // 只设 brightness：primaryColor 等留默认。downloader 的按钮走 plain + CSS
+        // 配色（见主仓 docs/webf/handoff.md 第 23 条），开关主色由插件用
+        // getColorScheme() 显式喂 activeColor，都不依赖 CupertinoTheme.primaryColor。
+        return CupertinoTheme(
+          data: CupertinoThemeData(
+            brightness:
+                widget.theme == 'dark' ? Brightness.dark : Brightness.light,
+          ),
+          child: webfChild,
         );
       },
     );

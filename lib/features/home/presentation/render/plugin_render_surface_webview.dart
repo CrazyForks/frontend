@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -8,6 +9,7 @@ import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/utils/webview_environment.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../plugin_host_bridge.dart';
+import 'plugin_color_scheme.dart';
 import 'plugin_render_controller.dart';
 
 /// `flutter_inappwebview` 渲染面（songloft-org/songloft#341 抽层前的原实现）。
@@ -59,16 +61,32 @@ class _PluginRenderSurfaceWebViewState
   InAppWebViewController? _controller;
   bool _pageReady = false;
 
+  /// `build()` 里读 `Theme.of(context)` 存下来，`onLoadStop` 那种拿不到 context 的
+  /// 回调里复用。与 WebF 面的同名字段一一对应。
+  ColorScheme? _colorScheme;
+  String? _lastPushedThemeSig;
+
   @override
   void didUpdateWidget(covariant PluginRenderSurfaceWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 首屏主题靠 URL 的 ?theme= 参数，这里只处理运行中的切换。
-    if (oldWidget.theme != widget.theme && _pageReady) {
-      _controller?.evaluateJavascript(
-        source:
-            "window.postMessage({type:'songloft-theme',theme:'${widget.theme}'},'*')",
-      );
-    }
+    // 首屏亮暗靠 URL 的 ?theme=、首屏色板靠 common.css 兜底，这里只处理运行中的
+    // 切换。无条件调用，由 `_syncTheme` 内部去重（换主题包时 `widget.theme` 可能
+    // 不变而色板变了，按 theme 比较会漏推）。
+    _syncTheme();
+  }
+
+  /// 亮暗标记 + 宿主真实色板下推，与 `PluginRenderSurfaceWebF._syncTheme` 对等
+  /// （载荷本身当去重签名）。色板必须走消息：`?theme=` 只带 light/dark 两个字，
+  /// 而 `ColorScheme` 有三十来个角色色、还会被 ThemePack 整体换掉。
+  void _syncTheme() {
+    if (!_pageReady) return;
+    final cs = _colorScheme;
+    final colors =
+        cs == null ? '' : ',colors:${jsonEncode(pluginColorSchemeMap(cs))}';
+    final payload = "{type:'songloft-theme',theme:'${widget.theme}'$colors}";
+    if (payload == _lastPushedThemeSig) return;
+    _lastPushedThemeSig = payload;
+    _controller?.evaluateJavascript(source: "window.postMessage($payload,'*')");
   }
 
   // ── PluginRenderController ──────────────────────────────────────────
@@ -102,6 +120,9 @@ class _PluginRenderSurfaceWebViewState
   @override
   Widget build(BuildContext context) {
     listenPlayerState();
+    // 在 build() 里读是为了建立 Theme 依赖：切亮暗 / 换主题包都会让本 widget
+    // 重建并自动重推。去重在 `_syncTheme` 内部做。
+    _colorScheme = Theme.of(context).colorScheme;
 
     final tokenScript = _buildTokenInjectionScript();
 
@@ -135,6 +156,10 @@ class _PluginRenderSurfaceWebViewState
       },
       onLoadStop: (controller, url) {
         _pageReady = true;
+        // 色板没有 URL 兜底通道（`?theme=` 只带 light/dark），每次加载完都要补推，
+        // 否则页面停在 common.css 的静态色上。清签名让去重判断照常生效。
+        _lastPushedThemeSig = null;
+        _syncTheme();
         widget.onLoadStop();
       },
       onReceivedError: (controller, request, error) {
