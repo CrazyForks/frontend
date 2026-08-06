@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../config/app_config.dart';
 import '../../../../core/network/api_exceptions.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -703,8 +704,11 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
 
   Widget _buildIcon(RegistryPluginEntry entry, ThemeData theme) {
     if (entry.icon != null && entry.icon!.isNotEmpty) {
-      final url = entry.icon!;
-      final isSvg = url.toLowerCase().endsWith('.svg');
+      final rawIcon = entry.icon!;
+      final isSvg = rawIcon.toLowerCase().endsWith('.svg');
+      final url = rawIcon.startsWith('/')
+          ? '${AppConfig.baseUrl}${AppConfig.basePath}$rawIcon'
+          : rawIcon;
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child:
