@@ -27,9 +27,17 @@ mkdir -p "$OUT"
 
 # ── 1. 组合 docroot ──────────────────────────────────────────────
 # 不能把 probe.html 放进 $ASSETS：那个目录被 //go:embed assets/* 嵌进 Go 二进制。
-[ -f "$ASSETS/common.css" ] || { echo "找不到 $ASSETS/common.css，检查 /repo 挂载" >&2; exit 1; }
+for asset in theme.css components.css webf-shims.css common.js webf-shims.js; do
+  [ -f "$ASSETS/$asset" ] || {
+    echo "找不到 $ASSETS/$asset，检查 /repo 挂载" >&2; exit 1;
+  }
+done
 rm -rf "$DOCROOT" && mkdir -p "$DOCROOT"
 cp -r "$ASSETS/." "$DOCROOT/"
+# probe.html 历史上只加载 common.css。公共资源拆分后，在探针 docroot 内按后端注入顺序
+# 合成同名兼容文件，确保既有探针判据继续覆盖三层真实 CSS；真实插件页不使用该文件。
+cat "$DOCROOT/theme.css" "$DOCROOT/components.css" "$DOCROOT/webf-shims.css" \
+  > "$DOCROOT/common.css"
 cp /opt/probe.html "$DOCROOT/probe.html"
 cp /opt/probe-after.css "$DOCROOT/probe-after.css"
 
