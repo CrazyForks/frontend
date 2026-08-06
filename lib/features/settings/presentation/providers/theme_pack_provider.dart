@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../data/theme_pack_api.dart';
 
@@ -57,6 +58,12 @@ final activeThemePackProvider =
 class ActiveThemePackNotifier extends AsyncNotifier<ThemePack?> {
   @override
   Future<ThemePack?> build() async {
+    // 未登录时不请求主题包，直接用默认主题：避免启动页/登录页发出无 token 的
+    // GET /theme-packs/active 触发 401。登录成功后 isAuthenticatedProvider 变化
+    // 会自动重建本 Provider 触发拉取，登出后又回落默认主题。
+    if (!ref.watch(isAuthenticatedProvider)) {
+      return null;
+    }
     final api = ref.watch(themePackApiProvider);
     try {
       return await api.getActiveThemePack();
