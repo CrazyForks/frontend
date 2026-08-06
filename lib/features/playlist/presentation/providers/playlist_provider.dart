@@ -369,7 +369,6 @@ class PaginatedSongsNotifier extends AsyncNotifier<PaginatedSongsState> {
   /// 搜索歌单内歌曲
   Future<void> search(String keyword) async {
     _keyword = keyword;
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => build());
   }
 

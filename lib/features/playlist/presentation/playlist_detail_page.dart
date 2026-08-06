@@ -72,6 +72,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
   /// 搜索状态
   bool _isSearchMode = false;
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   Timer? _debounceTimer;
 
   @override
@@ -94,6 +95,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _debounceTimer?.cancel();
     super.dispose();
   }
@@ -108,7 +110,11 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
   void _toggleSearch() {
     setState(() {
       _isSearchMode = !_isSearchMode;
-      if (!_isSearchMode) {
+      if (_isSearchMode) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _searchFocusNode.requestFocus();
+        });
+      } else {
         _searchController.clear();
         _debounceTimer?.cancel();
         ref.read(playlistSongsProvider(_playlistIdInt).notifier).search('');
@@ -1374,7 +1380,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
       ),
       child: TextField(
         controller: _searchController,
-        autofocus: true,
+        focusNode: _searchFocusNode,
         decoration: InputDecoration(
           prefixIcon: const Icon(Icons.search),
           suffixIcon:
