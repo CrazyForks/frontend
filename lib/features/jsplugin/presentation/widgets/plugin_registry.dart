@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../../config/app_config.dart';
 import '../../../../core/network/api_exceptions.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/utils/url_helper.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/utils/responsive_snackbar.dart';
 import '../../../settings/data/settings_api.dart';
@@ -725,10 +725,7 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
     if (entry.icon != null && entry.icon!.isNotEmpty) {
       final rawIcon = entry.icon!;
       final isSvg = rawIcon.toLowerCase().endsWith('.svg');
-      final url =
-          rawIcon.startsWith('/')
-              ? '${AppConfig.baseUrl}${AppConfig.basePath}$rawIcon'
-              : rawIcon;
+      final url = UrlHelper.buildResourceUrl(rawIcon);
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child:
