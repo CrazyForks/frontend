@@ -371,12 +371,9 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
           context.go(activeDest.indexToRoute[index]);
         }
       },
-      // 插件/设置页默认隐藏播放器以让出空间；但超宽屏（auto）用的是右侧竖排面板，
-      // 横向空间充足，这两类页面也保留播放器
+      // 插件/设置页隐藏播放器以让出空间（含超宽屏 auto 模式）
       bottomPlayer:
-          (!context.isAuto && (isPluginTab || isSettings))
-              ? null
-              : _buildBottomPlayer(context),
+          (isPluginTab || isSettings) ? null : _buildBottomPlayer(context),
       playlistDrawer: showPlaylistDrawer ? const PlaylistDrawer() : null,
     );
 
