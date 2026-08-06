@@ -110,11 +110,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
   void _toggleSearch() {
     setState(() {
       _isSearchMode = !_isSearchMode;
-      if (_isSearchMode) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _searchFocusNode.requestFocus();
-        });
-      } else {
+      if (!_isSearchMode) {
         _searchController.clear();
         _debounceTimer?.cancel();
         ref.read(playlistSongsProvider(_playlistIdInt).notifier).search('');
@@ -1381,6 +1377,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
       child: TextField(
         controller: _searchController,
         focusNode: _searchFocusNode,
+        autofocus: true,
         decoration: InputDecoration(
           prefixIcon: const Icon(Icons.search),
           suffixIcon:
