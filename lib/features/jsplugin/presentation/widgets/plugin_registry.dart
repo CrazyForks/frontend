@@ -418,15 +418,34 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
       );
     }
     if (_pluginResponse == null || _pluginResponse!.plugins.isEmpty) {
-      return Center(
-        child: Text(
-          _searchText.isNotEmpty
-              ? l10n.jspluginNoMatch
-              : l10n.jspluginRegistryEmpty,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.outline,
+      return Column(
+        children: [
+          if (_pluginResponse != null && _pluginResponse!.warnings.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: theme.colorScheme.errorContainer,
+              child: Text(
+                _pluginResponse!.warnings.join('\n'),
+                style: TextStyle(
+                  color: theme.colorScheme.onErrorContainer,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          Expanded(
+            child: Center(
+              child: Text(
+                _searchText.isNotEmpty
+                    ? l10n.jspluginNoMatch
+                    : l10n.jspluginRegistryEmpty,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       );
     }
 
@@ -706,9 +725,10 @@ class _RegistryPluginItemState extends ConsumerState<_RegistryPluginItem> {
     if (entry.icon != null && entry.icon!.isNotEmpty) {
       final rawIcon = entry.icon!;
       final isSvg = rawIcon.toLowerCase().endsWith('.svg');
-      final url = rawIcon.startsWith('/')
-          ? '${AppConfig.baseUrl}${AppConfig.basePath}$rawIcon'
-          : rawIcon;
+      final url =
+          rawIcon.startsWith('/')
+              ? '${AppConfig.baseUrl}${AppConfig.basePath}$rawIcon'
+              : rawIcon;
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child:
