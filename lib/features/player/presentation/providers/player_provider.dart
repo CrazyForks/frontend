@@ -42,6 +42,7 @@ import '../../domain/use_cases/sleep_timer_logic.dart';
 import '../../domain/use_cases/playback_retry_policy.dart';
 import '../../domain/use_cases/prefetch_strategy.dart';
 import '../../domain/use_cases/song_completion_router.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 import 'lyric_provider.dart';
 
 /// 播放器状态 Provider
@@ -1817,9 +1818,16 @@ class PlayerNotifier extends Notifier<PlayerState> {
         await _secureStorage.getAccessToken();
         if (_isSuperseded(gen, 'after-token')) return;
         debugPrint('[Player] _playCurrent: calling audioHandler.playSong');
+        // 切歌前清理上一首不完整的 normalize 缓存（songloft-org/songloft-player#35）
+        _audioHandler.clearIncompleteNormCache();
         final prefs = await ref.read(appPreferencesProvider.future);
         final quality = prefs.getAudioQuality();
-        await _audioHandler.playSong(song, quality: quality);
+        final normalizeOn = ref.read(volumeNormalizeProvider).value ?? false;
+        await _audioHandler.playSong(
+          song,
+          quality: quality,
+          normalize: normalizeOn,
+        );
         if (_isSuperseded(gen, 'after-playSong')) return;
         _playGenerationAtSource = gen;
         // 移动平台：音量由系统控制，just_audio 固定最大
@@ -1987,6 +1995,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       final quality = prefs.getAudioQuality();
+      final normalizeOn = ref.read(volumeNormalizeProvider).value ?? false;
       final targetFormat = AudioFormatHelper.getTranscodeFormat(
         nextSong.format,
       );
@@ -1995,6 +2004,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         nextSong.url!,
         songFormat: nextSong.format,
         quality: quality,
+        normalize: normalizeOn,
       );
       final separator = songUrl.contains('?') ? '&' : '?';
       final prefetchUrl = '$songUrl${separator}prefetch=1';

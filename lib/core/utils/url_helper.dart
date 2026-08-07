@@ -61,6 +61,7 @@ class UrlHelper {
     String? quality,
     bool hlsDirect = false,
     int? audioTrack,
+    bool normalize = false,
   }) {
     var result = buildResourceUrl(url);
     if (result.isEmpty) return '';
@@ -77,6 +78,9 @@ class UrlHelper {
     }
     if (hlsDirect) {
       result += '${result.contains('?') ? '&' : '?'}hls=direct';
+    }
+    if (normalize) {
+      result += '${result.contains('?') ? '&' : '?'}normalize=1';
     }
     return result;
   }

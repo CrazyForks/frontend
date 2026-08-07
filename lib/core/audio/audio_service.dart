@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 // LockCachingAudioSource 是 just_audio 中标记为实验性的边播边缓存 API，
 // 目前没有稳定替代方案，此处有意使用以提升播放体验。
@@ -9,6 +10,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:just_audio/just_audio.dart' as ja;
+import 'package:path_provider/path_provider.dart';
 
 import '../../config/app_config.dart';
 import '../../config/constants.dart';
@@ -38,6 +40,13 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 最近一次 [playSong] 的播放来源（本地缓存 / 远端流串），供 PlayerNotifier 回填
   /// 到 PlayerState，播放页「歌曲信息」据此展示。
   PlaybackSource lastPlaybackSource = PlaybackSource.unknown;
+
+  /// 当前播放歌曲的 normalize 缓存文件路径（仅 normalize 开启时非 null）。
+  /// 切歌时由 [clearIncompleteNormCache] 判定是否需要清理。
+  File? _normCacheFile;
+
+  /// 当前播放歌曲的元数据时长（秒），用于判断 normalize 缓存完整性。
+  double _currentSongMetaDuration = 0;
 
   /// 是否正连着 Bundle 内嵌本地后端（RunMode.local 的等价判定）。
   ///
@@ -581,7 +590,12 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   /// songloft-org/songloft#298）。缺省时对 Web 多音轨容器（mka）自动取首轨(0)，
   /// 使默认播放与切换统一走 `?track=` 机制（AAC 无损 remux 成 m4a）。原生端忽略此参数
   /// （由 libmpv 直接切轨）。
-  Future<void> playSong(Song song, {String? quality, int? audioTrack}) async {
+  Future<void> playSong(
+    Song song, {
+    String? quality,
+    int? audioTrack,
+    bool normalize = false,
+  }) async {
     // 确保 stream listeners 已建立
     await _initFuture;
 
@@ -653,6 +667,7 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
           quality: quality,
           hlsDirect: isDesktopLive,
           audioTrack: effectiveTrack,
+          normalize: normalize,
         );
       }
 
@@ -715,6 +730,8 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
           '[Player] SongloftAudioHandler: play from local cache: $cachedPath',
         );
         source = ja.AudioSource.uri(Uri.file(cachedPath));
+        _normCacheFile = null;
+        _currentSongMetaDuration = 0;
       } else if (useLiveSource) {
         final isMobile =
             !kIsWeb &&
@@ -751,10 +768,28 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
                   : liveHeaders;
           source = ja.AudioSource.uri(Uri.parse(songUrl), headers: headers);
         }
+        _normCacheFile = null;
+        _currentSongMetaDuration = 0;
       } else {
         // 普通歌曲用 LockCachingAudioSource（本身即经本地代理 + Dart HttpClient 边播边缓存），
         // 上游 HTTPS 已受 HttpOverrides trust-all 覆盖，无需额外处理。
-        source = ja.LockCachingAudioSource(Uri.parse(songUrl));
+        if (normalize) {
+          // normalize 流可能是 chunked（均衡产物未就绪时边转边发），用显式 cacheFile
+          // 以便切歌时检测并清理不完整数据（songloft-org/songloft-player#35）。
+          final dir = await getTemporaryDirectory();
+          final normDir = Directory('${dir.path}/songloft_norm_cache');
+          if (!normDir.existsSync()) normDir.createSync(recursive: true);
+          _normCacheFile = File('${normDir.path}/${song.id}.audio');
+          _currentSongMetaDuration = song.duration;
+          source = ja.LockCachingAudioSource(
+            Uri.parse(songUrl),
+            cacheFile: _normCacheFile!,
+          );
+        } else {
+          _normCacheFile = null;
+          _currentSongMetaDuration = 0;
+          source = ja.LockCachingAudioSource(Uri.parse(songUrl));
+        }
       }
 
       // ★ 修复自动切歌时通知栏不更新问题：
@@ -1009,6 +1044,43 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// 当前处理状态
   ja.ProcessingState get processingState => _player.processingState;
+
+  // ====================== normalize 缓存管理 ======================
+
+  /// 切歌时清理不完整的 normalize 缓存（songloft-org/songloft-player#35）。
+  ///
+  /// 对比播放器实际报告时长与歌曲元数据时长：差距超过 5 秒说明 chunked 流
+  /// 未传完就被切断，缓存文件不完整需要删除；时长匹配则说明文件已完整下载，保留缓存。
+  void clearIncompleteNormCache() {
+    if (_normCacheFile == null) return;
+    final playerDur = _player.duration;
+    if (playerDur == null || _currentSongMetaDuration <= 0) {
+      _tryDeleteNormCache();
+      return;
+    }
+    final diff = _currentSongMetaDuration - playerDur.inSeconds;
+    if (diff > 5) {
+      _tryDeleteNormCache();
+    } else {
+      _normCacheFile = null;
+      _currentSongMetaDuration = 0;
+    }
+  }
+
+  void _tryDeleteNormCache() {
+    try {
+      if (_normCacheFile?.existsSync() ?? false) {
+        _normCacheFile!.deleteSync();
+        debugPrint(
+          '[Player] deleted incomplete norm cache: ${_normCacheFile!.path}',
+        );
+      }
+    } catch (e) {
+      debugPrint('[Player] norm cache cleanup failed (ignored): $e');
+    }
+    _normCacheFile = null;
+    _currentSongMetaDuration = 0;
+  }
 
   // ====================== 音量控制 ======================
 
