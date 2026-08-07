@@ -88,6 +88,7 @@ class _DraggableScrollbarOverlayState extends State<DraggableScrollbarOverlay> {
 
   double _scrollFraction() {
     if (!widget.scrollController.hasClients) return 0.0;
+    if (widget.scrollController.positions.length != 1) return 0.0;
     final position = widget.scrollController.position;
     if (position.maxScrollExtent <= 0) return 0.0;
 
@@ -99,6 +100,7 @@ class _DraggableScrollbarOverlayState extends State<DraggableScrollbarOverlay> {
 
   int _currentIndex() {
     if (!widget.scrollController.hasClients) return 0;
+    if (widget.scrollController.positions.length != 1) return 0;
     final songOffset = math.max(
       0.0,
       widget.scrollController.offset - widget.headerExtent,
@@ -117,6 +119,7 @@ class _DraggableScrollbarOverlayState extends State<DraggableScrollbarOverlay> {
   double _thumbHeight(double trackHeight) {
     if (widget.totalItemCount <= 0) return _thumbMinHeight;
     if (!widget.scrollController.hasClients) return _thumbMinHeight;
+    if (widget.scrollController.positions.length != 1) return _thumbMinHeight;
     final viewportHeight = widget.scrollController.position.viewportDimension;
     final visibleItems = viewportHeight / widget.estimatedItemHeight;
     final fraction = visibleItems / widget.totalItemCount;
@@ -169,6 +172,7 @@ class _DraggableScrollbarOverlayState extends State<DraggableScrollbarOverlay> {
 
   void _scrollToFraction(double fraction, {required bool jump}) {
     if (!widget.scrollController.hasClients) return;
+    if (widget.scrollController.positions.length != 1) return;
     final position = widget.scrollController.position;
 
     final targetOffset =
@@ -200,7 +204,8 @@ class _DraggableScrollbarOverlayState extends State<DraggableScrollbarOverlay> {
       if (!mounted) return;
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
-      if (widget.scrollController.hasClients) {
+      if (widget.scrollController.hasClients &&
+          widget.scrollController.positions.length == 1) {
         final maxExtent = widget.scrollController.position.maxScrollExtent;
         widget.scrollController.animateTo(
           math.min(targetOffset, maxExtent),

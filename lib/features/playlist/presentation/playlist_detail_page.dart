@@ -116,11 +116,19 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
         ref.read(playlistSongsProvider(_playlistIdInt).notifier).search('');
       }
     });
+    if (_isSearchMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_searchFocusNode.hasFocus) {
+          _searchFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   /// 滚动监听：接近底部时触发分页加载
   void _onScroll() {
     if (!_scrollController.hasClients) return;
+    if (_scrollController.positions.length != 1) return;
     final position = _scrollController.position;
     if (position.pixels >= position.maxScrollExtent - _loadMoreThreshold) {
       ref.read(playlistSongsProvider(_playlistIdInt).notifier).loadMore();
@@ -328,6 +336,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     }
 
     if (!_scrollController.hasClients) return;
+    if (_scrollController.positions.length != 1) return;
     final headerExtent = context.useWideLayout ? 0.0 : 300.0;
     final target =
         headerExtent +

@@ -44,6 +44,7 @@ class _ScrollToTopFabState extends State<ScrollToTopFab> {
   void _onScroll() {
     final shouldShow =
         widget.scrollController.hasClients &&
+        widget.scrollController.positions.length == 1 &&
         widget.scrollController.offset > widget.showThreshold;
     if (shouldShow != _show) {
       setState(() => _show = shouldShow);
@@ -52,6 +53,7 @@ class _ScrollToTopFabState extends State<ScrollToTopFab> {
 
   void _scrollToTop() {
     if (!widget.scrollController.hasClients) return;
+    if (widget.scrollController.positions.length != 1) return;
     widget.scrollController.animateTo(
       0,
       duration: const Duration(milliseconds: 400),
