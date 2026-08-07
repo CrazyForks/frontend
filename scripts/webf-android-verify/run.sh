@@ -61,8 +61,21 @@ trap cleanup EXIT
 mkdir -p "$RUNTIME_DIR/data" "$RUNTIME_DIR/music"
 
 echo "[run] building downloader plugin on the host"
-pnpm --dir "$PLUGIN_ROOT" build
+# npm, not pnpm: the plugin's own release workflow builds with `npm ci`, so
+# package-lock.json is the lockfile that is kept in sync. Its pnpm-lock.yaml
+# trails package.json, and pnpm additionally needs interactive approval for
+# esbuild's install script.
+npm --prefix "$PLUGIN_ROOT" ci
+npm --prefix "$PLUGIN_ROOT" run build
 cp "$PLUGIN_ROOT/dist/downloader.jsplugin.zip" "$OUT/downloader.jsplugin.zip"
+
+# A foreign listener on this port would answer the health check below, so the
+# run would proceed against someone else's server and fail much later with an
+# opaque 401 from the plugin upload.
+if (echo >/dev/tcp/127.0.0.1/"$SERVER_PORT") 2>/dev/null; then
+  echo "[run] port $SERVER_PORT is already in use; set SERVER_PORT to a free port" >&2
+  exit 1
+fi
 
 echo "[run] building and starting temporary host server on port $SERVER_PORT"
 (

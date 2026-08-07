@@ -2,8 +2,10 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# The adb client lives in its own package; android-sdk-platform-tools ships the
+# other host tools but not adb itself.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      android-sdk-platform-tools bash ca-certificates curl \
+      adb android-sdk-platform-tools bash ca-certificates curl \
       imagemagick jq python3 python3-pil socat unzip \
     && rm -rf /var/lib/apt/lists/*
 

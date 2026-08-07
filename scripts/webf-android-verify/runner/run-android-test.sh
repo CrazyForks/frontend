@@ -36,10 +36,34 @@ adb -s "$SERIAL" shell settings put global transition_animation_scale 0
 adb -s "$SERIAL" shell settings put global animator_duration_scale 0
 adb -s "$SERIAL" shell settings put system screen_off_timeout 1800000
 adb -s "$SERIAL" shell settings put system system_locales zh-CN || true
+# The settings page is ~698 CSS px tall; on the stock 1080x1920 screen the viewport
+# is only 562 CSS px, so the second switch row sits permanently below the fold and
+# the assertion can only ever see one switch. A taller logical screen brings the
+# whole page into view. It cannot be solved by scrolling: WebF's CSS overflow
+# scrollers do not receive synthetic touch events at all (only programmatic
+# scrollTop moves them), so `input swipe` scrolls the Flutter list behind instead.
+adb -s "$SERIAL" shell wm size 1080x2400
 echo "[runner] forwarding server ${SERVER_HOST}:${SERVER_PORT}"
 socat "TCP-LISTEN:${SERVER_PORT},bind=127.0.0.1,reuseaddr,fork" "TCP:${SERVER_HOST}:${SERVER_PORT}" >/tmp/server-forward.log 2>&1 &
 forward_pid=$!
-trap 'kill "$forward_pid" 2>/dev/null || true' EXIT
+
+# Every step below drives the UI blind, so a failure is unreadable without the
+# screen state at the moment it happened.
+capture_failure() {
+  status=$?
+  [ "$status" -eq 0 ] && return 0
+  echo "[runner] step failed (exit $status); capturing device state" >&2
+  adb -s "$SERIAL" exec-out screencap -p >"$OUT/failure.png" 2>/dev/null || true
+  adb -s "$SERIAL" shell uiautomator dump /sdcard/failure.xml >/dev/null 2>&1 || true
+  adb -s "$SERIAL" exec-out cat /sdcard/failure.xml >"$OUT/failure-uiautomator.xml" 2>/dev/null || true
+  adb -s "$SERIAL" logcat -d >"$OUT/failure-logcat.txt" 2>/dev/null || true
+  return "$status"
+}
+restore_display() {
+  # Leave the device as we found it, so a kept-running emulator stays reusable.
+  adb -s "$SERIAL" shell wm size reset >/dev/null 2>&1 || true
+}
+trap 'capture_failure; restore_display; kill "$forward_pid" 2>/dev/null || true' EXIT
 adb -s "$SERIAL" reverse "tcp:${SERVER_PORT}" "tcp:${SERVER_PORT}"
 
 echo "[runner] installing downloader plugin"
@@ -54,6 +78,18 @@ curl -fsS "http://${SERVER_HOST}:${SERVER_PORT}/api/v1/jsplugins/" \
   | tee "$OUT/plugins.json" \
   | jq -e '.plugins[] | select(.entry_path == "downloader" and .render_engine == "webf")' >/dev/null
 
+# tab_config.plugin_tabs defaults to empty, so a freshly installed plugin has no
+# entry anywhere in the shell. It is server-side config, so publishing it over
+# the API is far steadier than driving the tab-config screen.
+plugin_id=$(jq -r '.plugins[] | select(.entry_path == "downloader") | .id' "$OUT/plugins.json")
+curl -fsS -X PUT "http://${SERVER_HOST}:${SERVER_PORT}/api/v1/settings/tab-config" \
+  -H "Authorization: Bearer ${bootstrap_token}" \
+  -H 'Content-Type: application/json' \
+  --data "$(jq -n --argjson id "$plugin_id" \
+    '{show_library: true, show_playlists: true,
+      plugin_tabs: [{plugin_id: $id, entry_path: "downloader", name: "歌曲下载"}]}')" \
+  >"$OUT/tab-config.json"
+
 echo "[runner] installing APK"
 adb -s "$SERIAL" install -r -g "$OUT/songloft-x86_64-release.apk" >"$OUT/install.log"
 adb -s "$SERIAL" shell pm clear "$PACKAGE" >/dev/null
@@ -67,15 +103,39 @@ click_text() {
   python3 /opt/webf-android-runner/ui.py "$SERIAL" click "$1"
 }
 
+# Flutter exposes an *empty* TextField as a bare EditText node carrying no text
+# and no content-desc — the hint ("Username", "API address") is painted, not
+# published to the semantics tree. So the login fields cannot be matched by
+# label in any locale and are addressed by their screen order instead.
+edit_field() {
+  python3 /opt/webf-android-runner/ui.py "$SERIAL" click-nth android.widget.EditText \
+    --index "$1"
+  # Flutter needs a moment to move focus before it accepts synthetic key events.
+  sleep 1
+  adb -s "$SERIAL" shell input text "$2"
+}
+
 echo "[runner] logging in"
-wait_for_text 'API 地址|服务器地址|API URL|Server URL' 30
-click_text 'API 地址|服务器地址|API URL|Server URL'
-adb -s "$SERIAL" shell input text "http://localhost:${SERVER_PORT}"
-click_text '用户名|Username'
-adb -s "$SERIAL" shell input text admin
-click_text '密码|Password'
-adb -s "$SERIAL" shell input text admin
-click_text '登录|Login'
+python3 /opt/webf-android-runner/ui.py "$SERIAL" wait-count android.widget.EditText \
+  --count 3 --timeout 60
+edit_field 0 admin
+edit_field 1 admin
+edit_field 2 "http://localhost:${SERVER_PORT}"
+# The IME covers the login button, and BACK would pop the route instead.
+adb -s "$SERIAL" shell input keyevent 111
+sleep 1
+click_text '^(登录|Log in)$'
+
+# The APK carries a synthetic FRONTEND_VERSION, so the startup patch check
+# always resolves the real latest release as newer and pops a modal that covers
+# the whole shell. It fires a few seconds after authentication, so it has to be
+# cleared before anything else can be driven.
+echo "[runner] dismissing the startup update dialog if it appears"
+if wait_for_text '^(稍后|Later)$' 25; then
+  click_text '^(稍后|Later)$'
+  sleep 2
+fi
+
 wait_for_text '歌曲下载' 45
 
 echo "[runner] opening downloader WebF page"
@@ -94,10 +154,14 @@ sleep 2
 
 echo "[runner] capturing downloader settings"
 adb -s "$SERIAL" exec-out screencap -p >"$OUT/settings-light.png"
+# The dump is the assertion's reference frame, not just an artefact: it supplies the
+# row content edge the switches must reach. It has to describe the same screen state
+# as the screenshot, so keep the two captures adjacent.
 adb -s "$SERIAL" shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
-adb -s "$SERIAL" exec-out cat /sdcard/window.xml >"$OUT/uiautomator.xml" || true
+adb -s "$SERIAL" exec-out cat /sdcard/window.xml >"$OUT/uiautomator.xml"
 
-python3 /usr/local/bin/assert-switch-alignment.py "$OUT/settings-light.png" >"$OUT/assertion.json"
+python3 /usr/local/bin/assert-switch-alignment.py \
+  "$OUT/settings-light.png" "$OUT/uiautomator.xml" >"$OUT/assertion.json"
 
 echo "[runner] verifying switch interaction through the server"
 before=$(curl -fsS "http://${SERVER_HOST}:${SERVER_PORT}/api/v1/jsplugin/downloader/api/settings" \
