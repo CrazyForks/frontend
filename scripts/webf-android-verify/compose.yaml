@@ -1,0 +1,42 @@
+name: songloft-webf-android
+
+services:
+  apk-builder:
+    build:
+      context: ../..
+      dockerfile: scripts/webf-android-verify/Dockerfile.apk-builder
+    volumes:
+      - ./out:/out
+    environment:
+      FRONTEND_VERSION: webf-android-test
+      FLUTTER_BINDING: "3.44.6"
+
+  emulator:
+    image: ${EMULATOR_IMAGE:-us-docker.pkg.dev/android-emulator-268719/images/30-google-x64:30.1.2}
+    environment:
+      ADBKEY: ${ADBKEY:-}
+      EMULATOR_PARAMS: ${EMULATOR_PARAMS:--no-window -no-snapshot -no-boot-anim -no-audio -gpu swiftshader}
+    devices:
+      - /dev/kvm:/dev/kvm
+    ports:
+      - "${EMULATOR_ADB_PORT:-15555}:5555"
+    tmpfs:
+      - /data:size=4g
+
+  test-runner:
+    build:
+      context: ../..
+      dockerfile: scripts/webf-android-verify/Dockerfile.test-runner
+    depends_on:
+      emulator:
+        condition: service_started
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./out:/out
+    environment:
+      ADBKEY: ${ADBKEY:-}
+      ANDROID_SERIAL: emulator:5555
+      SERVER_HOST: host.docker.internal
+      SERVER_PORT: ${SERVER_PORT:-58192}
+      APP_PACKAGE: com.songloft.songloft_flutter

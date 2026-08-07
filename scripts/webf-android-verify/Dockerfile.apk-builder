@@ -1,0 +1,44 @@
+FROM ubuntu:24.04
+
+ARG FLUTTER_VERSION=3.44.6
+ARG ANDROID_CMDLINE_TOOLS=11076708
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV FLUTTER_HOME=/opt/flutter
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV PATH=/opt/flutter/bin:/opt/flutter/bin/cache/dart-sdk/bin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/build-tools/35.0.0:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl git unzip xz-utils zip \
+      openjdk-17-jdk-headless libglu1-mesa \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch ${FLUTTER_VERSION} \
+      https://github.com/flutter/flutter.git ${FLUTTER_HOME} \
+    && git config --global --add safe.directory ${FLUTTER_HOME} \
+    && flutter config --no-analytics
+
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
+    && curl -fsSL \
+      https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS}_latest.zip \
+      -o /tmp/cmdline-tools.zip \
+    && unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools \
+    && mv /tmp/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest \
+    && rm -rf /tmp/cmdline-tools /tmp/cmdline-tools.zip \
+    && yes | sdkmanager --licenses >/dev/null || true \
+    && sdkmanager \
+      "platform-tools" \
+      "platforms;android-35" \
+      "build-tools;35.0.0" \
+      "ndk;27.2.12479018"
+
+WORKDIR /workspace
+COPY . /workspace
+
+RUN flutter pub get
+
+COPY scripts/webf-android-verify/build-apk.sh /usr/local/bin/build-apk.sh
+RUN chmod +x /usr/local/bin/build-apk.sh
+
+ENTRYPOINT ["/usr/local/bin/build-apk.sh"]

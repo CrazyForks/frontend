@@ -1,0 +1,15 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      android-sdk-platform-tools bash ca-certificates curl \
+      imagemagick jq python3 python3-pil socat unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY scripts/webf-android-verify/runner /opt/webf-android-runner
+COPY scripts/webf-android-verify/assert_switch_alignment.py /usr/local/bin/assert-switch-alignment.py
+
+RUN chmod +x /opt/webf-android-runner/*.sh /usr/local/bin/assert-switch-alignment.py
+
+ENTRYPOINT ["/opt/webf-android-runner/run-android-test.sh"]
