@@ -275,13 +275,22 @@ class PaginatedSongsNotifier extends AsyncNotifier<PaginatedSongsState> {
   /// 每页大小
   static const int pageLimit = 100;
 
-  /// 当前排序和搜索参数（build 时默认值）
+  /// 当前排序和搜索参数（build 时从歌单详情读取保存的偏好）
   String _sort = 'position';
   String _order = 'asc';
   String _keyword = '';
+  bool _sortInitialized = false;
 
   @override
   Future<PaginatedSongsState> build() async {
+    if (!_sortInitialized) {
+      try {
+        final playlist = await ref.read(playlistRepositoryProvider).getPlaylist(_playlistId);
+        _sort = playlist.sortBy;
+        _order = playlist.sortOrder;
+      } catch (_) {}
+      _sortInitialized = true;
+    }
     final repository = ref.watch(playlistRepositoryProvider);
     final response = await repository.getPlaylistSongs(
       _playlistId,
@@ -358,12 +367,19 @@ class PaginatedSongsNotifier extends AsyncNotifier<PaginatedSongsState> {
     }
   }
 
-  /// 切换排序（视图排序，不改变 position）
+  /// 切换排序（视图排序，不改变 position）并持久化到服务端
   Future<void> setSort(String sort, String order) async {
     _sort = sort;
     _order = order;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => build());
+    try {
+      await ref.read(playlistRepositoryProvider).updatePlaylistSort(
+        _playlistId,
+        sortBy: sort,
+        sortOrder: order,
+      );
+    } catch (_) {}
   }
 
   /// 搜索歌单内歌曲
@@ -379,6 +395,13 @@ class PaginatedSongsNotifier extends AsyncNotifier<PaginatedSongsState> {
     _keyword = '';
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => build());
+    try {
+      await ref.read(playlistRepositoryProvider).updatePlaylistSort(
+        _playlistId,
+        sortBy: 'position',
+        sortOrder: 'asc',
+      );
+    } catch (_) {}
   }
 }
 

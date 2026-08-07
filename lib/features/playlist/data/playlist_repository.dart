@@ -187,6 +187,15 @@ class PlaylistRepository implements IPlaylistRepository {
   }
 
   @override
+  Future<void> updatePlaylistSort(int id, {required String sortBy, required String sortOrder}) async {
+    try {
+      await playlistApi.updatePlaylistSort(id, sortBy: sortBy, sortOrder: sortOrder);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  @override
   Future<Playlist> setPlaylistVisibility(int id, {required bool hidden}) async {
     try {
       return await playlistApi.setPlaylistVisibility(id, hidden: hidden);

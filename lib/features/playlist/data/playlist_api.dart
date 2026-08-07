@@ -228,6 +228,19 @@ class PlaylistApi {
     await dio.post('${AppConfig.apiPrefix}/playlists/$id/touch');
   }
 
+  /// 更新歌单视图排序偏好
+  /// PUT /api/v1/playlists/{id}/sort
+  Future<void> updatePlaylistSort(
+    int id, {
+    required String sortBy,
+    required String sortOrder,
+  }) async {
+    await dio.put(
+      '${AppConfig.apiPrefix}/playlists/$id/sort',
+      data: {'sort_by': sortBy, 'sort_order': sortOrder},
+    );
+  }
+
   /// 设置歌单可见性
   /// PUT /api/v1/playlists/{id}/visibility
   Future<Playlist> setPlaylistVisibility(int id, {required bool hidden}) async {

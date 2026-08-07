@@ -76,6 +76,9 @@ abstract class IPlaylistRepository {
   /// 更新歌单最后访问时间
   Future<void> touchPlaylist(int id);
 
+  /// 更新歌单视图排序偏好
+  Future<void> updatePlaylistSort(int id, {required String sortBy, required String sortOrder});
+
   /// 设置歌单可见性
   Future<Playlist> setPlaylistVisibility(int id, {required bool hidden});
 

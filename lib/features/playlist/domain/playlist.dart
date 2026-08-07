@@ -8,6 +8,8 @@ class Playlist {
   final String? description;
   final String? coverUrl; // 封面URL（后端统一处理）
   final List<String> labels; // ["built_in"] 或 ["auto_created"]
+  final String sortBy; // 视图排序字段
+  final String sortOrder; // 视图排序方向
   final int songCount;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -19,6 +21,8 @@ class Playlist {
     this.description,
     this.coverUrl,
     this.labels = const [],
+    this.sortBy = 'position',
+    this.sortOrder = 'asc',
     this.songCount = 0,
     required this.createdAt,
     required this.updatedAt,
@@ -32,6 +36,8 @@ class Playlist {
       description: json['description'] as String?,
       coverUrl: json['cover_url'] as String?,
       labels: _labelsFromJson(json['labels']),
+      sortBy: json['sort_by'] as String? ?? 'position',
+      sortOrder: json['sort_order'] as String? ?? 'asc',
       songCount: _intFromJson(json['song_count']),
       createdAt: _dateTimeFromJson(json['created_at']),
       updatedAt: _dateTimeFromJson(json['updated_at']),
@@ -46,6 +52,8 @@ class Playlist {
       'description': description,
       'cover_url': coverUrl,
       'labels': labels,
+      'sort_by': sortBy,
+      'sort_order': sortOrder,
       'song_count': songCount,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -60,6 +68,8 @@ class Playlist {
     String? coverPath,
     String? coverUrl,
     List<String>? labels,
+    String? sortBy,
+    String? sortOrder,
     int? songCount,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -71,6 +81,8 @@ class Playlist {
       description: description ?? this.description,
       coverUrl: coverUrl ?? this.coverUrl,
       labels: labels ?? this.labels,
+      sortBy: sortBy ?? this.sortBy,
+      sortOrder: sortOrder ?? this.sortOrder,
       songCount: songCount ?? this.songCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
