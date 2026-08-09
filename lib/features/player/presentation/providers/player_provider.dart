@@ -37,6 +37,7 @@ import '../../domain/playback_context.dart';
 import '../../domain/player_state.dart';
 import '../../domain/use_cases/play_mode_resolver.dart';
 import '../../domain/use_cases/play_queue.dart';
+import '../../domain/use_cases/playback_resume_state.dart';
 import '../../domain/use_cases/queue_loader.dart';
 import '../../domain/use_cases/sleep_timer_logic.dart';
 import '../../domain/use_cases/playback_retry_policy.dart';
@@ -85,7 +86,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   static const int _saveDebounceMs = 2000;
   static const int _positionSaveIntervalSec = 10;
   final PlaybackStateStorage _playbackStorage = PlaybackStateStorage();
-  int _savedPositionMs = 0;
+  final PlaybackResumeState _playbackResumeState = PlaybackResumeState();
   bool _webPlaybackPersistenceDisabled = false;
 
   @override
@@ -242,7 +243,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
       final savedIndex = snapshot.currentIndex ?? prefs.getCurrentIndex();
       final safeIndex = savedIndex.clamp(0, savedQueue.length - 1);
-      _savedPositionMs = prefs.getPositionMs();
+      final savedPositionMs = prefs.getPositionMs();
+      final savedSong = savedQueue[safeIndex];
+      _playbackResumeState.restore(
+        songId: savedSong.id,
+        songType: savedSong.type,
+        position: Duration(milliseconds: savedPositionMs),
+      );
       final savedContext = prefs.getSourceContext();
 
       state = state.copyWith(
@@ -255,7 +262,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
       debugPrint(
         '[Player] Restored playback state: ${savedQueue.length} songs, '
-        'index=$safeIndex, position=${_savedPositionMs}ms',
+        'index=$safeIndex, position=${savedPositionMs}ms',
       );
     } catch (e) {
       debugPrint('[Player] Failed to restore playback state: $e');
@@ -575,6 +582,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       '[Player] playSong: ${song.title} (id: ${song.id}, type: ${song.type})',
     );
     _retryPolicy.recordSuccess();
+    _playbackResumeState.clear();
     // 检查是否已在播放列表中
     final existingIndex = state.playlist.indexWhere(
       (s) => s.id == song.id && s.type == song.type,
@@ -686,6 +694,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
       debugPrint('[Player] playPlaylist: empty songs list, returning');
       return;
     }
+
+    _playbackResumeState.clear();
 
     // 取消之前的预加载
     _prefetchCancelToken?.cancel('operation changed');
@@ -1062,6 +1072,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     // 递增代次，使正在进行的后台加载自动取消
     _loadGeneration = _queueLoader.invalidate();
     _retryPolicy.recordSuccess();
+    _playbackResumeState.clear();
     _audioHandler.stop();
     _modeResolver.onQueueChanged();
     _stopPositionSaveTimer();
@@ -1224,7 +1235,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     // 刻意不 await 起播就启动补齐：playPlaylist 会一路 await 到音频真正加载完成，
     // 首曲加载慢或播放失败重试（网络歌曲最多 7 次指数退避，可达数十秒）时，
     // 队列补齐会被整段推迟 —— 用户看到队列里只有这一首、切不了歌。
-    // playPlaylist 在它的第一个 await 之前��同步递增 _loadGeneration 并写好 state，
+    // playPlaylist 在它的第一个 await 之前会同步递增 _loadGeneration 并写好 state，
     // 所以紧接着读到的代次就是本次播放的代次。
     final playing = playPlaylist([song], startIndex: 0, context: context);
     final generation = _loadGeneration;
@@ -1244,9 +1255,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
     if (playlistId != null) {
       return ref.read(playlistApiProvider).getPlaylistSongIds(playlistId);
     }
-    // 上下文类型不认识（prefs 被写坏、手工深��、playlist 的 key 不��数字…）时必须早退：
-    // categorySongsFilter 对未知 field 返回全 null 的过滤器，会退化成��无条件查询」，
-    // 把整个曲库拉��������播放队列。
+    // 上下文类型不认识（prefs 被写坏、手工深链、playlist 的 key 不是数字…）时必须早退：
+    // categorySongsFilter 对未知 field 返回全 null 的过滤器，会退化成「无条件查询」，
+    // 把整个曲库拉进播放队列。
     if (!categoryFields.contains(context.type)) {
       debugPrint('[Player] 未知播放上下文类型，跳过队列补齐: ${context.type}');
       return const [];
@@ -1748,6 +1759,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
   Future<void> _playAtIndex(int index) async {
     if (index < 0 || index >= state.playlist.length) return;
 
+    _playbackResumeState.clear();
+
     // 取消之前的预加载
     _prefetchCancelToken?.cancel('operation changed');
 
@@ -1775,6 +1788,20 @@ class PlayerNotifier extends Notifier<PlayerState> {
       '[Player] _playCurrent superseded at $where: gen=$gen current=$_playGeneration',
     );
     return true;
+  }
+
+  Future<bool> _getVolumeNormalizeEnabled() async {
+    final current = ref.read(volumeNormalizeProvider).value;
+    if (current != null) return current;
+
+    try {
+      return await ref.read(volumeNormalizeProvider.future);
+    } catch (e) {
+      debugPrint(
+        '[Player] Failed to load volume normalize setting, using false: $e',
+      );
+      return false;
+    }
   }
 
   /// 播放当前歌曲（带自动重试）
@@ -1834,12 +1861,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
         // 副作用：刷新 SecureStorageService.cachedAccessToken,供 UrlHelper 使用
         await _secureStorage.getAccessToken();
         if (_isSuperseded(gen, 'after-token')) return;
-        debugPrint('[Player] _playCurrent: calling audioHandler.playSong');
         // 切歌前清理上一首不完整的 normalize 缓存（songloft-org/songloft-player#35）
         _audioHandler.clearIncompleteNormCache();
-        final prefs = await ref.read(appPreferencesProvider.future);
+        final prefsFuture = ref.read(appPreferencesProvider.future);
+        final normalizeFuture = _getVolumeNormalizeEnabled();
+        final prefs = await prefsFuture;
+        final normalizeOn = await normalizeFuture;
+        if (_isSuperseded(gen, 'after-playback-settings')) return;
         final quality = prefs.getAudioQuality();
-        final normalizeOn = ref.read(volumeNormalizeProvider).value ?? false;
+        debugPrint('[Player] _playCurrent: calling audioHandler.playSong');
         await _audioHandler.playSong(
           song,
           quality: quality,
@@ -1867,11 +1897,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
         );
         _notifyPlayEvent(song.id, 'play', context: state.playbackContext);
 
-        // 恢复上次保存的播放进度
-        if (_savedPositionMs > 0) {
-          final pos = Duration(milliseconds: _savedPositionMs);
-          _savedPositionMs = 0;
-          await _audioHandler.seek(pos);
+        // Only the song restored from the previous app session may consume
+        // the saved position. Explicit song and queue changes clear it first.
+        final resumePosition = _playbackResumeState.takeFor(
+          songId: song.id,
+          songType: song.type,
+        );
+        if (resumePosition != null) {
+          await _audioHandler.seek(resumePosition);
           if (_isSuperseded(gen, 'after-seek')) return;
         }
 
@@ -2012,7 +2045,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     try {
       final prefs = await ref.read(appPreferencesProvider.future);
       final quality = prefs.getAudioQuality();
-      final normalizeOn = ref.read(volumeNormalizeProvider).value ?? false;
+      final normalizeOn = await _getVolumeNormalizeEnabled();
       final targetFormat = AudioFormatHelper.getTranscodeFormat(
         nextSong.format,
       );
