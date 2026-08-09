@@ -31,6 +31,7 @@ import '../domain/playlist.dart';
 import '../domain/use_cases/playlist_sort.dart';
 import 'providers/playlist_provider.dart';
 import 'widgets/playlist_edit_dialog.dart';
+import 'widgets/playlist_search_field.dart';
 import 'widgets/playlist_song_tile.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../l10n/app_localizations.dart';
@@ -107,22 +108,22 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     });
   }
 
+  void _clearSearch() {
+    _debounceTimer?.cancel();
+    _searchController.clear();
+    ref.read(playlistSongsProvider(_playlistIdInt).notifier).search('');
+  }
+
   void _toggleSearch() {
     setState(() {
       _isSearchMode = !_isSearchMode;
       if (!_isSearchMode) {
         _searchController.clear();
         _debounceTimer?.cancel();
+        _searchFocusNode.unfocus();
         ref.read(playlistSongsProvider(_playlistIdInt).notifier).search('');
       }
     });
-    if (_isSearchMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_searchFocusNode.hasFocus) {
-          _searchFocusNode.requestFocus();
-        }
-      });
-    }
   }
 
   /// 滚动监听：接近底部时触发分页加载
@@ -597,7 +598,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
         ),
 
         // 搜索栏
-        if (_isSearchMode) SliverToBoxAdapter(child: _buildSearchBar(context)),
+        SliverToBoxAdapter(child: _buildSearchBar(context)),
 
         // 歌曲列表
         songsAsync.when(
@@ -839,8 +840,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
             controller: _scrollController,
             scrollCacheExtent: webListCacheExtent,
             slivers: [
-              if (_isSearchMode)
-                SliverToBoxAdapter(child: _buildSearchBar(context)),
+              SliverToBoxAdapter(child: _buildSearchBar(context)),
               songsAsync.when(
                 data: (state) => _buildSongList(context, playlist, state.items),
                 loading:
@@ -1376,43 +1376,12 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
   }
 
   Widget _buildSearchBar(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs,
-      ),
-      child: TextField(
-        controller: _searchController,
-        focusNode: _searchFocusNode,
-        autofocus: true,
-        decoration: InputDecoration(
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon:
-              _searchController.text.isNotEmpty
-                  ? IconButton(
-                    icon: const Icon(Icons.clear),
-                    tooltip: l10n.clearSearch,
-                    onPressed: () {
-                      _searchController.clear();
-                      ref
-                          .read(playlistSongsProvider(_playlistIdInt).notifier)
-                          .search('');
-                    },
-                  )
-                  : null,
-          hintText: l10n.playlistSearchHint,
-          filled: true,
-          fillColor: colorScheme.surfaceContainerHighest,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-        ),
-        onChanged: _onSearchChanged,
-      ),
+    return PlaylistSearchField(
+      visible: _isSearchMode,
+      controller: _searchController,
+      focusNode: _searchFocusNode,
+      onChanged: _onSearchChanged,
+      onClear: _clearSearch,
     );
   }
 
