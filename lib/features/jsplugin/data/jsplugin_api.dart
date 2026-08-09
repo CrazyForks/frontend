@@ -643,6 +643,9 @@ class JSPluginApi {
       final response = await dio.post(
         '${AppConfig.apiPrefix}/jsplugins/registry/refresh',
         data: body,
+        // 多源聚合会递归拉取注册表与 plugin.json，服务端正常处理时间可能
+        // 超过全局 15 秒接收超时。只放宽这个慢端点，避免影响其他 API。
+        options: Options(receiveTimeout: const Duration(seconds: 60)),
       );
       return RegistryRefreshResponse.fromJson(
         response.data as Map<String, dynamic>,

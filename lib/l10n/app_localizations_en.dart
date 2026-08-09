@@ -745,6 +745,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get jspluginRegistryEmpty => 'This source has no plugins';
 
   @override
+  String jspluginRegistryWarningsSummary(int count) {
+    return 'Some plugin data could not be loaded (warnings: $count)';
+  }
+
+  @override
+  String get jspluginRegistryWarningsTitle => 'Loading warnings';
+
+  @override
+  String get jspluginRegistryWarningsDetails => 'View warning details';
+
+  @override
   String get jspluginPrevPage => 'Previous page';
 
   @override

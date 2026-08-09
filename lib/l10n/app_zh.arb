@@ -485,6 +485,16 @@
   "jspluginLoadingList": "正在加载插件列表…",
   "jspluginNoMatch": "没有找到匹配的插件",
   "jspluginRegistryEmpty": "该订阅源暂无插件",
+  "jspluginRegistryWarningsSummary": "部分插件信息未能加载（{count} 条警告）",
+  "@jspluginRegistryWarningsSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jspluginRegistryWarningsTitle": "加载警告",
+  "jspluginRegistryWarningsDetails": "查看警告详情",
   "jspluginPrevPage": "上一页",
   "jspluginNextPage": "下一页",
   "jspluginInstallFailed": "安装失败: {error}",

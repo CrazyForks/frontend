@@ -726,6 +726,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get jspluginRegistryEmpty => '该订阅源暂无插件';
 
   @override
+  String jspluginRegistryWarningsSummary(int count) {
+    return '部分插件信息未能加载（$count 条警告）';
+  }
+
+  @override
+  String get jspluginRegistryWarningsTitle => '加载警告';
+
+  @override
+  String get jspluginRegistryWarningsDetails => '查看警告详情';
+
+  @override
   String get jspluginPrevPage => '上一页';
 
   @override

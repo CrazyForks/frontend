@@ -421,18 +421,7 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
       return Column(
         children: [
           if (_pluginResponse != null && _pluginResponse!.warnings.isNotEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: theme.colorScheme.errorContainer,
-              child: Text(
-                _pluginResponse!.warnings.join('\n'),
-                style: TextStyle(
-                  color: theme.colorScheme.onErrorContainer,
-                  fontSize: 12,
-                ),
-              ),
-            ),
+            PluginRegistryWarningsBanner(warnings: _pluginResponse!.warnings),
           Expanded(
             child: Center(
               child: Text(
@@ -457,18 +446,7 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
       children: [
         // warnings
         if (_pluginResponse!.warnings.isNotEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: theme.colorScheme.errorContainer,
-            child: Text(
-              _pluginResponse!.warnings.join('\n'),
-              style: TextStyle(
-                color: theme.colorScheme.onErrorContainer,
-                fontSize: 12,
-              ),
-            ),
-          ),
+          PluginRegistryWarningsBanner(warnings: _pluginResponse!.warnings),
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -557,6 +535,70 @@ class _PluginRegistryPageState extends ConsumerState<PluginRegistryPage> {
               }
             },
           ),
+    );
+  }
+}
+
+/// 将可能很长的订阅源错误收进详情对话框，避免局部失败遮住成功加载的插件。
+class PluginRegistryWarningsBanner extends StatelessWidget {
+  final List<String> warnings;
+
+  const PluginRegistryWarningsBanner({required this.warnings, super.key});
+
+  void _showDetails(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            scrollable: true,
+            title: Text(l10n.jspluginRegistryWarningsTitle),
+            content: SelectableText(warnings.join('\n\n')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(l10n.jspluginClose),
+              ),
+            ],
+          ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16, top: 4, bottom: 4, right: 4),
+        child: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              size: 20,
+              color: colors.onErrorContainer,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                l10n.jspluginRegistryWarningsSummary(warnings.length),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.onErrorContainer),
+              ),
+            ),
+            IconButton(
+              onPressed: () => _showDetails(context),
+              icon: const Icon(Icons.info_outline),
+              color: colors.onErrorContainer,
+              tooltip: l10n.jspluginRegistryWarningsDetails,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

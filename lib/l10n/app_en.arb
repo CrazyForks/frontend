@@ -380,6 +380,16 @@
   "jspluginLoadingList": "Loading plugin list…",
   "jspluginNoMatch": "No matching plugins found",
   "jspluginRegistryEmpty": "This source has no plugins",
+  "jspluginRegistryWarningsSummary": "Some plugin data could not be loaded (warnings: {count})",
+  "@jspluginRegistryWarningsSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jspluginRegistryWarningsTitle": "Loading warnings",
+  "jspluginRegistryWarningsDetails": "View warning details",
   "jspluginPrevPage": "Previous page",
   "jspluginNextPage": "Next page",
   "jspluginInstallFailed": "Installation failed: {error}",

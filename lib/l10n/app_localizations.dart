@@ -1376,6 +1376,24 @@ abstract class AppLocalizations {
   /// **'该订阅源暂无插件'**
   String get jspluginRegistryEmpty;
 
+  /// No description provided for @jspluginRegistryWarningsSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'部分插件信息未能加载（{count} 条警告）'**
+  String jspluginRegistryWarningsSummary(int count);
+
+  /// No description provided for @jspluginRegistryWarningsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'加载警告'**
+  String get jspluginRegistryWarningsTitle;
+
+  /// No description provided for @jspluginRegistryWarningsDetails.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看警告详情'**
+  String get jspluginRegistryWarningsDetails;
+
   /// No description provided for @jspluginPrevPage.
   ///
   /// In zh, this message translates to:
