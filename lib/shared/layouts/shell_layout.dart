@@ -95,6 +95,9 @@ class _ShellLayoutState extends ConsumerState<ShellLayout> {
   /// 查后端 `/settings/github-proxy`。改成监听 [authStateProvider]，与本类
   /// [_scheduleAutoEnterLyrics] 等播放状态恢复的写法同形。
   void _scheduleUpdateCheck() {
+    // Web 端由服务端直接提供当前前端资源，不支持客户端补丁/整包升级，
+    // 也不应在启动时访问 Release API 或弹出更新对话框。
+    if (kIsWeb) return;
     if (_updateChecked) return;
     if (ref.read(authStateProvider).status == AuthStatus.authenticated) {
       _armUpdateCheck();

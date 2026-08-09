@@ -819,15 +819,14 @@ class _SettingsCategoryContentState
         icon: Icons.system_update_outlined,
         children: [
           _buildServerVersionTile(),
-          if (!AppConfig.isEmbedded) ...[
+          if (!kIsWeb && !AppConfig.isEmbedded) ...[
             const Divider(height: 1),
             _buildFrontendUpdateTile(),
           ],
-          // 开关刻意在 isEmbedded 守卫**之外**:它管的是启动时的 maybeShow,而那个
-          // 检查在所有平台都会跑(embedded web 也会走整包新版本提示并引导去下载
-          // 客户端)。跟着上面的 tile 一起隐藏会让 embedded 用户没法关掉它。
-          const Divider(height: 1),
-          _buildAutoUpdateCheckTile(),
+          if (!kIsWeb) ...[
+            const Divider(height: 1),
+            _buildAutoUpdateCheckTile(),
+          ],
           const Divider(height: 1),
           _buildLogLevelTile(),
           const Divider(height: 1),

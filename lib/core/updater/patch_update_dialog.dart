@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_patcher/flutter_patcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -72,6 +73,10 @@ class PatchUpdateDialog extends ConsumerStatefulWidget {
     WidgetRef ref, {
     bool manual = false,
   }) async {
+    // Web 端没有客户端补丁或安装包更新流程。这里保留防护，避免未来新增
+    // 启动/手动调用点时误发 Release 检查请求或弹出更新对话框。
+    if (kIsWeb) return false;
+
     final prefs = await ref.read(appPreferencesProvider.future);
 
     // 自动路径下、写新时间戳之前的旧值。查到补丁却没能弹出来时用它回滚节流窗口。

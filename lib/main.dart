@@ -44,7 +44,6 @@ import 'features/player/presentation/widgets/player_shortcut_scope.dart';
 import 'features/settings/presentation/providers/settings_provider.dart';
 import 'features/settings/presentation/providers/theme_pack_provider.dart';
 import 'features/startup/presentation/startup_gate.dart';
-import 'features/startup/presentation/web_update_gate.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_holder.dart';
 
@@ -513,15 +512,12 @@ class SongloftApp extends ConsumerWidget {
                   ),
           child: child!,
         );
-        // Web 端启动时检测缓存是否过期（原生端 build 直返 child，零开销）。
-        // 包在此处：位于所有路由的公共祖先，且通过 rootNavigatorKey 弹窗。
-        final gated = WebUpdateGate(child: themed);
         // 桌面端在 MaterialApp.builder（Navigator 之上、WidgetsApp 默认 Shortcuts
         // 之下）挂载全局播放快捷键监听：此处是所有路由的公共祖先，故 push 的全屏
         // 播放页 / 队列 BottomSheet 等脱离 ShellRoute 的页面也能命中快捷键
         // （songloft-org/songloft#279）。移动/Web 不包裹（零开销、零行为变化）。
-        if (!PlatformUtils.isDesktop) return gated;
-        return PlayerShortcutScope(child: gated);
+        if (!PlatformUtils.isDesktop) return themed;
+        return PlayerShortcutScope(child: themed);
       },
     );
   }
