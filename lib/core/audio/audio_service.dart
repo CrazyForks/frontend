@@ -805,7 +805,8 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
       // Web: stop() 会 removeAttribute('src') 重置 <audio> 元素，破坏浏览器的
       // autoplay 授权链——后台标签页中自动切歌时 play() 被拒绝导致无声（#351）。
       // iOS: stop() 会使音频会话变为空闲，系统限制后台网络访问，下一首无法加载。
-      // setAudioSource 内部的 load() 已处理 HLS 清理和旧源释放，无需预先 stop。
+      // vendored Web player 的完整 load() 会重建音源树缓存并处理 HLS 清理，无需预先 stop
+      // （songloft-org/songloft#376）。
 
       // 主动通知后端：本会话已切到 song.id，让其他 songID 的 prefetch/transcode/reassign 退场。
       // 必须在 setAudioSource 之前发起，让后端 plugin worker 尽早释放给本次播放使用。

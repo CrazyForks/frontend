@@ -609,9 +609,24 @@ class SettingsApi {
   /// 下载已脱敏的后端日志（GET /logs/export），返回原始字节供打包导出。
   Future<List<int>> downloadBackendLogs() async {
     try {
+      // 日志导出允许缺少后端时降级为仅打包前端日志。先用短超时健康探测，避免
+      // 浏览器在离线地址上叠加普通 API 的连接/接收超时；探测成功后再给有界日志流
+      // 足够的接收时间。
+      const probeTimeout = Duration(seconds: 3);
+      await dio.get<dynamic>(
+        '${AppConfig.apiPrefix}/health',
+        options: Options(
+          connectTimeout: probeTimeout,
+          receiveTimeout: probeTimeout,
+        ),
+      );
       final response = await dio.get<List<int>>(
         '${AppConfig.apiPrefix}/logs/export',
-        options: Options(responseType: ResponseType.bytes),
+        options: Options(
+          responseType: ResponseType.bytes,
+          connectTimeout: AppConfig.connectTimeout,
+          receiveTimeout: const Duration(seconds: 60),
+        ),
       );
       return response.data ?? <int>[];
     } on DioException catch (e) {

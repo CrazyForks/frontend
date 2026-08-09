@@ -86,6 +86,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   static const int _positionSaveIntervalSec = 10;
   final PlaybackStateStorage _playbackStorage = PlaybackStateStorage();
   int _savedPositionMs = 0;
+  bool _webPlaybackPersistenceDisabled = false;
 
   @override
   PlayerState build() {
@@ -235,10 +236,11 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   Future<void> _restorePlaybackState(AppPreferences prefs) async {
     try {
-      final savedQueue = await _playbackStorage.loadQueue();
+      final snapshot = await _playbackStorage.loadQueue();
+      final savedQueue = snapshot.songs;
       if (savedQueue.isEmpty) return;
 
-      final savedIndex = prefs.getCurrentIndex();
+      final savedIndex = snapshot.currentIndex ?? prefs.getCurrentIndex();
       final safeIndex = savedIndex.clamp(0, savedQueue.length - 1);
       _savedPositionMs = prefs.getPositionMs();
       final savedContext = prefs.getSourceContext();
@@ -262,6 +264,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   void _savePlaybackState() {
     _saveDebounceTimer?.cancel();
+    if (_webPlaybackPersistenceDisabled && state.playlist.isNotEmpty) return;
     _saveDebounceTimer = Timer(
       const Duration(milliseconds: _saveDebounceMs),
       () async {
@@ -270,9 +273,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
           if (state.playlist.isEmpty) {
             await _playbackStorage.clear();
             await prefs.clearPlaybackState();
+            _webPlaybackPersistenceDisabled = false;
           } else {
-            await _playbackStorage.saveQueue(state.playlist);
-            await prefs.setCurrentIndex(state.currentIndex);
+            final result = await _playbackStorage.saveQueue(
+              state.playlist,
+              currentIndex: state.currentIndex,
+            );
+            if (!result.saved) {
+              if (kIsWeb) _webPlaybackPersistenceDisabled = true;
+              return;
+            }
+            await prefs.setCurrentIndex(result.persistedIndex);
             await prefs.setPositionMs(state.currentTime.inMilliseconds);
             await prefs.setSourceContext(state.playbackContext);
             if (state.playbackContext != null && state.currentSong != null) {
@@ -283,6 +294,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
             }
           }
         } catch (e) {
+          if (kIsWeb) _webPlaybackPersistenceDisabled = true;
           debugPrint('[Player] Failed to save playback state: $e');
         }
       },
@@ -294,11 +306,16 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _positionSaveTimer = Timer.periodic(
       const Duration(seconds: _positionSaveIntervalSec),
       (_) async {
-        if (!state.isPlaying || state.currentIndex < 0) return;
+        if (!state.isPlaying ||
+            state.currentIndex < 0 ||
+            _webPlaybackPersistenceDisabled) {
+          return;
+        }
         try {
           final prefs = await ref.read(appPreferencesProvider.future);
           await prefs.setPositionMs(state.currentTime.inMilliseconds);
         } catch (e) {
+          if (kIsWeb) _webPlaybackPersistenceDisabled = true;
           debugPrint('[Player] Failed to save position: $e');
         }
       },

@@ -1,6 +1,7 @@
 // 本文件 vendoring 自 just_audio_web 0.4.16（lib/just_audio_web.dart），
-// 逐字复制上游实现，仅做一处外科式改动：在 [Html5AudioPlayer.loadUri] 内
-// 为 HLS(.m3u8/.m3u) 源接入 hls.js（见 `web/hls_bridge.js` 的 SongloftHls）。
+// 逐字复制上游实现，保留两处 Songloft 修正：在 [Html5AudioPlayer.loadUri] 内
+// 为 HLS(.m3u8/.m3u) 源接入 hls.js；完整 load 时重建音源缓存，避免 just_audio
+// 复用固定 playlist 根 ID 后仍命中上一首歌曲的旧音源树。
 //
 // 背景：桌面 Chrome/Edge 的 <audio> 元素原生不支持 HLS（仅 Safari 支持），
 // 导致 web 端 m3u8 电台完全无法播放（songloft-org/songloft#275）。hls.js 用 MSE 解码后
@@ -322,6 +323,11 @@ class Html5AudioPlayer extends JustAudioPlayer {
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     _currentAudioSourcePlayer?.pause();
+    // just_audio 0.10 的完整 setAudioSources() 会复用 ConcatenatingAudioSource
+    // 根节点 ID（空字符串），但请求里的 children 已是全新的 URI。上游 Web 实现若继续
+    // 按 ID 命中旧根节点，<audio> 会重播旧 URI，造成 UI/歌词已切歌而声音不变。
+    // 完整 load 代表整棵树的权威快照，必须先清缓存再解码；后续动态增删仍复用新树缓存。
+    _audioSourcePlayers.clear();
     _audioSourcePlayer = getAudioSource(request.audioSourceMessage);
     _index = request.initialIndex ?? 0;
     final duration = await _currentAudioSourcePlayer!.load(
