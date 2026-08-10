@@ -3610,7 +3610,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsGithubProxyCustom => '自定义代理';
 
   @override
-  String get settingsGithubProxyCustomHelper => '输入代理地址，如 https://ghproxy.com/';
+  String get settingsGithubProxyCustomHelper => '输入代理地址，如 https://example.com/';
+
+  @override
+  String get settingsGithubProxyCopyPrompt => '复制 Prompt 让 AI 帮你找';
+
+  @override
+  String get settingsGithubProxyCopied => '已复制到剪贴板，粘贴给任意 AI 即可';
 
   @override
   String get settingsGithubProxyCleared => '已切换为直连';

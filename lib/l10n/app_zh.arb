@@ -2361,7 +2361,9 @@
   "settingsGithubProxyTitle": "GitHub 加速代理",
   "settingsGithubProxyDialogDesc": "插件安装/更新、检查更新与客户端下载共用此代理。国内访问 GitHub 较慢时可选择镜像加速。",
   "settingsGithubProxyCustom": "自定义代理",
-  "settingsGithubProxyCustomHelper": "输入代理地址，如 https://ghproxy.com/",
+  "settingsGithubProxyCustomHelper": "输入代理地址，如 https://example.com/",
+  "settingsGithubProxyCopyPrompt": "复制 Prompt 让 AI 帮你找",
+  "settingsGithubProxyCopied": "已复制到剪贴板，粘贴给任意 AI 即可",
   "settingsGithubProxyCleared": "已切换为直连",
   "settingsGithubProxySet": "已设置 GitHub 代理：{proxy}",
   "@settingsGithubProxySet": {

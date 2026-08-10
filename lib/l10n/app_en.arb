@@ -2256,7 +2256,9 @@
   "settingsGithubProxyTitle": "GitHub Proxy",
   "settingsGithubProxyDialogDesc": "Shared by plugin install/update, update checks and client downloads. Pick a mirror if GitHub is slow in your region.",
   "settingsGithubProxyCustom": "Custom proxy",
-  "settingsGithubProxyCustomHelper": "Enter a proxy address, e.g. https://ghproxy.com/",
+  "settingsGithubProxyCustomHelper": "Enter a proxy address, e.g. https://example.com/",
+  "settingsGithubProxyCopyPrompt": "Copy prompt to ask AI",
+  "settingsGithubProxyCopied": "Copied — paste it into any AI chat",
   "settingsGithubProxyCleared": "Switched to direct connection",
   "settingsGithubProxySet": "GitHub proxy set to {proxy}",
   "@settingsGithubProxySet": {

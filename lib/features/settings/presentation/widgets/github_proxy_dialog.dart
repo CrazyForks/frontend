@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/constants/github_proxy.dart';
+
+const _kAiPrompt =
+    '请帮我找几个目前可用的 GitHub 文件加速/反代服务（GitHub proxy mirror），'
+    '要求：1) 免费、无需注册；2) 支持代理 github.com 和 raw.githubusercontent.com 的文件下载；'
+    '3) 用法是在原始 URL 前拼接代理前缀，如 https://代理地址/https://github.com/...。'
+    '请给出 3-5 个可用的代理地址（以 https:// 开头、/ 结尾），并注明各自的特点。';
 
 /// GitHub 加速代理选择弹窗：预设常用镜像 + 自定义地址，返回选定的代理前缀（空串表示直连）。
 class GithubProxyDialog extends StatefulWidget {
@@ -89,7 +96,7 @@ class _GithubProxyDialogState extends State<GithubProxyDialog> {
                 ],
               ),
             ),
-            if (_selected == -1)
+            if (_selected == -1) ...[
               Padding(
                 padding: const EdgeInsets.only(left: 16, top: 4),
                 child: TextField(
@@ -105,6 +112,31 @@ class _GithubProxyDialogState extends State<GithubProxyDialog> {
                   style: theme.textTheme.bodySmall,
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.only(left: 16, top: 8),
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(
+                      const ClipboardData(text: _kAiPrompt),
+                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.settingsGithubProxyCopied),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.auto_awesome, size: 16),
+                  label: Text(l10n.settingsGithubProxyCopyPrompt),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

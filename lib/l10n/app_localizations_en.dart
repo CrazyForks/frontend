@@ -3771,7 +3771,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsGithubProxyCustomHelper =>
-      'Enter a proxy address, e.g. https://ghproxy.com/';
+      'Enter a proxy address, e.g. https://example.com/';
+
+  @override
+  String get settingsGithubProxyCopyPrompt => 'Copy prompt to ask AI';
+
+  @override
+  String get settingsGithubProxyCopied => 'Copied — paste it into any AI chat';
 
   @override
   String get settingsGithubProxyCleared => 'Switched to direct connection';

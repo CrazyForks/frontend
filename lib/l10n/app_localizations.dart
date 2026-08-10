@@ -6532,8 +6532,20 @@ abstract class AppLocalizations {
   /// No description provided for @settingsGithubProxyCustomHelper.
   ///
   /// In zh, this message translates to:
-  /// **'输入代理地址，如 https://ghproxy.com/'**
+  /// **'输入代理地址，如 https://example.com/'**
   String get settingsGithubProxyCustomHelper;
+
+  /// No description provided for @settingsGithubProxyCopyPrompt.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制 Prompt 让 AI 帮你找'**
+  String get settingsGithubProxyCopyPrompt;
+
+  /// No description provided for @settingsGithubProxyCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'已复制到剪贴板，粘贴给任意 AI 即可'**
+  String get settingsGithubProxyCopied;
 
   /// No description provided for @settingsGithubProxyCleared.
   ///
