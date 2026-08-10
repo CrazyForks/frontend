@@ -45,9 +45,6 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 切歌时由 [clearIncompleteNormCache] 判定是否需要清理。
   File? _normCacheFile;
 
-  /// 当前播放歌曲的元数据时长（秒），用于判断 normalize 缓存完整性。
-  double _currentSongMetaDuration = 0;
-
   /// 是否正连着 Bundle 内嵌本地后端（RunMode.local 的等价判定）。
   ///
   /// handler 无 Riverpod Ref 拿不到 runModeProvider，但本地模式的所有入口都把
@@ -731,7 +728,6 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
         );
         source = ja.AudioSource.uri(Uri.file(cachedPath));
         _normCacheFile = null;
-        _currentSongMetaDuration = 0;
       } else if (useLiveSource) {
         final isMobile =
             !kIsWeb &&
@@ -769,7 +765,6 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
           source = ja.AudioSource.uri(Uri.parse(songUrl), headers: headers);
         }
         _normCacheFile = null;
-        _currentSongMetaDuration = 0;
       } else {
         // 普通歌曲用 LockCachingAudioSource（本身即经本地代理 + Dart HttpClient 边播边缓存），
         // 上游 HTTPS 已受 HttpOverrides trust-all 覆盖，无需额外处理。
@@ -779,15 +774,21 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
           final dir = await getTemporaryDirectory();
           final normDir = Directory('${dir.path}/songloft_norm_cache');
           if (!normDir.existsSync()) normDir.createSync(recursive: true);
-          _normCacheFile = File('${normDir.path}/${song.id}.audio');
-          _currentSongMetaDuration = song.duration;
-          source = ja.LockCachingAudioSource(
-            Uri.parse(songUrl),
-            cacheFile: _normCacheFile!,
-          );
+          final cacheFile = File('${normDir.path}/${song.id}.audio');
+          if (cacheFile.existsSync()) {
+            // 完整缓存命中（LockCachingAudioSource 已将 .part rename 为最终文件）
+            source = ja.AudioSource.uri(Uri.file(cacheFile.path));
+            _normCacheFile = null;
+          } else {
+            _cleanupPartialNormDownload(cacheFile.path);
+            _normCacheFile = cacheFile;
+            source = ja.LockCachingAudioSource(
+              Uri.parse(songUrl),
+              cacheFile: _normCacheFile!,
+            );
+          }
         } else {
           _normCacheFile = null;
-          _currentSongMetaDuration = 0;
           source = ja.LockCachingAudioSource(Uri.parse(songUrl));
         }
       }
@@ -1050,37 +1051,38 @@ class SongloftAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// 切歌时清理不完整的 normalize 缓存（songloft-org/songloft-player#35）。
   ///
-  /// 对比播放器实际报告时长与歌曲元数据时长：差距超过 5 秒说明 chunked 流
-  /// 未传完就被切断，缓存文件不完整需要删除；时长匹配则说明文件已完整下载，保留缓存。
+  /// 判定依据：LockCachingAudioSource 下载完成时将 .part rename 为最终 cacheFile，
+  /// 因此 cacheFile 存在即表示下载完整——保留；不存在则说明下载未完成（数据仍在
+  /// .part 中），清理 .part 及 .mime 残留文件。
   void clearIncompleteNormCache() {
     if (_normCacheFile == null) return;
-    final playerDur = _player.duration;
-    if (playerDur == null || _currentSongMetaDuration <= 0) {
-      _tryDeleteNormCache();
+    if (_normCacheFile!.existsSync()) {
+      debugPrint(
+        '[Player] norm cache complete, keeping: ${_normCacheFile!.path}',
+      );
+      _normCacheFile = null;
       return;
     }
-    final diff = _currentSongMetaDuration - playerDur.inSeconds;
-    if (diff > 5) {
-      _tryDeleteNormCache();
-    } else {
-      _normCacheFile = null;
-      _currentSongMetaDuration = 0;
-    }
+    debugPrint(
+      '[Player] norm cache incomplete, cleaning up: ${_normCacheFile!.path}',
+    );
+    _cleanupPartialNormDownload(_normCacheFile!.path);
+    _normCacheFile = null;
   }
 
-  void _tryDeleteNormCache() {
-    try {
-      if (_normCacheFile?.existsSync() ?? false) {
-        _normCacheFile!.deleteSync();
-        debugPrint(
-          '[Player] deleted incomplete norm cache: ${_normCacheFile!.path}',
-        );
+  /// 删除 LockCachingAudioSource 的 .part（下载中间态）和 .mime（内容类型记录）文件。
+  void _cleanupPartialNormDownload(String cachePath) {
+    for (final suffix in ['.part', '.mime']) {
+      try {
+        final f = File('$cachePath$suffix');
+        if (f.existsSync()) {
+          f.deleteSync();
+          debugPrint('[Player] deleted partial norm file: $cachePath$suffix');
+        }
+      } catch (e) {
+        debugPrint('[Player] norm cleanup failed (ignored): $e');
       }
-    } catch (e) {
-      debugPrint('[Player] norm cache cleanup failed (ignored): $e');
     }
-    _normCacheFile = null;
-    _currentSongMetaDuration = 0;
   }
 
   // ====================== 音量控制 ======================
