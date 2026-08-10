@@ -131,14 +131,20 @@ class AppConfig {
           : frontendUpdateReleasesUrl;
 
   /// 格式化前端版本号用于显示
-  /// 'dev' -> '开发版本 (abc1234)', '1.0.14' -> 'v1.0.14'
+  /// 'dev' -> '开发版本 (abc1234 · 2026-08-01_12:00:00)'
+  /// '1.0.14' -> 'v1.0.14 (abc1234 · 2026-08-01_12:00:00)'
   static String get frontendVersionDisplay {
-    if (frontendVersion == 'dev') {
-      final label = l10nOrNull?.coreVersionDev ?? '开发版本';
-      return frontendGitCommit != 'unknown' && frontendGitCommit.isNotEmpty
-          ? '$label ($frontendGitCommit)'
-          : label;
+    final base =
+        frontendVersion == 'dev'
+            ? (l10nOrNull?.coreVersionDev ?? '开发版本')
+            : 'v$frontendVersion';
+    final details = <String>[];
+    if (frontendGitCommit != 'unknown' && frontendGitCommit.isNotEmpty) {
+      details.add(frontendGitCommit);
     }
-    return 'v$frontendVersion';
+    if (frontendBuildTime != 'unknown' && frontendBuildTime.isNotEmpty) {
+      details.add(frontendBuildTime);
+    }
+    return details.isEmpty ? base : '$base (${details.join(' · ')})';
   }
 }

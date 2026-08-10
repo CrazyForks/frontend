@@ -118,16 +118,18 @@ class SettingsServerInfoCard extends ConsumerWidget {
     final versionInfo = serverVersionAsync.value;
     String? versionLabel;
     if (versionInfo != null) {
-      // 开发版显示「开发版」，正式版显示 vX.Y.Z；两者都附上构建时间以便核对
-      // 当前跑的具体构建（build_time 缺失/unknown 时省略）。
       final base =
           versionInfo.version == 'dev'
               ? l10n.settingsDevVersion
               : 'v${versionInfo.version}';
-      versionLabel =
-          versionInfo.buildTime != null
-              ? '$base (${versionInfo.buildTime})'
-              : base;
+      final details = <String>[];
+      if (versionInfo.gitCommit != null) {
+        details.add(versionInfo.gitCommit!);
+      }
+      if (versionInfo.buildTime != null) {
+        details.add(versionInfo.buildTime!);
+      }
+      versionLabel = details.isEmpty ? base : '$base (${details.join(' · ')})';
     }
 
     return Container(
