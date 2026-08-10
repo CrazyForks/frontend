@@ -1,1 +1,1 @@
-void overrideSemanticsPointerEvents(bool block) {}
+void injectSemanticsPointerOverride() {}

@@ -10,30 +10,29 @@ import 'semantics_pointer_override.dart';
 /// songloft-org/songloft#186），让读屏器无需用户先点「Enable accessibility」；
 /// 移动端浏览器**不常驻**，否则软键盘弹不出来（见下文 songloft-player#26）。
 ///
-/// 但插件 Tab 是内嵌 iframe 的**平台视图**（HtmlElementView）。当语义树常驻时，
-/// Flutter 引擎的残留 bug（[flutter/flutter#175119]）会把语义节点卡在
-/// `pointer-events: auto` 并叠在插件平台视图之上，抢走本该落到 iframe 的点击，
-/// 导致插件完全无法操作（songloft-org/songloft#295）。引擎主修复 #182167 已在
-/// 当前 Flutter 版本中，但未完全覆盖此场景。
+/// ## 全局 pointer-events 覆盖（songloft-org/songloft#378）
 ///
-/// 方案分两层：
+/// 常驻语义树时，引擎为每个语义节点设置 `pointer-events: auto`，形成覆盖在
+/// canvas 之上的 DOM 层。Flutter 自身的 hover 检测走 canvas 层 hit-testing（始终
+/// 准确），但点击可被语义 DOM 节点拦截。若语义节点的位置因滚动、布局变化
+/// （ExpansionTile 展开/收起）等原因与渲染树不同步（flutter/flutter#175119），
+/// 就会出现「hover 高亮在 A 项、点击却落到 B 项」的错位。
 ///
-/// 1. **释放语义句柄**——进入插件 Tab 时临时释放我们持有的语义句柄。若此时没有
-///    读屏器（普通鼠标用户），语义树句柄计数归零、整棵语义 DOM 被拆除，残留的
-///    遮挡节点随之消失，iframe 恢复可点击；离开插件 Tab 时重新获取句柄。
+/// 修复：[enableByDefault] 在获取句柄的同时**全局注入**
+/// `pointer-events: none !important`，确保所有指针事件统一走 Flutter canvas
+/// 层 hit-testing，彻底消除 hover/click 位置漂移。屏幕阅读器通过无障碍 API
+/// 操作元素、不依赖 DOM pointer events，功能不受影响。
 ///
-/// 2. **CSS 层 pointer-events 覆盖**——释放句柄在读屏器激活时（平台持有另一个
-///    独立句柄，见 SemanticsBinding `_handleSemanticsEnabledChanged`）不会关闭
-///    语义树。此时第二层保底：给 `flt-semantics-host` 加 CSS class，用
-///    `pointer-events: none !important` 覆盖引擎对每个 `flt-semantics` 节点设置
-///    的内联 `pointer-events: auto/all`，确保语义节点无论是否存在都不会拦截
-///    iframe 的点击事件。
+/// ## 插件 Tab iframe 遮挡（songloft-org/songloft#295）
 ///
-/// [suspendForPlugin] / [resume] 使用引用计数：多个独立调用方（shell_layout 的
-/// 插件 Tab 与 plugin_webview_page 的全屏插件路由）可安全嵌套，仅当所有调用方
-/// 都已 resume 后才真正恢复语义树。
+/// 插件 Tab 是内嵌 iframe 的**平台视图**（HtmlElementView）。即使全局 CSS 已禁止
+/// 语义节点拦截指针，语义 DOM 本身仍可能叠在 iframe 上方、干扰原生事件分发
+/// （尤其在读屏器激活、平台持有独立句柄时语义 DOM 不可拆除）。
 ///
-/// 插件内容本身是独立文档、自带无障碍，故主 App 的无障碍能力不受影响。
+/// [suspendForPlugin] 临时释放我们持有的句柄：若此时没有读屏器，语义树句柄计数
+/// 归零、整棵语义 DOM 被拆除，iframe 恢复正常；离开插件 Tab 时 [resume] 重新
+/// 获取句柄。引用计数支持多个调用方（shell_layout 插件 Tab + plugin_webview_page
+/// 全屏插件路由）安全嵌套。
 ///
 /// ## 移动端浏览器不常驻语义树（songloft-org/songloft-player#26）
 ///
@@ -74,7 +73,9 @@ class WebSemanticsController {
   /// suspend/resume，引用计数确保仅当**所有**调用方都 resume 后才真正恢复语义。
   int _suspendCount = 0;
 
-  /// 应用启动时调用一次：桌面 Web 默认启用（常驻）语义树。
+  /// 应用启动时调用一次：桌面 Web 默认启用（常驻）语义树，并全局注入
+  /// `pointer-events: none` 覆盖，防止语义 DOM 节点拦截指针事件导致
+  /// hover/click 位置漂移（songloft-org/songloft#378）。
   ///
   /// 移动端浏览器跳过，否则软键盘弹不出来（见类注释
   /// songloft-org/songloft-player#26）。
@@ -83,6 +84,7 @@ class WebSemanticsController {
     if (isMobileWebPlatform(defaultTargetPlatform)) return;
     _wantEnabledByDefault = true;
     _acquire();
+    injectSemanticsPointerOverride();
   }
 
   /// 当前 Web 运行环境是否为移动端浏览器。
@@ -95,32 +97,33 @@ class WebSemanticsController {
   static bool isMobileWebPlatform(TargetPlatform platform) =>
       platform == TargetPlatform.iOS || platform == TargetPlatform.android;
 
-  /// 进入插件 Tab（iframe 平台视图激活）时调用：临时释放语义句柄，并用 CSS
-  /// 覆盖禁止语义节点拦截指针事件，避免残留语义节点遮挡 iframe
-  /// （songloft-org/songloft#295）。
+  /// 进入插件 Tab（iframe 平台视图激活）时调用：临时释放语义句柄，让无读屏器
+  /// 时的语义 DOM 被完全拆除，避免残留节点叠在 iframe 上方干扰原生事件分发
+  /// （songloft-org/songloft#295）。同时注入全局 pointer-events 覆盖——桌面 Web
+  /// 上由 [enableByDefault] 已注入（此处幂等 no-op），移动端 Web 则在此处兜底
+  /// 读屏器自行开启语义树的场景。
   ///
   /// 支持嵌套：多次调用需匹配等量的 [resume] 才真正恢复。
   ///
-  /// 不再要求 [_wantEnabledByDefault]：移动端浏览器不常驻语义树，但读屏器可能自己
-  /// 开启语义树，第二层 CSS 兜底仍需生效（[_release] 在未持句柄时本就是 no-op）。
+  /// 不要求 [_wantEnabledByDefault]：移动端浏览器不常驻语义树，但读屏器可能自己
+  /// 开启语义树（[_release] 在未持句柄时本就是 no-op）。
   void suspendForPlugin() {
     if (!kIsWeb) return;
     _suspendCount++;
     if (_suspendCount == 1) {
       _release();
-      overrideSemanticsPointerEvents(true);
+      injectSemanticsPointerOverride();
     }
   }
 
-  /// 离开插件 Tab 时调用：当所有 suspend 调用方都已 resume 后，恢复指针事件；仅当
-  /// 本就常驻语义树（桌面 Web）时才重新获取句柄。
+  /// 离开插件 Tab 时调用：当所有 suspend 调用方都已 resume 后，仅当本就常驻语义树
+  /// （桌面 Web）时重新获取句柄。
   void resume() {
     if (!kIsWeb) return;
     if (_suspendCount <= 0) return;
     _suspendCount--;
     if (_suspendCount == 0) {
       if (_wantEnabledByDefault) _acquire();
-      overrideSemanticsPointerEvents(false);
     }
   }
 
