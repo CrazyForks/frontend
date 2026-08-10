@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
@@ -150,25 +149,41 @@ class PaginatedPlaylistsNotifier
   @override
   Future<PaginatedPlaylistsState> build() async {
     final repository = ref.watch(playlistRepositoryProvider);
+    final typeLabel = _typeArg ?? 'all';
     // 首屏关键请求：单次超时 + 有限重试兜底，避免偶发「服务端已返回但请求卡在坏连接上
     // 不完成」导致首页无限骨架屏、只能反复退出重启（songloft-org/songloft#314）。
     // 全部重试失败才抛出，交由 UI 显示错误态 + 手动重试。
-    final response = await loadWithRetry(
-      () => repository.getPlaylists(
-        type: _typeArg,
-        excludeLabels: _excludeLabels,
+    try {
+      final response = await loadWithRetry(
+        () => repository.getPlaylists(
+          type: _typeArg,
+          excludeLabels: _excludeLabels,
+          keyword: _keyword,
+          limit: pageLimit,
+          offset: 0,
+        ),
+        onRetry: (attempt, error) {
+          debugPrint(
+            '[PlaylistList] 初始加载重试: type=$typeLabel '
+            'failedAttempt=$attempt error=$error',
+          );
+        },
+      );
+      debugPrint(
+        '[PlaylistList] 初始加载完成: type=$typeLabel '
+        'count=${response.playlists.length} total=${response.total}',
+      );
+      return PaginatedPlaylistsState(
+        items: response.playlists,
+        totalCount: response.total,
+        hasMore: response.playlists.length >= pageLimit,
+        isLoadingMore: false,
         keyword: _keyword,
-        limit: pageLimit,
-        offset: 0,
-      ),
-    );
-    return PaginatedPlaylistsState(
-      items: response.playlists,
-      totalCount: response.total,
-      hasMore: response.playlists.length >= pageLimit,
-      isLoadingMore: false,
-      keyword: _keyword,
-    );
+      );
+    } catch (error) {
+      debugPrint('[PlaylistList] 初始加载失败: type=$typeLabel error=$error');
+      rethrow;
+    }
   }
 
   /// 设置排除标签并刷新列表
@@ -285,7 +300,9 @@ class PaginatedSongsNotifier extends AsyncNotifier<PaginatedSongsState> {
   Future<PaginatedSongsState> build() async {
     if (!_sortInitialized) {
       try {
-        final playlist = await ref.read(playlistRepositoryProvider).getPlaylist(_playlistId);
+        final playlist = await ref
+            .read(playlistRepositoryProvider)
+            .getPlaylist(_playlistId);
         _sort = playlist.sortBy;
         _order = playlist.sortOrder;
       } catch (_) {}
@@ -374,11 +391,9 @@ class PaginatedSongsNotifier extends AsyncNotifier<PaginatedSongsState> {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => build());
     try {
-      await ref.read(playlistRepositoryProvider).updatePlaylistSort(
-        _playlistId,
-        sortBy: sort,
-        sortOrder: order,
-      );
+      await ref
+          .read(playlistRepositoryProvider)
+          .updatePlaylistSort(_playlistId, sortBy: sort, sortOrder: order);
     } catch (_) {}
   }
 
@@ -396,11 +411,13 @@ class PaginatedSongsNotifier extends AsyncNotifier<PaginatedSongsState> {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => build());
     try {
-      await ref.read(playlistRepositoryProvider).updatePlaylistSort(
-        _playlistId,
-        sortBy: 'position',
-        sortOrder: 'asc',
-      );
+      await ref
+          .read(playlistRepositoryProvider)
+          .updatePlaylistSort(
+            _playlistId,
+            sortBy: 'position',
+            sortOrder: 'asc',
+          );
     } catch (_) {}
   }
 }

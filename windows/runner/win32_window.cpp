@@ -249,6 +249,29 @@ void Win32Window::SetChildContent(HWND content) {
   SetFocus(child_content_);
 }
 
+bool Win32Window::RefreshChildContentBounds() {
+  if (window_handle_ == nullptr || child_content_ == nullptr) {
+    return false;
+  }
+
+  const RECT target = GetClientArea();
+  RECT current = {};
+  if (!GetClientRect(child_content_, &current)) {
+    return false;
+  }
+
+  const LONG target_width = target.right - target.left;
+  const LONG target_height = target.bottom - target.top;
+  const LONG current_width = current.right - current.left;
+  const LONG current_height = current.bottom - current.top;
+  if (current_width == target_width && current_height == target_height) {
+    return false;
+  }
+
+  return MoveWindow(child_content_, target.left, target.top, target_width,
+                    target_height, TRUE) != FALSE;
+}
+
 RECT Win32Window::GetClientArea() {
   RECT frame;
   GetClientRect(window_handle_, &frame);

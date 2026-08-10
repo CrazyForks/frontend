@@ -56,8 +56,14 @@ bool FlutterWindow::OnCreate() {
   });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  flutter_controller_->engine()->SetNextFrameCallback([&]() {
+  flutter_controller_->engine()->SetNextFrameCallback([this]() {
     this->Show();
+    // Showing the top-level window can apply its final monitor DPI. Correct the
+    // Flutter child only when that changed the client size; unconditional
+    // top-level resize jitter can leave the Windows surface on a stale frame.
+    if (this->RefreshChildContentBounds()) {
+      flutter_controller_->ForceRedraw();
+    }
   });
 
   // Flutter can complete the first frame before the "show window" callback is

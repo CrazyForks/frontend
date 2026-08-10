@@ -45,6 +45,10 @@ class Win32Window {
   // Inserts |content| into the window tree.
   void SetChildContent(HWND content);
 
+  // Ensures the hosted content matches the top-level window's client area.
+  // Returns true when the child window was resized.
+  bool RefreshChildContentBounds();
+
   // Returns the backing Window handle to enable clients to set icon and other
   // window properties. Returns nullptr if the window has been destroyed.
   HWND GetHandle();
