@@ -157,6 +157,21 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
       debugPrint('[CacheManager] 获取图片缓存大小失败: $e');
     }
 
+    // 音量均衡缓存大小（临时目录中的 songloft_norm_cache，songloft-org/songloft-player#35）
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final normCacheDir = Directory('${tempDir.path}/songloft_norm_cache');
+      if (await normCacheDir.exists()) {
+        await for (final entity in normCacheDir.list(recursive: true)) {
+          if (entity is File) {
+            total += await entity.length();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[CacheManager] 获取均衡缓存大小失败: $e');
+    }
+
     if (mounted) {
       setState(() {
         _localCacheSize = total;
@@ -234,6 +249,19 @@ class _CacheManagerState extends ConsumerState<CacheManager> {
         }
       } catch (e) {
         debugPrint('[CacheManager] 清理图片缓存失败: $e');
+      }
+
+      // 清理音量均衡缓存（songloft-org/songloft-player#35）：这个目录此前不在
+      // 统计/清理范围内，导致旧版本遗留的不完整缓存文件永久残留、被误判为完整
+      // 而一直命中，播放时长缺失且无法自愈。
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final normCacheDir = Directory('${tempDir.path}/songloft_norm_cache');
+        if (await normCacheDir.exists()) {
+          await normCacheDir.delete(recursive: true);
+        }
+      } catch (e) {
+        debugPrint('[CacheManager] 清理均衡缓存失败: $e');
       }
 
       // 重新加载本地缓存大小
