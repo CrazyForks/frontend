@@ -1090,6 +1090,33 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _savePlaybackState();
   }
 
+  /// 读取歌单持久化的视图排序偏好（PUT /playlists/{id}/sort 写入），
+  /// 拿不到时退回 position/asc（等同不指定排序时后端的默认行为）。
+  /// 播放整单 / 播放历史续播都要用这个偏好，而不是想当然地按 position 拉，
+  /// 否则播放队列顺序会和歌单详情页里看到的自定义排序不一致
+  /// （songloft-org/songloft#381）。
+  Future<(String, String)> _playlistSortOrder(int playlistId) async {
+    try {
+      final playlist = await ref
+          .read(playlistApiProvider)
+          .getPlaylist(playlistId);
+      return (playlist.sortBy, playlist.sortOrder);
+    } catch (e) {
+      debugPrint('[Player] 获取歌单 $playlistId 排序偏好失败，回退默认排序: $e');
+      return ('position', 'asc');
+    }
+  }
+
+  /// 批量版 [_playlistSortOrder]，供合并播放多个歌单时并发取各自的排序偏好。
+  Future<Map<int, (String, String)>> _playlistSortOrders(
+    List<int> playlistIds,
+  ) async {
+    final entries = await Future.wait(
+      playlistIds.map((id) async => MapEntry(id, await _playlistSortOrder(id))),
+    );
+    return Map.fromEntries(entries);
+  }
+
   /// 通过歌单 ID 播放全部歌曲
   /// 策略：先取第一页（100首）立即开始播放，后台异步加载剩余歌曲
   /// 使用 _loadGeneration 防止竞态：用户切换歌单或清空时自动取消旧的后台加载
@@ -1102,10 +1129,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
     debugPrint('[Player] playPlaylistById: start, playlistId=$playlistId');
     _retryPolicy.recordSuccess();
     try {
+      final (sort, order) = await _playlistSortOrder(playlistId);
       final firstPageResponse = await playlistApi.getPlaylistSongs(
         playlistId,
         limit: firstPageLimit,
         offset: 0,
+        sort: sort,
+        order: order,
       );
       final firstPageSongs = firstPageResponse.songs;
       final total = firstPageResponse.total;
@@ -1160,6 +1190,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
           firstPageSongs.length,
           total,
           generation,
+          sort: sort,
+          order: order,
         );
       } else {
         debugPrint('[Player] playPlaylistById: all songs loaded in first page');
@@ -1250,10 +1282,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
   }
 
   /// 拉取上下文的有序歌曲 ID 列表。顺序与该上下文的分页列表一致。
-  Future<List<int>> _fetchContextSongIds(PlaybackContext context) async {
+  /// [sort]/[order] 仅对歌单上下文有意义，传入歌单当前的持久化排序偏好。
+  Future<List<int>> _fetchContextSongIds(
+    PlaybackContext context, {
+    String? sort,
+    String? order,
+  }) async {
     final playlistId = context.playlistId;
     if (playlistId != null) {
-      return ref.read(playlistApiProvider).getPlaylistSongIds(playlistId);
+      return ref
+          .read(playlistApiProvider)
+          .getPlaylistSongIds(playlistId, sort: sort, order: order);
     }
     // 上下文类型不认识（prefs 被写坏、手工深链、playlist 的 key 不是数字…）时必须早退：
     // categorySongsFilter 对未知 field 返回全 null 的过滤器，会退化成「无条件查询」，
@@ -1277,9 +1316,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
   }
 
   /// 返回按 offset/limit 抓取该上下文歌曲的函数。
+  /// [sort]/[order] 仅对歌单上下文有意义，传入歌单当前的持久化排序偏好。
   Future<List<Song>> Function(int offset, int limit) _contextFetcher(
-    PlaybackContext context,
-  ) {
+    PlaybackContext context, {
+    String? sort,
+    String? order,
+  }) {
     final playlistId = context.playlistId;
     if (playlistId != null) {
       final playlistApi = ref.read(playlistApiProvider);
@@ -1288,6 +1330,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
           playlistId,
           limit: limit,
           offset: offset,
+          sort: sort,
+          order: order,
         );
         return resp.songs;
       };
@@ -1317,10 +1361,19 @@ class PlayerNotifier extends Notifier<PlayerState> {
     required int generation,
   }) async {
     try {
-      final ids = await _fetchContextSongIds(context);
+      String? sort;
+      String? order;
+      final playlistId = context.playlistId;
+      if (playlistId != null) {
+        final (s, o) = await _playlistSortOrder(playlistId);
+        sort = s;
+        order = o;
+      }
+
+      final ids = await _fetchContextSongIds(context, sort: sort, order: order);
       if (_loadGeneration != generation || ids.isEmpty) return;
 
-      final fetch = _contextFetcher(context);
+      final fetch = _contextFetcher(context, sort: sort, order: order);
       final absIndex = ids.indexOf(songId);
 
       final success = await _queueLoader.loadAroundSong(
@@ -1375,11 +1428,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _retryPolicy.recordSuccess();
 
     try {
+      final sortPrefs = await _playlistSortOrders(playlistIds);
       final firstId = playlistIds.first;
+      final (firstSort, firstOrder) = sortPrefs[firstId]!;
       final firstPageResponse = await playlistApi.getPlaylistSongs(
         firstId,
         limit: firstPageLimit,
         offset: 0,
+        sort: firstSort,
+        order: firstOrder,
       );
       final firstPageSongs = firstPageResponse.songs;
       final firstTotal = firstPageResponse.total;
@@ -1400,6 +1457,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         generation,
         batchLimit,
         maxRetries,
+        sortPrefs,
       );
 
       return firstTotal;
@@ -1410,6 +1468,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   }
 
   /// 后台加载多歌单的剩余歌曲
+  /// [sortPrefs] 每个歌单各自的排序偏好（见 [_playlistSortOrders]）
   Future<void> _loadRemainingMultiplePlaylists(
     List<int> playlistIds,
     PlaylistApi playlistApi,
@@ -1418,9 +1477,11 @@ class PlayerNotifier extends Notifier<PlayerState> {
     int generation,
     int batchLimit,
     int maxRetries,
+    Map<int, (String, String)> sortPrefs,
   ) async {
     try {
       // 加载第一个歌单的剩余歌曲
+      final (firstSort, firstOrder) = sortPrefs[playlistIds.first]!;
       int offset = firstPlaylistOffset;
       while (offset < firstPlaylistTotal) {
         if (_loadGeneration != generation) return;
@@ -1429,6 +1490,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
             playlistIds.first,
             limit: batchLimit,
             offset: offset,
+            sort: firstSort,
+            order: firstOrder,
           ),
           maxRetries,
         );
@@ -1442,6 +1505,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       for (int i = 1; i < playlistIds.length; i++) {
         if (_loadGeneration != generation) return;
         final playlistId = playlistIds[i];
+        final (sort, order) = sortPrefs[playlistId]!;
         debugPrint(
           '[Player] _loadRemainingMultiplePlaylists: loading playlist $playlistId (${i + 1}/${playlistIds.length})',
         );
@@ -1454,6 +1518,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
               playlistId,
               limit: batchLimit,
               offset: playlistOffset,
+              sort: sort,
+              order: order,
             ),
             maxRetries,
           );

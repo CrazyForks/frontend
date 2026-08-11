@@ -1734,27 +1734,29 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
     }
   }
 
-  /// 播放全部（委托给 PlayerNotifier.playPlaylistById）
+  /// 播放全部（复用已加载分页 + 当前排序，与 `_playSong` 同一套路，
+  /// 修复播放全部/播放历史续播不遵循歌单自定义排序的问题 songloft-org/songloft#381）
   Future<void> _playAll(Playlist playlist, List<Song> songs) async {
     final l10n = AppLocalizations.of(context);
     if (songs.isEmpty) {
       ResponsiveSnackBar.show(context, message: l10n.playlistEmpty);
       return;
     }
-    final total = await ref
+    final state = ref.read(playlistSongsProvider(_playlistIdInt)).value;
+    final total = state?.total ?? songs.length;
+    await ref
         .read(playerStateProvider.notifier)
-        .playPlaylistById(playlist.id);
+        .playPlaylistFromLoaded(
+          loadedSongs: songs,
+          startIndex: 0,
+          playlistId: playlist.id,
+          total: total,
+          sort: state?.sort ?? 'position',
+          order: state?.order ?? 'asc',
+          keyword: state?.keyword ?? '',
+        );
     if (!mounted) return;
-    if (total < 0) {
-      ResponsiveSnackBar.showError(context, message: l10n.playlistPlayFailed);
-    } else if (total == 0) {
-      ResponsiveSnackBar.show(context, message: l10n.playlistEmpty);
-    } else {
-      ResponsiveSnackBar.show(
-        context,
-        message: l10n.playlistPlayingCount(total),
-      );
-    }
+    ResponsiveSnackBar.show(context, message: l10n.playlistPlayingCount(total));
   }
 
   /// 打开该歌单的播放历史面板（点某条历史可从那首接着往下播）

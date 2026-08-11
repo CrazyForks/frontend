@@ -210,13 +210,22 @@ class PlaylistApi {
   }
 
   /// 获取歌单内全部歌曲 ID（有序、不分页）
-  /// GET /api/v1/playlists/{id}/song-ids
+  /// GET /api/v1/playlists/{id}/song-ids?sort=&order=
   ///
-  /// 顺序与 getPlaylistSongs 的默认顺序一致，因此返回列表里的下标可以直接
+  /// sort/order 语义与 getPlaylistSongs 完全一致，省略时默认 position asc。
+  /// 传入与 getPlaylistSongs 相同的 sort/order 时，返回列表里的下标可以直接
   /// 当作 getPlaylistSongs 的 offset 使用（用于定位「某首歌在歌单里排第几」）。
-  Future<List<int>> getPlaylistSongIds(int id) async {
+  Future<List<int>> getPlaylistSongIds(
+    int id, {
+    String? sort,
+    String? order,
+  }) async {
+    final params = <String, dynamic>{};
+    if (sort != null && sort.isNotEmpty) params['sort'] = sort;
+    if (order != null && order.isNotEmpty) params['order'] = order;
     final response = await dio.get<Map<String, dynamic>>(
       '${AppConfig.apiPrefix}/playlists/$id/song-ids',
+      queryParameters: params,
     );
     final ids = response.data?['ids'] as List<dynamic>? ?? const [];
     return ids.map((e) => (e as num).toInt()).toList();
