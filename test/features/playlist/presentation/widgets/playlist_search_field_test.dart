@@ -48,7 +48,12 @@ void main() {
     }
   }
 
-  testWidgets('打开搜索框后在布局完成时获得焦点', (tester) async {
+  testWidgets('隐藏时不渲染 TextField', (tester) async {
+    await tester.pumpWidget(buildHarness());
+    expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('打开搜索框后获得焦点', (tester) async {
     await tester.pumpWidget(buildHarness());
     expect(focusNode.hasFocus, isFalse);
 
@@ -60,15 +65,15 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
   });
 
-  testWidgets('关闭后不会执行过期的焦点请求', (tester) async {
-    await tester.pumpWidget(buildHarness());
+  testWidgets('关闭后 TextField 从 tree 移除', (tester) async {
     visible.value = true;
-    await tester.pump();
+    await tester.pumpWidget(buildHarness());
+    await pumpFocusRequest(tester);
+    expect(find.byType(TextField), findsOneWidget);
+
     visible.value = false;
     await tester.pump();
-    await pumpFocusRequest(tester);
-
-    expect(focusNode.hasFocus, isFalse);
+    expect(find.byType(TextField), findsNothing);
   });
 
   testWidgets('异步父级重建期间焦点保持不变', (tester) async {
@@ -82,5 +87,18 @@ void main() {
     await tester.pump();
 
     expect(focusNode.hasFocus, isTrue);
+  });
+
+  testWidgets('输入文本后显示清除按钮', (tester) async {
+    visible.value = true;
+    await tester.pumpWidget(buildHarness());
+    await pumpFocusRequest(tester);
+
+    expect(find.byIcon(Icons.clear), findsNothing);
+
+    controller.text = 'test';
+    await tester.pump();
+
+    expect(find.byIcon(Icons.clear), findsOneWidget);
   });
 }

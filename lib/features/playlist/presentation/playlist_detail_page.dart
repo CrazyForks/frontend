@@ -104,6 +104,12 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
   void _onSearchChanged(String value) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      // IME 组合进行中时不发起搜索，避免 rebuild 打断 Windows 输入法状态。
+      final composing = _searchController.value.composing;
+      if (composing.isValid && !composing.isCollapsed) {
+        _onSearchChanged(_searchController.text);
+        return;
+      }
       ref.read(playlistSongsProvider(_playlistIdInt).notifier).search(value);
     });
   }
