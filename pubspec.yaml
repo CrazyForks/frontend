@@ -166,6 +166,8 @@ flutter:
     # 因此离线设备上也能看到完整许可全文，不依赖外链。
     - LICENSES/GPL-3.0.txt
     - NOTICE
+    - assets/legal/TERMS.md
+    - assets/legal/TERMS.en.md
   fonts:
     - family: NotoSansSC
       fonts:

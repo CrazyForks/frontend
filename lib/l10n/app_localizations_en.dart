@@ -1343,6 +1343,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authUseLocalMode => 'Use local mode';
 
   @override
+  String get authAgreePrefix => 'I have read and agree to the ';
+
+  @override
+  String get authTermsAndPrivacy => 'Terms of Service & Privacy Policy';
+
+  @override
+  String get authPleaseAgreeTerms =>
+      'Please read and agree to the Terms & Privacy Policy first';
+
+  @override
+  String get authTermsTitle => 'Terms of Service & Privacy Policy';
+
+  @override
   String authCopyright(int year) {
     return '© $year Songloft';
   }

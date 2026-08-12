@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
@@ -36,6 +38,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _apiUrlController = TextEditingController();
 
   bool _obscurePassword = true;
+  bool _agreedToTerms = false;
   bool _isLocalModeBootstrapping = false;
   String _localModeHint = '';
 
@@ -50,10 +53,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
     _loadSavedCredentials();
 
-    // 本地模式下自动登录（token 过期回到登录页时，无需用户手动操作）
-    if (_showLocalMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _tryAutoLoginLocal());
-    }
+    // 本地模式下自动登录已移至协议勾选后触发（_onAgreementChanged）
   }
 
   Future<void> _loadSavedApiUrl() async {
@@ -220,7 +220,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             // API 地址输入框 — 嵌入模式下隐藏，独立部署时显示
                             if (!AppConfig.isEmbedded)
                               _buildApiUrlField(colorScheme),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 16),
+
+                            // 同意协议勾选
+                            _buildAgreementCheckbox(colorScheme),
+                            const SizedBox(height: 16),
 
                             // 登录按钮
                             _buildLoginButton(authState, colorScheme),
@@ -408,9 +412,116 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
+  void _onAgreementChanged(bool value) {
+    setState(() => _agreedToTerms = value);
+    if (value && _showLocalMode) {
+      final runMode = ref.read(runModeProvider);
+      if (runMode == RunMode.local) {
+        _tryAutoLoginLocal();
+      }
+    }
+  }
+
+  Widget _buildAgreementCheckbox(ColorScheme colorScheme) {
+    final l10n = AppLocalizations.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: _agreedToTerms,
+            onChanged: (value) => _onAgreementChanged(value ?? false),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _showTermsDialog(),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: l10n.authAgreePrefix,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  TextSpan(
+                    text: l10n.authTermsAndPrivacy,
+                    style: TextStyle(fontSize: 13, color: colorScheme.primary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showTermsDialog() async {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context);
+    final assetPath =
+        locale.languageCode == 'zh'
+            ? 'assets/legal/TERMS.md'
+            : 'assets/legal/TERMS.en.md';
+
+    final content = await rootBundle.loadString(assetPath);
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 40,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 8, 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.authTermsTitle,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                  Flexible(
+                    child: Markdown(
+                      data: content,
+                      padding: const EdgeInsets.all(24),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
   Widget _buildLoginButton(AuthState authState, ColorScheme colorScheme) {
+    final disabled = authState.isLoading || !_agreedToTerms;
     return FilledButton(
-      onPressed: authState.isLoading ? null : _handleLogin,
+      onPressed: disabled ? null : _handleLogin,
       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       child:
           authState.isLoading
@@ -504,10 +615,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Widget _buildLocalModeButton(ColorScheme colorScheme) {
+    final disabled = _isLocalModeBootstrapping || !_agreedToTerms;
     return Column(
       children: [
         OutlinedButton.icon(
-          onPressed: _isLocalModeBootstrapping ? null : _handleLocalMode,
+          onPressed: disabled ? null : _handleLocalMode,
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
           ),

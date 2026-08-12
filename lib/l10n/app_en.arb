@@ -729,6 +729,10 @@
   "authServer": "Server",
   "authTvPressToLogin": "Press OK to log in",
   "authUseLocalMode": "Use local mode",
+  "authAgreePrefix": "I have read and agree to the ",
+  "authTermsAndPrivacy": "Terms of Service & Privacy Policy",
+  "authPleaseAgreeTerms": "Please read and agree to the Terms & Privacy Policy first",
+  "authTermsTitle": "Terms of Service & Privacy Policy",
   "authCopyright": "© {year} Songloft",
   "@authCopyright": {
     "placeholders": {

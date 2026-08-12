@@ -1309,6 +1309,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authUseLocalMode => '使用本地模式';
 
   @override
+  String get authAgreePrefix => '我已阅读并同意';
+
+  @override
+  String get authTermsAndPrivacy => '《用户协议与隐私政策》';
+
+  @override
+  String get authPleaseAgreeTerms => '请先阅读并同意用户协议与隐私政策';
+
+  @override
+  String get authTermsTitle => '用户协议与隐私政策';
+
+  @override
   String authCopyright(int year) {
     return '© $year Songloft';
   }

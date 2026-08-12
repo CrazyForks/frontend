@@ -2450,6 +2450,30 @@ abstract class AppLocalizations {
   /// **'使用本地模式'**
   String get authUseLocalMode;
 
+  /// No description provided for @authAgreePrefix.
+  ///
+  /// In zh, this message translates to:
+  /// **'我已阅读并同意'**
+  String get authAgreePrefix;
+
+  /// No description provided for @authTermsAndPrivacy.
+  ///
+  /// In zh, this message translates to:
+  /// **'《用户协议与隐私政策》'**
+  String get authTermsAndPrivacy;
+
+  /// No description provided for @authPleaseAgreeTerms.
+  ///
+  /// In zh, this message translates to:
+  /// **'请先阅读并同意用户协议与隐私政策'**
+  String get authPleaseAgreeTerms;
+
+  /// No description provided for @authTermsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户协议与隐私政策'**
+  String get authTermsTitle;
+
   /// No description provided for @authCopyright.
   ///
   /// In zh, this message translates to:

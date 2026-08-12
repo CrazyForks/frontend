@@ -834,6 +834,10 @@
   "authServer": "服务器",
   "authTvPressToLogin": "按确认键登录",
   "authUseLocalMode": "使用本地模式",
+  "authAgreePrefix": "我已阅读并同意",
+  "authTermsAndPrivacy": "《用户协议与隐私政策》",
+  "authPleaseAgreeTerms": "请先阅读并同意用户协议与隐私政策",
+  "authTermsTitle": "用户协议与隐私政策",
   "authCopyright": "© {year} Songloft",
   "@authCopyright": {
     "placeholders": {
