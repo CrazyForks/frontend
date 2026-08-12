@@ -1858,10 +1858,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   Future<bool> _getVolumeNormalizeEnabled() async {
     final current = ref.read(volumeNormalizeProvider).value;
-    if (current != null) return current;
+    if (current != null) return current.enabled;
 
     try {
-      return await ref.read(volumeNormalizeProvider.future);
+      return (await ref.read(volumeNormalizeProvider.future)).enabled;
     } catch (e) {
       debugPrint(
         '[Player] Failed to load volume normalize setting, using false: $e',

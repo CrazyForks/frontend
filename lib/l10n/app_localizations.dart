@@ -6403,6 +6403,30 @@ abstract class AppLocalizations {
   /// **'已关闭音量均衡'**
   String get settingsVolumeNormalizeDisabled;
 
+  /// No description provided for @settingsVolumeNormalizeLoudnessTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'目标响度 (LUFS)'**
+  String get settingsVolumeNormalizeLoudnessTitle;
+
+  /// No description provided for @settingsVolumeNormalizeLoudnessSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义 EBU R128 目标响度，默认 -16。流媒体常用 -14，广播 -23。范围 -40 ~ -5'**
+  String get settingsVolumeNormalizeLoudnessSubtitle;
+
+  /// No description provided for @settingsVolumeNormalizeLoudnessInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入 -40 ~ -5 之间的数值'**
+  String get settingsVolumeNormalizeLoudnessInvalid;
+
+  /// No description provided for @settingsVolumeNormalizeLoudnessSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'目标响度已设为 {value} LUFS'**
+  String settingsVolumeNormalizeLoudnessSaved(String value);
+
   /// No description provided for @settingsProxyAllowlistTitle.
   ///
   /// In zh, this message translates to:
@@ -6454,7 +6478,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsInsecureTlsSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'连接使用自签或无效 HTTPS 证书的服务器时开启。同时对接口请求和音频播放生效'**
+  /// **'���接使用自签或无效 HTTPS 证书的服务器时开启。同时对接口请求和音频播放生效'**
   String get settingsInsecureTlsSubtitle;
 
   /// No description provided for @settingsInsecureTlsEnabled.

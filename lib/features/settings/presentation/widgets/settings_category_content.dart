@@ -1272,38 +1272,140 @@ class _SettingsCategoryContentState
   Widget _buildVolumeNormalizeTile() {
     final l10n = AppLocalizations.of(context);
     final enabledAsync = ref.watch(volumeNormalizeProvider);
-    final enabled = enabledAsync.value ?? false;
+    final setting = enabledAsync.value;
+    final enabled = setting?.enabled ?? false;
 
-    return SwitchListTile(
-      secondary: const Icon(Icons.graphic_eq_outlined),
-      title: Text(l10n.settingsVolumeNormalizeTitle),
-      subtitle: Text(l10n.settingsVolumeNormalizeSubtitle),
-      value: enabled,
-      onChanged:
-          enabledAsync.isLoading
-              ? null
-              : (value) async {
-                try {
-                  await ref
-                      .read(volumeNormalizeProvider.notifier)
-                      .setValue(value);
-                  if (!mounted) return;
-                  ResponsiveSnackBar.show(
-                    context,
-                    message:
-                        value
-                            ? l10n.settingsVolumeNormalizeEnabled
-                            : l10n.settingsVolumeNormalizeDisabled,
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  ResponsiveSnackBar.showError(
-                    context,
-                    message: l10n.settingsSaveFailed(e.toString()),
-                  );
-                }
-              },
+    return Column(
+      children: [
+        SwitchListTile(
+          secondary: const Icon(Icons.graphic_eq_outlined),
+          title: Text(l10n.settingsVolumeNormalizeTitle),
+          subtitle: Text(l10n.settingsVolumeNormalizeSubtitle),
+          value: enabled,
+          onChanged:
+              enabledAsync.isLoading
+                  ? null
+                  : (value) async {
+                    try {
+                      await ref
+                          .read(volumeNormalizeProvider.notifier)
+                          .setEnabled(value);
+                      if (!mounted) return;
+                      ResponsiveSnackBar.show(
+                        context,
+                        message:
+                            value
+                                ? l10n.settingsVolumeNormalizeEnabled
+                                : l10n.settingsVolumeNormalizeDisabled,
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ResponsiveSnackBar.showError(
+                        context,
+                        message: l10n.settingsSaveFailed(e.toString()),
+                      );
+                    }
+                  },
+        ),
+        // 开启时展开目标响度（LUFS）编辑项；关闭时隐藏。
+        if (enabled)
+          ListTile(
+            enabled: !enabledAsync.isLoading,
+            leading: const Icon(Icons.tune_outlined),
+            title: Text(l10n.settingsVolumeNormalizeLoudnessTitle),
+            subtitle: Text(l10n.settingsVolumeNormalizeLoudnessSubtitle),
+            trailing: Text(
+              setting == null ? '-16' : setting.loudness.toStringAsFixed(1),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            onTap:
+                enabledAsync.isLoading
+                    ? null
+                    : () =>
+                        _editVolumeNormalizeLoudness(setting?.loudness ?? -16),
+          ),
+      ],
     );
+  }
+
+  /// 弹出对话框编辑目标响度（LUFS）。校验范围 [-40, -5]，非法值提示。
+  Future<void> _editVolumeNormalizeLoudness(double current) async {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController(text: current.toStringAsFixed(1));
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) {
+        String? errorText;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            Future<void> submit() async {
+              final v = double.tryParse(controller.text.trim());
+              if (v == null) {
+                setState(
+                  () => errorText = l10n.settingsVolumeNormalizeLoudnessInvalid,
+                );
+                return;
+              }
+              if (v < -40 || v > -5) {
+                setState(
+                  () => errorText = l10n.settingsVolumeNormalizeLoudnessInvalid,
+                );
+                return;
+              }
+              if (!context.mounted) return;
+              Navigator.of(context).pop(v);
+            }
+
+            return AlertDialog(
+              title: Text(l10n.settingsVolumeNormalizeLoudnessTitle),
+              content: TextField(
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                decoration: InputDecoration(
+                  hintText: '-16',
+                  helperText: 'LUFS',
+                  errorText: errorText,
+                ),
+                autofocus: true,
+                onSubmitted: (_) => submit(),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    MaterialLocalizations.of(context).cancelButtonLabel,
+                  ),
+                ),
+                TextButton(onPressed: submit, child: Text(l10n.settingsSave)),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+
+    if (result == null) return;
+    try {
+      await ref.read(volumeNormalizeProvider.notifier).setLoudness(result);
+      if (!mounted) return;
+      ResponsiveSnackBar.show(
+        context,
+        message: l10n.settingsVolumeNormalizeLoudnessSaved(
+          result.toStringAsFixed(1),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ResponsiveSnackBar.showError(
+        context,
+        message: l10n.settingsSaveFailed(e.toString()),
+      );
+    }
   }
 
   Widget _buildHlsProxyTile() {

@@ -2326,6 +2326,17 @@
   "settingsVolumeNormalizeSubtitle": "启用 EBU R128 响度均衡，消除不同音源之间的音量差异。需要 ffmpeg，会增加 CPU 和首次播放延迟",
   "settingsVolumeNormalizeEnabled": "已开启音量均衡",
   "settingsVolumeNormalizeDisabled": "已关闭音量均衡",
+  "settingsVolumeNormalizeLoudnessTitle": "目标响度 (LUFS)",
+  "settingsVolumeNormalizeLoudnessSubtitle": "自定义 EBU R128 目标响度，默认 -16。流媒体常用 -14，广播 -23。范围 -40 ~ -5",
+  "settingsVolumeNormalizeLoudnessInvalid": "请输入 -40 ~ -5 之间的数值",
+  "settingsVolumeNormalizeLoudnessSaved": "目标响度已设为 {value} LUFS",
+  "@settingsVolumeNormalizeLoudnessSaved": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "settingsProxyAllowlistTitle": "私网代理白名单",
   "settingsProxyAllowlistEmpty": "未配置（私网地址一律拒绝）",
   "settingsProxyAllowlistCount": "已允许 {count} 个地址/网段",
@@ -2341,7 +2352,7 @@
   "settingsProxyAllowlistHelper": "每行填一个单 IP（如 192.168.1.100）或 CIDR 网段（如 192.168.1.0/24）。仅影响通用资源代理，不影响其他功能。",
   "settingsProxyAllowlistSaved": "已保存私网代理白名单",
   "settingsInsecureTlsTitle": "忽略 SSL 证书校验",
-  "settingsInsecureTlsSubtitle": "连接使用自签或无效 HTTPS 证书的服务器时开启。同时对接口请求和音频播放生效",
+  "settingsInsecureTlsSubtitle": "���接使用自签或无效 HTTPS 证书的服务器时开启。同时对接口请求和音频播放生效",
   "settingsInsecureTlsEnabled": "已开启忽略证书校验",
   "settingsInsecureTlsDisabled": "已关闭忽略证书校验",
   "settingsInsecureTlsWarnTitle": "降低安全性",

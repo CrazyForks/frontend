@@ -611,26 +611,51 @@ final hlsProxyEnabledProvider =
 // 音量均衡 Provider
 // ============================================================================
 
-/// EBU R128 音量均衡开关。
+/// EBU R128 音量均衡配置（开关 + 目标响度）。
 /// 启用后服务端对不含显式 normalize 参数的播放请求自动执行 loudnorm 滤镜，
 /// 消除不同音源之间的响度落差。需要 ffmpeg，会增加 CPU 和首次播放延迟。
+/// 目标响度（LUFS）默认 -16，用户可自定义（-40 ~ -5，songloft-org/songloft-player#38）。
 /// 业务端点：GET/PUT /api/v1/settings/volume-normalize
-class VolumeNormalizeNotifier extends AsyncNotifier<bool> {
+class VolumeNormalizeNotifier extends AsyncNotifier<VolumeNormalizeSetting> {
   @override
-  Future<bool> build() async {
+  Future<VolumeNormalizeSetting> build() async {
     final api = ref.watch(settingsApiProvider);
     try {
-      return await api.getVolumeNormalizeEnabled();
+      return await api.getVolumeNormalize();
     } catch (_) {
-      return false;
+      return const VolumeNormalizeSetting(enabled: false);
     }
   }
 
-  Future<void> setValue(bool value) async {
-    state = AsyncValue.data(value);
+  /// 切换开关，响度保持当前值不变。
+  Future<void> setEnabled(bool value) async {
+    final current = state.value ?? const VolumeNormalizeSetting(enabled: false);
+    state = AsyncValue.data(current.copyWith(enabled: value));
     try {
       final api = ref.read(settingsApiProvider);
-      await api.setVolumeNormalizeEnabled(value);
+      final updated = await api.setVolumeNormalize(
+        VolumeNormalizeSetting(enabled: value, loudness: current.loudness),
+      );
+      state = AsyncValue.data(updated);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// 设置目标响度（LUFS），开关保持当前值。前端先校验 [-40, -5]，越界抛错。
+  Future<void> setLoudness(double value) async {
+    if (value < -40 || value > -5) {
+      throw ArgumentError('loudness $value 越界，需在 -40 ~ -5 LUFS');
+    }
+    final current = state.value ?? const VolumeNormalizeSetting(enabled: false);
+    state = AsyncValue.data(current.copyWith(loudness: value));
+    try {
+      final api = ref.read(settingsApiProvider);
+      final updated = await api.setVolumeNormalize(
+        VolumeNormalizeSetting(enabled: current.enabled, loudness: value),
+      );
+      state = AsyncValue.data(updated);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;
@@ -638,9 +663,9 @@ class VolumeNormalizeNotifier extends AsyncNotifier<bool> {
   }
 }
 
-/// 音量均衡开关 Provider
+/// 音量均衡配置 Provider
 final volumeNormalizeProvider =
-    AsyncNotifierProvider<VolumeNormalizeNotifier, bool>(
+    AsyncNotifierProvider<VolumeNormalizeNotifier, VolumeNormalizeSetting>(
       VolumeNormalizeNotifier.new,
     );
 

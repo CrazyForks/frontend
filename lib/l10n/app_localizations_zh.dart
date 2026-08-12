@@ -3537,6 +3537,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsVolumeNormalizeDisabled => '已关闭音量均衡';
 
   @override
+  String get settingsVolumeNormalizeLoudnessTitle => '目标响度 (LUFS)';
+
+  @override
+  String get settingsVolumeNormalizeLoudnessSubtitle =>
+      '自定义 EBU R128 目标响度，默认 -16。流媒体常用 -14，广播 -23。范围 -40 ~ -5';
+
+  @override
+  String get settingsVolumeNormalizeLoudnessInvalid => '请输入 -40 ~ -5 之间的数值';
+
+  @override
+  String settingsVolumeNormalizeLoudnessSaved(String value) {
+    return '目标响度已设为 $value LUFS';
+  }
+
+  @override
   String get settingsProxyAllowlistTitle => '私网代理白名单';
 
   @override
@@ -3566,7 +3581,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsInsecureTlsSubtitle =>
-      '连接使用自签或无效 HTTPS 证书的服务器时开启。同时对接口请求和音频播放生效';
+      '���接使用自签或无效 HTTPS 证书的服务器时开启。同时对接口请求和音频播放生效';
 
   @override
   String get settingsInsecureTlsEnabled => '已开启忽略证书校验';

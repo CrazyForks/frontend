@@ -3696,6 +3696,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsVolumeNormalizeDisabled => 'Volume normalization disabled';
 
   @override
+  String get settingsVolumeNormalizeLoudnessTitle => 'Target loudness (LUFS)';
+
+  @override
+  String get settingsVolumeNormalizeLoudnessSubtitle =>
+      'Customize the EBU R128 target loudness, default -16. Streaming often uses -14, broadcast -23. Range -40 to -5';
+
+  @override
+  String get settingsVolumeNormalizeLoudnessInvalid =>
+      'Please enter a value between -40 and -5';
+
+  @override
+  String settingsVolumeNormalizeLoudnessSaved(String value) {
+    return 'Target loudness set to $value LUFS';
+  }
+
+  @override
   String get settingsProxyAllowlistTitle => 'Private network proxy allowlist';
 
   @override

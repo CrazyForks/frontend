@@ -364,6 +364,33 @@ class UserPreferences {
   }
 }
 
+/// 音量均衡配置（GET/PUT /settings/volume-normalize）
+///
+/// [loudness] 为目标响度（LUFS）：GET 恒返回当前值；PUT 时为 null 表示只切换开关、
+/// 不改动响度配置（向后兼容旧前端只发 {enabled}）。默认 -16，合法范围 -40 ~ -5。
+class VolumeNormalizeSetting {
+  final bool enabled;
+  final double loudness;
+
+  const VolumeNormalizeSetting({required this.enabled, this.loudness = -16});
+
+  factory VolumeNormalizeSetting.fromJson(Map<String, dynamic> json) {
+    return VolumeNormalizeSetting(
+      enabled: json['enabled'] as bool? ?? false,
+      loudness: (json['loudness'] as num?)?.toDouble() ?? -16,
+    );
+  }
+
+  /// PUT 请求体：前端始终带 loudness（后端也会在缺省时保持既有响度，双保险）。
+  Map<String, dynamic> toJson() => {'enabled': enabled, 'loudness': loudness};
+
+  VolumeNormalizeSetting copyWith({bool? enabled, double? loudness}) =>
+      VolumeNormalizeSetting(
+        enabled: enabled ?? this.enabled,
+        loudness: loudness ?? this.loudness,
+      );
+}
+
 /// 业务化设置 API 集合（/api/v1/settings/*）
 ///
 /// 用户可见的功能开关一律走这里；通用 KV 配置仍走 ConfigApi（admin 入口）。
@@ -402,27 +429,43 @@ class SettingsApi {
 
   // ---------- 音量均衡 ----------
 
-  Future<bool> getVolumeNormalizeEnabled() async {
+  /// 获取音量均衡配置：开关 + 目标响度（LUFS，默认 -16）。
+  /// 后端端点 GET /settings/volume-normalize，体 {enabled, loudness}。
+  Future<VolumeNormalizeSetting> getVolumeNormalize() async {
     try {
       final response = await dio.get(
         '${AppConfig.apiPrefix}/settings/volume-normalize',
       );
-      final data = response.data as Map<String, dynamic>;
-      return data['enabled'] as bool? ?? false;
+      return VolumeNormalizeSetting.fromJson(
+        response.data as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
   }
 
-  Future<void> setVolumeNormalizeEnabled(bool enabled) async {
+  /// 更新音量均衡配置。[loudness] 为 null 时只切换开关、不改动响度（向后兼容）。
+  Future<VolumeNormalizeSetting> setVolumeNormalize(
+    VolumeNormalizeSetting setting,
+  ) async {
     try {
-      await dio.put(
+      final response = await dio.put(
         '${AppConfig.apiPrefix}/settings/volume-normalize',
-        data: {'enabled': enabled},
+        data: setting.toJson(),
+      );
+      return VolumeNormalizeSetting.fromJson(
+        response.data as Map<String, dynamic>,
       );
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
+  }
+
+  Future<bool> getVolumeNormalizeEnabled() async =>
+      (await getVolumeNormalize()).enabled;
+
+  Future<void> setVolumeNormalizeEnabled(bool enabled) async {
+    await setVolumeNormalize(VolumeNormalizeSetting(enabled: enabled));
   }
 
   /// 获取私网代理白名单条目（单 IP 或 CIDR 网段字符串）。

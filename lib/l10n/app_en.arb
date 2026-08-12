@@ -2221,6 +2221,17 @@
   "settingsVolumeNormalizeSubtitle": "Enable EBU R128 loudness normalization to equalize volume across different audio sources. Requires ffmpeg; increases CPU usage and first-play latency",
   "settingsVolumeNormalizeEnabled": "Volume normalization enabled",
   "settingsVolumeNormalizeDisabled": "Volume normalization disabled",
+  "settingsVolumeNormalizeLoudnessTitle": "Target loudness (LUFS)",
+  "settingsVolumeNormalizeLoudnessSubtitle": "Customize the EBU R128 target loudness, default -16. Streaming often uses -14, broadcast -23. Range -40 to -5",
+  "settingsVolumeNormalizeLoudnessInvalid": "Please enter a value between -40 and -5",
+  "settingsVolumeNormalizeLoudnessSaved": "Target loudness set to {value} LUFS",
+  "@settingsVolumeNormalizeLoudnessSaved": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "settingsProxyAllowlistTitle": "Private network proxy allowlist",
   "settingsProxyAllowlistEmpty": "Not configured (private addresses are rejected)",
   "settingsProxyAllowlistCount": "{count} address(es)/range(s) allowed",
