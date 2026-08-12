@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart' show CupertinoTheme, CupertinoThemeData;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webf/webf.dart';
@@ -324,8 +325,15 @@ class _PluginRenderSurfaceWebFState
         _kRequestBackMethod,
         null,
       );
-      return _decodeBool(result);
-    } catch (_) {
+      final decoded = _decodeBool(result);
+      if (decoded) {
+        // webf 在 methodChannel 回调里改了 DOM、渲染树已脏，但没有任何
+        // 指针事件/动画去 scheduleFrame，Flutter 不会发起新帧→画面冻结
+        // （「逻辑消费成功、截图逐字节不变」）。这里主动请求一帧让脏树重绘。
+        SchedulerBinding.instance.scheduleFrame();
+      }
+      return decoded;
+    } catch (e) {
       // 页面没注册 handler（老插件 / common.js 未更新）或调用超时：
       // 当作「没消费」，由宿主退出路由，不能把返回键卡死。
       return false;

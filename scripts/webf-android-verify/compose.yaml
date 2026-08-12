@@ -7,6 +7,19 @@ services:
       dockerfile: scripts/webf-android-verify/Dockerfile.apk-builder
     volumes:
       - ./out:/out
+      # 持久化构建缓存：`--rm` 容器原本每次都重装 NDK/CMake、重下 gradle 依赖、
+      # 重新解析 pub 包（单次 ~30min）。挂这三个命名卷后只有首次真正下载，
+      # 后续重建命中缓存、只做增量编译（~数分钟）。
+      - gradle-cache:/root/.gradle
+      - android-sdk:/opt/android-sdk
+      - pub-cache:/root/.pub-cache
+      # 把宿主源码以卷形式挂进 /workspace，覆盖镜像里 `COPY . /workspace` 的快照——
+      # 这样改 host 代码不再需要 `docker compose build` 重建镜像（镜像重建会重跑
+      # `flutter pub get` 全量下包、~15min 且无缓存）。`.dart_tool` 单独挂卷，避免
+      # 容器内 pub get 写脏宿主仓库，且跨次复用。
+      - ../..:/workspace
+      - dart-tool:/workspace/.dart_tool
+      - build-dir:/workspace/build
     environment:
       FRONTEND_VERSION: webf-android-test
       FLUTTER_BINDING: "3.44.6"
@@ -40,3 +53,10 @@ services:
       SERVER_HOST: host.docker.internal
       SERVER_PORT: ${SERVER_PORT:-58192}
       APP_PACKAGE: com.songloft.songloft_flutter
+
+volumes:
+  gradle-cache:
+  android-sdk:
+  pub-cache:
+  dart-tool:
+  build-dir:

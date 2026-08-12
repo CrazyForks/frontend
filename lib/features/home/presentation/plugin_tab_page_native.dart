@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/app_config.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../settings/presentation/providers/settings_provider.dart';
+import 'plugin_tab_back_registry.dart';
 import 'plugin_theme_utils.dart';
 import 'render/plugin_render_controller.dart';
 import 'render/plugin_render_engine_provider.dart';
@@ -42,6 +42,13 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
     }
   }
 
+  @override
+  void dispose() {
+    // 注销返回处理，避免路由层 PopScope 回调打到已销毁的渲染面上。
+    PluginTabBackRegistry.unregister(widget.entryPath);
+    super.dispose();
+  }
+
   String _buildPluginUrl(String theme) {
     final token = SecureStorageService.cachedAccessToken ?? '';
     final uri = Uri.parse(
@@ -70,36 +77,31 @@ class _PluginTabPageState extends ConsumerState<PluginTabPage> {
     // 先按默认 WebView 渲染再切 WebF 会让整页加载两次。理由见 provider 注释。
     final engine = ref.watch(pluginRenderEngineForProvider(widget.entryPath));
 
-    // 接管 Android 硬件返回键：优先让页面内部后退，无更多历史时再退出应用
-    // （songloft-org/songloft#273）。前提是 shell 子 Navigator 保持挂载，
-    // 返回键才能分发到本页 PopScope——保活逻辑见 shell_layout.dart。
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (await (_renderController?.goBackIfPossible() ??
-            Future.value(false))) {
-          return;
-        }
-        await SystemNavigator.pop();
-      },
-      child: SafeArea(
-        bottom: false,
-        child:
-            engine == null
-                ? const Center(child: CircularProgressIndicator())
-                : PluginRenderView(
-                  url: _buildPluginUrl(theme),
-                  theme: theme,
-                  engine: engine,
-                  // Tab 靠 shell 层 Offstage 保活，Hybrid Composition 下反复切换
-                  // 会让 overlay 重建异常、把底部 NavigationBar 抹成黑块，故用
-                  // Virtual Display（songloft-org/songloft#273）。
-                  useHybridComposition: false,
-                  onControllerReady:
-                      (controller) => _renderController = controller,
-                ),
-      ),
+    // 返回键接管在路由层 `/plugin-tab` 页的 PopScope 里（经
+    // [PluginTabBackRegistry] 调到本页的 `_renderController.goBackIfPossible`）：
+    // 本页真实内容由 ShellLayout 用 Offstage 保活、不在路由页树内，本页挂的
+    // PopScope 不会被 go_router 咨询，故改由路由页统一处理。
+    return SafeArea(
+      bottom: false,
+      child:
+          engine == null
+              ? const Center(child: CircularProgressIndicator())
+              : PluginRenderView(
+                url: _buildPluginUrl(theme),
+                theme: theme,
+                engine: engine,
+                // Tab 靠 shell 层 Offstage 保活，Hybrid Composition 下反复切换
+                // 会让 overlay 重建异常、把底部 NavigationBar 抹成黑块，故用
+                // Virtual Display（songloft-org/songloft#273）。
+                useHybridComposition: false,
+                onControllerReady: (controller) {
+                  _renderController = controller;
+                  PluginTabBackRegistry.register(widget.entryPath, () {
+                    return _renderController?.goBackIfPossible() ??
+                        Future.value(false);
+                  });
+                },
+              ),
     );
   }
 }

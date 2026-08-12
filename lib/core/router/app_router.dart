@@ -8,6 +8,7 @@ import '../../features/auth/presentation/providers/auth_provider.dart';
 
 import '../../features/home/presentation/home_page.dart';
 import '../../features/home/presentation/plugin_webview_page.dart';
+import '../../features/home/presentation/plugin_tab_back_registry.dart';
 import '../../features/library/presentation/library_page.dart';
 import '../../features/library/presentation/category_songs_page.dart';
 import '../../features/playlist/presentation/playlist_detail_page.dart';
@@ -330,9 +331,32 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.pluginTab,
             pageBuilder: (context, state) {
               final entryPath = state.pathParameters['entryPath'] ?? '';
+              // canPop:false 让嵌套 navigator 的 maybePop 返回 false，从而进入下面的
+              // onExit 兜底——由它经 PluginTabBackRegistry 调插件 consumeBack：
+              // 有浮层/编辑器就收起（onExit 返回 false=阻止退出，留页），没有就
+              // context.go(home) 退回首页 tab（而非退出 App）。
+              // 直接 canPop:true 的话 maybePop 会弹出这个占位路由→直接回 Library，
+              // 绕过插件内部返回。
               return NoTransitionPage(
                 key: ValueKey('plugin-tab-$entryPath'),
-                child: const SizedBox.shrink(),
+                child: PopScope(
+                  canPop: false,
+                  // 返回键由路由页的 PopScope 统一接管（canPop:false 阻止系统弹栈，
+                  // onPopInvokedWithResult 在每次返回时触发）：有浮层/编辑器/非 main
+                  // 页就调插件 consumeBack 收起并吞掉这次返回；否则退回首页 tab。
+                  // 之前只挂 onExit 时，go_router 在 webf 覆盖层打开时不咨询 onExit，
+                  // 导致「打开设备选择器后返回键直接吞掉、不收起」；PopScope 的
+                  // onPopInvokedWithResult 是 Flutter 层回调，对每次系统返回都稳定触发。
+                  onPopInvokedWithResult: (didPop, result) async {
+                    if (didPop) return;
+                    final consumed =
+                        await PluginTabBackRegistry.handleBack(entryPath);
+                    if (!consumed && context.mounted) {
+                      context.go(AppRoutes.home);
+                    }
+                  },
+                  child: const SizedBox.shrink(),
+                ),
               );
             },
           ),
