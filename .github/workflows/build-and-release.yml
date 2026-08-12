@@ -506,6 +506,21 @@ jobs:
       - build-ios
     runs-on: ubuntu-latest
     steps:
+      - name: Check all builds succeeded (required for non-dev releases)
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          FAILED=""
+          if [[ "${{ needs.build-web.result }}" != "success" ]]; then FAILED="${FAILED} build-web(${{ needs.build-web.result }})"; fi
+          if [[ "${{ needs.build-linux.result }}" != "success" ]]; then FAILED="${FAILED} build-linux(${{ needs.build-linux.result }})"; fi
+          if [[ "${{ needs.build-windows.result }}" != "success" ]]; then FAILED="${FAILED} build-windows(${{ needs.build-windows.result }})"; fi
+          if [[ "${{ needs.build-macos.result }}" != "success" ]]; then FAILED="${FAILED} build-macos(${{ needs.build-macos.result }})"; fi
+          if [[ "${{ needs.build-android.result }}" != "success" ]]; then FAILED="${FAILED} build-android(${{ needs.build-android.result }})"; fi
+          if [[ "${{ needs.build-ios.result }}" != "success" ]]; then FAILED="${FAILED} build-ios(${{ needs.build-ios.result }})"; fi
+          if [[ -n "$FAILED" ]]; then
+            echo "::error::正式版 release 要求所有平台构建成功。失败的 job:${FAILED}"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # 获取完整历史以生成 changelog
