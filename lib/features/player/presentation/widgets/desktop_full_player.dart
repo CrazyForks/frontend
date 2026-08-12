@@ -126,16 +126,19 @@ class _DesktopFullPlayerState extends ConsumerState<DesktopFullPlayer>
           // 背景模糊封面 / 无封面时的动态渐变
           if (coverUrl != null)
             Positioned.fill(
-              child: ExcludeSemantics(
-                child: ImageFiltered(
-                  imageFilter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
-                  child: Image.network(
-                    UrlHelper.buildCoverUrl(coverUrl),
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (_, _, _) => Container(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                        ),
+              child: ClipRect(
+                child: ExcludeSemantics(
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
+                    child: Image.network(
+                      UrlHelper.buildCoverUrl(coverUrl),
+                      fit: BoxFit.cover,
+                      cacheWidth: 50,
+                      errorBuilder:
+                          (_, _, _) => Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                          ),
+                    ),
                   ),
                 ),
               ),
